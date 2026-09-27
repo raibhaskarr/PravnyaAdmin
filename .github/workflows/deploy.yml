@@ -1,0 +1,48 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Build backend
+        working-directory: backend
+        run: |
+          npm ci
+          npx prisma generate
+          npm run build
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_API_BASE_URL: ""
+
+      - name: Package deploy artifact
+        run: |
+          mkdir -p /tmp/artifact/backend /tmp/artifact/frontend
+          cp -r backend/dist backend/package.json backend/package-lock.json backend/prisma /tmp/artifact/backend/
+          cp -r frontend/dist /tmp/artifact/frontend/
+          tar czf /tmp/pravnyaadmin-deploy.tar.gz -C /tmp/artifact .
+
+      - name: Upload artifact and run deploy script
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          scp -i ~/.ssh/deploy_key /tmp/pravnyaadmin-deploy.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/pravnyaadmin-deploy.tar.gz"
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash /home/pravnix/apps/deploy-pravnyaadmin.sh"
