@@ -3,7 +3,7 @@ generator client {
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
-// DATABASE_URL includes `?schema=admin` — this backend's migrations only ever
+// DATABASE_URL includes `?schema=admin` -- this backend's migrations only ever
 // touch the `admin` schema inside the shared Pravnya database, kept separate
 // from the Pravnya client backend's `public` schema/migration history.
 datasource db {
@@ -11,7 +11,204 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Placeholder {
-  id        String   @id @default(uuid()) @db.Uuid
-  createdAt DateTime @default(now())
+enum UserRole {
+  SUPERADMIN
+  TENANT_ADMIN
+  THERAPIST
+  VIEWER
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SkillSource {
+  PROD
+  FRAMEWORK
+}
+
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  DISCONTINUED
+}
+
+enum Modality {
+  VERBAL
+  MANUAL_SIGN
+  AAC
+  WRITTEN
+  GESTURAL
+}
+
+enum KidStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// Single login table for every user in the system. SUPERADMIN rows have
+// tenantId = null; every other role is scoped to exactly one tenant. A
+// therapist working across multiple tenants is a known future case, not
+// modeled here.
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  tenantId     String?   @db.Uuid
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  therapist    Therapist?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+model Tenant {
+  id         String        @id @default(uuid()) @db.Uuid
+  name       String
+  slug       String        @unique
+  status     TenantStatus  @default(ACTIVE)
+  users      User[]
+  disciplines TenantDiscipline[]
+  therapists Therapist[]
+  kids       Kid[]
+  goals      Goal[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model CanonicalDomain {
+  id        String          @id @default(uuid()) @db.Uuid
+  key       String          @unique
+  name      String
+  sortOrder Int             @default(0)
+  skills    CanonicalSkill[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model CanonicalDiscipline {
+  id                String           @id @default(uuid()) @db.Uuid
+  key               String           @unique
+  name              String
+  defaultForSkills  CanonicalSkill[] @relation("DefaultDiscipline")
+  tenants           TenantDiscipline[]
+  goals             Goal[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model CanonicalSkill {
+  id                   String              @id @default(uuid()) @db.Uuid
+  domainId             String              @db.Uuid
+  domain               CanonicalDomain     @relation(fields: [domainId], references: [id], onDelete: Restrict)
+  key                  String              @unique
+  name                 String
+  description          String?
+  defaultDisciplineId  String?             @db.Uuid
+  defaultDiscipline    CanonicalDiscipline? @relation("DefaultDiscipline", fields: [defaultDisciplineId], references: [id], onDelete: SetNull)
+  supportsItems        Boolean             @default(false)
+  sourceTag            SkillSource         @default(FRAMEWORK)
+  items                CanonicalSkillItem[]
+  goals                Goal[]
+  createdAt            DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([domainId])
+}
+
+model CanonicalSkillItem {
+  id            String         @id @default(uuid()) @db.Uuid
+  skillId       String         @db.Uuid
+  skill         CanonicalSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  key           String
+  displayName   String
+  semanticGroup String         @default("OTHER")
+  aliases       Json?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([skillId, key])
+  @@index([skillId])
+}
+
+model TenantDiscipline {
+  id           String              @id @default(uuid()) @db.Uuid
+  tenantId     String              @db.Uuid
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  disciplineId String              @db.Uuid
+  discipline   CanonicalDiscipline @relation(fields: [disciplineId], references: [id], onDelete: Restrict)
+  createdAt    DateTime            @default(now())
+
+  @@unique([tenantId, disciplineId])
+  @@index([tenantId])
+}
+
+model Therapist {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId        String   @unique @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  disciplineIds String[] @default([])
+  kids          KidTherapist[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model Kid {
+  id         String      @id @default(uuid()) @db.Uuid
+  tenantId   String      @db.Uuid
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  firstName  String
+  lastName   String
+  dob        DateTime?
+  status     KidStatus   @default(ACTIVE)
+  therapists KidTherapist[]
+  goals      Goal[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([tenantId])
+}
+
+model KidTherapist {
+  id          String    @id @default(uuid()) @db.Uuid
+  kidId       String    @db.Uuid
+  kid         Kid       @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  therapistId String    @db.Uuid
+  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([kidId, therapistId])
+  @@index([therapistId])
+}
+
+model Goal {
+  id               String              @id @default(uuid()) @db.Uuid
+  tenantId         String              @db.Uuid
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId            String              @db.Uuid
+  kid              Kid                 @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  canonicalSkillId String              @db.Uuid
+  canonicalSkill   CanonicalSkill      @relation(fields: [canonicalSkillId], references: [id], onDelete: Restrict)
+  disciplineId     String              @db.Uuid
+  discipline       CanonicalDiscipline @relation(fields: [disciplineId], references: [id], onDelete: Restrict)
+  modality         Modality
+  title            String
+  status           GoalStatus          @default(ACTIVE)
+  notes            String?
+  createdById      String?             @db.Uuid
+  updatedById      String?             @db.Uuid
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([tenantId, kidId])
+  @@index([canonicalSkillId])
 }

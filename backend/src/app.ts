@@ -3,6 +3,14 @@ import express from "express";
 import helmet from "helmet";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
+import { errorMiddleware } from "./common/errors/errorMiddleware";
+import { authRoutes } from "./modules/auth/auth.routes";
+import { tenantsRoutes } from "./modules/tenants/tenants.routes";
+import { taxonomyRoutes } from "./modules/taxonomy/taxonomy.routes";
+import { tenantDisciplinesRoutes } from "./modules/tenant-disciplines/tenantDisciplines.routes";
+import { therapistsRoutes } from "./modules/therapists/therapists.routes";
+import { kidsRoutes } from "./modules/kids/kids.routes";
+import { goalsRoutes } from "./modules/goals/goals.routes";
 
 export function createApp() {
   const app = express();
@@ -22,6 +30,16 @@ export function createApp() {
       res.status(503).json({ ok: false, error: error instanceof Error ? error.message : "unknown error" });
     }
   });
+
+  app.use("/api/auth", authRoutes);
+  app.use("/api/tenants", tenantsRoutes);
+  app.use("/api/taxonomy", taxonomyRoutes);
+  app.use("/api/tenant-disciplines", tenantDisciplinesRoutes);
+  app.use("/api/therapists", therapistsRoutes);
+  app.use("/api/kids", kidsRoutes);
+  app.use("/api/goals", goalsRoutes);
+
+  app.use(errorMiddleware);
 
   return app;
 }
