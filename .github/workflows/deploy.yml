@@ -31,7 +31,7 @@ jobs:
       - name: Package deploy artifact
         run: |
           mkdir -p /tmp/artifact/backend /tmp/artifact/frontend
-          cp -r backend/dist backend/package.json backend/package-lock.json backend/prisma /tmp/artifact/backend/
+          cp -r backend/dist /tmp/artifact/backend/
           cp -r frontend/dist /tmp/artifact/frontend/
           tar czf /tmp/pravnyaadmin-deploy.tar.gz -C /tmp/artifact .
 
