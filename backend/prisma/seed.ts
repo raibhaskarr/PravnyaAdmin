@@ -58,7 +58,7 @@ const SKILLS: SkillSeed[] = [
   { domain: "RECEPTIVE_LANGUAGE", name: "Follows verbal directions (graded by step count)", discipline: "SLP", supportsItems: false, source: "PROD" },
   { domain: "RECEPTIVE_LANGUAGE", name: "Follows directions with spatial/preposition concepts", discipline: "SLP", supportsItems: true, source: "PROD" },
   { domain: "RECEPTIVE_LANGUAGE", name: "Identifies objects by attribute", discipline: "SLP", supportsItems: true, source: "PROD" },
-  { domain: "RECEPTIVE_LANGUAGE", name: "Answers WH-questions (receptive/selection response)", discipline: "SLP", supportsItems: false, source: "PROD" },
+  { domain: "RECEPTIVE_LANGUAGE", name: "Answers WH-questions (receptive/selection response)", discipline: "SLP", supportsItems: true, source: "PROD" },
   { domain: "RECEPTIVE_LANGUAGE", name: "Identifies colors when named", discipline: "SLP", supportsItems: true, source: "FRAMEWORK" },
   { domain: "RECEPTIVE_LANGUAGE", name: "Understands quantity/size concepts", discipline: "SLP", supportsItems: true, source: "FRAMEWORK" },
   { domain: "RECEPTIVE_LANGUAGE", name: "Understands negation", discipline: "SLP", supportsItems: false, source: "FRAMEWORK" },
@@ -260,6 +260,10 @@ const ITEM_BANKS: Record<string, Array<{ group: string; items: string[] }>> = {
   "Understands quantity/size concepts": [{ group: "OTHER", items: ["More/Less", "Big/Bigger/Biggest", "Small/Smaller/Smallest", "All/None", "Some", "Empty/Full", "One/Many"] }],
   "Understands basic possessive pronouns": [{ group: "OTHER", items: ["His", "Her", "My", "Your", "Their", "Our"] }],
   "Identifies emotions from facial expression/context": [{ group: "OTHER", items: ["Happy", "Sad", "Angry", "Scared", "Surprised", "Excited", "Tired", "Confused"] }],
+  // Question-type categories only -- the actual question text/answer is inherently per-kid
+  // (their own family, school, routine), so it isn't pre-populated here, same as how the picture
+  // activity schedule skill's items are the child's own routine, generated per child.
+  "Answers WH-questions (receptive/selection response)": [{ group: "OTHER", items: ["Who", "What", "Where", "When", "Why"] }],
 
   "Requests desired items/actions/locations (mand)": [{ group: "OTHER", items: ["Water", "Snack", "Toy", "Break", "More", "Help", "Bathroom", "All done", "Open", "Turn on", "Turn off", "Go outside", "Juice", "Book"] }],
   "Answers personal/social questions": [{ group: "OTHER", items: ["Name", "Age", "School name", "Mother's name", "Father's name", "Siblings' names", "Address", "Favorite color", "Favorite food"] }],
