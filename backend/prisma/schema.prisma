@@ -1,0 +1,17 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+// DATABASE_URL includes `?schema=admin` — this backend's migrations only ever
+// touch the `admin` schema inside the shared Pravnya database, kept separate
+// from the Pravnya client backend's `public` schema/migration history.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Placeholder {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+}
