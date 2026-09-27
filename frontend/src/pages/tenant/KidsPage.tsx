@@ -43,58 +43,62 @@ export function KidsPage() {
 
       {canEdit ? (
         <>
-          <button type="button" onClick={() => setShowForm((v) => !v)}>
-            {showForm ? "Cancel" : "New kid"}
-          </button>
+          <div className="page-toolbar">
+            <button type="button" className="btn btn-secondary" onClick={() => setShowForm((v) => !v)}>
+              {showForm ? "Cancel" : "New kid"}
+            </button>
+          </div>
           {showForm ? (
-            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 360, marginTop: "1rem" }}>
-              <label>
-                First name
-                <input name="firstName" required style={{ display: "block", width: "100%" }} />
+            <form onSubmit={handleCreate} className="form-panel">
+              <label className="field">
+                <span className="field-label">First name</span>
+                <input className="input" name="firstName" required />
               </label>
-              <label>
-                Last name
-                <input name="lastName" required style={{ display: "block", width: "100%" }} />
+              <label className="field">
+                <span className="field-label">Last name</span>
+                <input className="input" name="lastName" required />
               </label>
-              <fieldset>
+              <fieldset className="form-group">
                 <legend>Assigned therapists</legend>
                 {therapists.map((t) => (
-                  <label key={t.id} style={{ display: "block" }}>
+                  <label key={t.id} className="checkbox-row">
                     <input type="checkbox" name={`therapist_${t.id}`} /> {t.name}
                   </label>
                 ))}
               </fieldset>
-              <button type="submit">Create kid</button>
+              <button type="submit" className="btn btn-primary">
+                Create kid
+              </button>
             </form>
           ) : null}
         </>
       ) : null}
 
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+      {error ? <p className="error-text">{error}</p> : null}
 
-      <table style={{ marginTop: "1.5rem", borderCollapse: "collapse", width: "100%" }}>
-        <thead>
-          <tr>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Therapists</th>
-          </tr>
-        </thead>
-        <tbody>
-          {kids.map((k) => (
-            <tr key={k.id}>
-              <td style={cellStyle}>
-                {k.firstName} {k.lastName}
-              </td>
-              <td style={cellStyle}>{k.status}</td>
-              <td style={cellStyle}>{k.therapists.map((t) => t.therapist.name).join(", ") || "—"}</td>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Therapists</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {kids.length === 0 ? <p style={{ color: "#888" }}>No kids visible to your account yet.</p> : null}
+          </thead>
+          <tbody>
+            {kids.map((k) => (
+              <tr key={k.id}>
+                <td>
+                  {k.firstName} {k.lastName}
+                </td>
+                <td>{k.status}</td>
+                <td>{k.therapists.map((t) => t.therapist.name).join(", ") || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {kids.length === 0 ? <p className="empty-state">No kids visible to your account yet.</p> : null}
+      </div>
     </div>
   );
 }
-
-const cellStyle = { border: "1px solid #ddd", padding: "0.5rem", textAlign: "left" as const };

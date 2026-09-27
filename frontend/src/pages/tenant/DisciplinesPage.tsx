@@ -29,19 +29,16 @@ export function DisciplinesPage() {
   return (
     <div>
       <h1>Disciplines offered</h1>
-      <ul style={{ listStyle: "none", padding: 0 }}>
+      <div className="card" style={{ maxWidth: 420 }}>
         {disciplines.map((d) => (
-          <li key={d.id} style={{ marginBottom: "0.5rem" }}>
-            <label>
-              <input type="checkbox" checked={d.enabled} disabled={!canEdit} onChange={() => toggle(d)} />
-              {" "}
-              {d.name}
-            </label>
-          </li>
+          <label key={d.id} className="checkbox-row">
+            <input type="checkbox" checked={d.enabled} disabled={!canEdit} onChange={() => toggle(d)} />
+            {d.name}
+          </label>
         ))}
-      </ul>
-      {!canEdit ? <p style={{ color: "#888" }}>Only a Tenant Admin can change offered disciplines.</p> : null}
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+      </div>
+      {!canEdit ? <p className="hint-text" style={{ marginTop: "0.75rem" }}>Only a Tenant Admin can change offered disciplines.</p> : null}
+      {error ? <p className="error-text">{error}</p> : null}
     </div>
   );
 }

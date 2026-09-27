@@ -26,22 +26,25 @@ export function LoginPage() {
   }
 
   return (
-    <main style={{ fontFamily: "sans-serif", maxWidth: 360, margin: "4rem auto" }}>
-      <h1>Pravnya Admin</h1>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        <label>
-          Email
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} style={{ display: "block", width: "100%" }} />
-        </label>
-        <label>
-          Password
-          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} style={{ display: "block", width: "100%" }} />
-        </label>
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Signing in..." : "Sign in"}
-        </button>
-        {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
-      </form>
+    <main className="login-page">
+      <div className="login-card">
+        <p className="login-brand">Pravnya Admin</p>
+        <p className="login-subtitle">Sign in to manage tenants and taxonomy.</p>
+        <form onSubmit={handleSubmit} className="login-form">
+          <label className="field">
+            <span className="field-label">Email</span>
+            <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Password</span>
+            <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? "Signing in..." : "Sign in"}
+          </button>
+          {error ? <p className="error-text">{error}</p> : null}
+        </form>
+      </div>
     </main>
   );
 }

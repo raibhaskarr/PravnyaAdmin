@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Tenant } from "../../api/types";
@@ -50,78 +50,84 @@ export function TenantsPage() {
   return (
     <div>
       <h1>Tenants</h1>
+
       {createdCreds ? (
-        <div style={{ background: "#eef", padding: "1rem", marginBottom: "1rem" }}>
+        <div className="callout">
           <p>
             Tenant admin created: <strong>{createdCreds.email}</strong>
           </p>
           <p>
             Temporary password (shown once): <code>{createdCreds.tempPassword}</code>
           </p>
-          <button type="button" onClick={() => setCreatedCreds(null)}>
+          <button type="button" className="btn btn-secondary" onClick={() => setCreatedCreds(null)}>
             Dismiss
           </button>
         </div>
       ) : null}
 
-      <button type="button" onClick={() => setShowForm((v) => !v)}>
-        {showForm ? "Cancel" : "New tenant"}
-      </button>
+      <div className="page-toolbar">
+        <button type="button" className="btn btn-secondary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? "Cancel" : "New tenant"}
+        </button>
+      </div>
 
       {showForm ? (
-        <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 360, marginTop: "1rem" }}>
-          <label>
-            Tenant name
-            <input name="name" required style={{ display: "block", width: "100%" }} />
+        <form onSubmit={handleCreate} className="form-panel">
+          <label className="field">
+            <span className="field-label">Tenant name</span>
+            <input className="input" name="name" required />
           </label>
-          <label>
-            Slug (lowercase, hyphens)
-            <input name="slug" required pattern="[a-z0-9-]+" style={{ display: "block", width: "100%" }} />
+          <label className="field">
+            <span className="field-label">Slug (lowercase, hyphens)</span>
+            <input className="input" name="slug" required pattern="[a-z0-9-]+" />
           </label>
-          <label>
-            First admin email
-            <input name="adminEmail" type="email" required style={{ display: "block", width: "100%" }} />
+          <label className="field">
+            <span className="field-label">First admin email</span>
+            <input className="input" name="adminEmail" type="email" required />
           </label>
-          <label>
-            First admin name
-            <input name="adminName" required style={{ display: "block", width: "100%" }} />
+          <label className="field">
+            <span className="field-label">First admin name</span>
+            <input className="input" name="adminName" required />
           </label>
-          <button type="submit">Create tenant</button>
+          <button type="submit" className="btn btn-primary">
+            Create tenant
+          </button>
         </form>
       ) : null}
 
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+      {error ? <p className="error-text">{error}</p> : null}
 
       {loading ? (
-        <p>Loading...</p>
+        <p className="empty-state">Loading...</p>
       ) : (
-        <table style={{ marginTop: "1.5rem", borderCollapse: "collapse", width: "100%" }}>
-          <thead>
-            <tr>
-              <th style={cellStyle}>Name</th>
-              <th style={cellStyle}>Slug</th>
-              <th style={cellStyle}>Status</th>
-              <th style={cellStyle}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {tenants.map((t) => (
-              <tr key={t.id}>
-                <td style={cellStyle}>{t.name}</td>
-                <td style={cellStyle}>{t.slug}</td>
-                <td style={cellStyle}>{t.status}</td>
-                <td style={cellStyle}>
-                  <button type="button" onClick={() => toggleStatus(t)}>
-                    {t.status === "ACTIVE" ? "Suspend" : "Reactivate"}
-                  </button>
-                </td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <th>Status</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tenants.map((t) => (
+                <tr key={t.id}>
+                  <td>{t.name}</td>
+                  <td>{t.slug}</td>
+                  <td>{t.status}</td>
+                  <td>
+                    <button type="button" className="btn btn-secondary" onClick={() => toggleStatus(t)}>
+                      {t.status === "ACTIVE" ? "Suspend" : "Reactivate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {tenants.length === 0 ? <p className="empty-state">No tenants yet.</p> : null}
+        </div>
       )}
     </div>
   );
 }
-
-const cellStyle: CSSProperties = { border: "1px solid #ddd", padding: "0.5rem", textAlign: "left" };

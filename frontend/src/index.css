@@ -1,4 +1,492 @@
+/* Design tokens. Deliberately light-only (no `color-scheme: light dark`) -- an internal admin
+   tool doesn't need a dark mode, and the previous bug (white text on white background) came from
+   declaring color-scheme without ever pairing it with actual dark-mode color values. */
+:root {
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #fafbfc;
+  --color-border: #e1e4e8;
+  --color-text: #1a1d23;
+  --color-text-secondary: #5b6270;
+  --color-text-faint: #8b929e;
+  --color-primary: #2f6f5a;
+  --color-primary-hover: #255a48;
+  --color-primary-soft: #eaf3ef;
+  --color-danger: #c0392b;
+  --color-danger-soft: #fbeceb;
+  --color-sidebar-bg: #1c2128;
+  --color-sidebar-text: #c9d1d9;
+  --color-sidebar-text-faint: #8b929e;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 32, 0.06);
+  --shadow-md: 0 8px 24px rgba(16, 24, 32, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  color-scheme: light dark;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0 0 1.25rem;
+}
+
+h2 {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.6rem;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+/* ---------- Buttons & inputs ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-text-faint);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.field-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.input,
+select.input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.input:disabled {
+  background: var(--color-surface-muted);
+  color: var(--color-text-faint);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--color-text);
+  padding: 0.2rem 0;
+}
+
+/* ---------- Login page ---------- */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+}
+
+.login-card {
+  width: 360px;
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 2.5rem;
+}
+
+.login-brand {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 0.15rem;
+}
+
+.login-subtitle {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 1.75rem;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-form .btn-primary {
+  margin-top: 0.35rem;
+  width: 100%;
+}
+
+/* ---------- App shell ---------- */
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--color-sidebar-bg);
+  color: var(--color-sidebar-text);
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-brand {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1rem;
+  margin: 0 0 0.2rem;
+}
+
+.sidebar-user {
+  font-size: 0.78rem;
+  color: var(--color-sidebar-text-faint);
+  margin: 0 0 2rem;
+}
+
+.sidebar-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sidebar-nav a {
+  display: block;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+
+.sidebar-nav a:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.sidebar-nav a.active {
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.sidebar .btn-secondary {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--color-sidebar-text);
+}
+
+.sidebar .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+.content {
+  flex: 1;
+  padding: 2rem 2.5rem;
+  max-width: 1150px;
+}
+
+.page-toolbar {
+  margin-bottom: 1.25rem;
+}
+
+/* ---------- Cards, callouts, tags ---------- */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.callout {
+  background: var(--color-primary-soft);
+  border: 1px solid #cfe4da;
+  color: var(--color-text);
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.1rem;
+  font-size: 0.9rem;
+}
+
+.callout code {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.error-text {
+  color: var(--color-danger);
+  font-size: 0.86rem;
+  margin: 0.5rem 0;
+}
+
+.empty-state {
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+  padding: 0.75rem 0;
+}
+
+.hint-text {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: 0.4rem;
+}
+
+.tag-prod {
+  background: #e3f4ec;
+  color: #1c6b4a;
+}
+
+.tag-framework {
+  background: #eef0f3;
+  color: var(--color-text-secondary);
+}
+
+/* ---------- Forms ---------- */
+
+.form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 420px;
+  margin: 1rem 0 1.5rem;
+  padding: 1.25rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+fieldset.form-group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.9rem 0.9rem;
+  margin: 0;
+}
+
+fieldset.form-group legend {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 0.35rem;
+}
+
+/* ---------- Tables ---------- */
+
+.table-wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted);
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-table td {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.88rem;
+  color: var(--color-text);
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover td {
+  background: var(--color-surface-muted);
+}
+
+/* ---------- Taxonomy three-pane browser ---------- */
+
+.taxonomy-columns {
+  display: flex;
+  gap: 1.75rem;
+  align-items: flex-start;
+}
+
+.taxonomy-col {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.taxonomy-col-domains {
+  width: 260px;
+  flex-shrink: 0;
+}
+
+.taxonomy-col-skills {
+  width: 320px;
+  flex-shrink: 0;
+}
+
+.taxonomy-col-items {
+  flex: 1;
+  min-width: 0;
+}
+
+.taxonomy-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.taxonomy-item-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.86rem;
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.taxonomy-item-btn:hover {
+  background: var(--color-surface-muted);
+}
+
+.taxonomy-item-btn.active {
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.item-group {
+  margin-bottom: 0.9rem;
+}
+
+.item-group-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.item-group-values {
+  font-size: 0.88rem;
+  color: var(--color-text);
+  line-height: 1.6;
 }

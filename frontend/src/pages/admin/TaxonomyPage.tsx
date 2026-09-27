@@ -27,75 +27,60 @@ export function TaxonomyPage() {
   return (
     <div>
       <h1>Canonical Taxonomy</h1>
-      <div style={{ display: "flex", gap: "2rem" }}>
-        <div style={{ width: 260 }}>
-          <h2 style={{ fontSize: "1rem" }}>Domains ({domains.length})</h2>
-          <ul style={{ listStyle: "none", padding: 0 }}>
+      <div className="taxonomy-columns">
+        <div className="taxonomy-col taxonomy-col-domains">
+          <h2>Domains ({domains.length})</h2>
+          <ul className="taxonomy-list">
             {domains.map((d) => (
               <li key={d.id}>
                 <button
                   type="button"
                   onClick={() => setSelectedDomainId(d.id)}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "0.35rem",
-                    fontWeight: d.id === selectedDomainId ? "bold" : "normal",
-                    background: d.id === selectedDomainId ? "#eef" : "transparent"
-                  }}
+                  className={`taxonomy-item-btn ${d.id === selectedDomainId ? "active" : ""}`}
                 >
-                  {d.name} {d._count ? `(${d._count.skills})` : ""}
+                  {d.name}
+                  {d._count ? ` (${d._count.skills})` : ""}
                 </button>
               </li>
             ))}
           </ul>
         </div>
 
-        <div style={{ width: 320 }}>
-          <h2 style={{ fontSize: "1rem" }}>Skills ({skills.length})</h2>
-          <ul style={{ listStyle: "none", padding: 0 }}>
+        <div className="taxonomy-col taxonomy-col-skills">
+          <h2>Skills ({skills.length})</h2>
+          <ul className="taxonomy-list">
             {skills.map((s) => (
               <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => api.getSkill(token!, s.id).then(setSelectedSkill)}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "0.35rem",
-                    fontWeight: s.id === selectedSkill?.id ? "bold" : "normal",
-                    background: s.id === selectedSkill?.id ? "#eef" : "transparent"
-                  }}
+                  className={`taxonomy-item-btn ${s.id === selectedSkill?.id ? "active" : ""}`}
                 >
                   {s.name}
-                  <span style={{ marginLeft: "0.4rem", fontSize: "0.75rem", color: s.sourceTag === "PROD" ? "#2a6" : "#999" }}>
-                    [{s.sourceTag}]
-                  </span>
+                  <span className={`tag ${s.sourceTag === "PROD" ? "tag-prod" : "tag-framework"}`}>{s.sourceTag}</span>
                 </button>
               </li>
             ))}
           </ul>
         </div>
 
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: "1rem" }}>Items</h2>
+        <div className="taxonomy-col taxonomy-col-items">
+          <h2>Items</h2>
           {!selectedSkill ? (
-            <p style={{ color: "#888" }}>Select a skill to see its item bank.</p>
+            <p className="empty-state">Select a skill to see its item bank.</p>
           ) : !selectedSkill.supportsItems ? (
-            <p style={{ color: "#888" }}>This skill is tracked by duration/independence, not an item bank.</p>
+            <p className="empty-state">This skill is tracked by duration/independence, not an item bank.</p>
           ) : selectedSkill.items.length === 0 ? (
-            <p style={{ color: "#888" }}>No items seeded for this skill yet.</p>
+            <p className="empty-state">No items seeded for this skill yet.</p>
           ) : (
-            <ul>
+            <div>
               {Object.entries(groupByCategory(selectedSkill.items)).map(([group, items]) => (
-                <li key={group} style={{ marginBottom: "0.75rem" }}>
-                  <strong>{group}</strong>
-                  <div>{items.map((i) => i.displayName).join(", ")}</div>
-                </li>
+                <div key={group} className="item-group">
+                  <div className="item-group-name">{group}</div>
+                  <div className="item-group-values">{items.map((i) => i.displayName).join(", ")}</div>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       </div>

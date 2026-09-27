@@ -44,15 +44,16 @@ export function TherapistsPage() {
   return (
     <div>
       <h1>Therapists</h1>
+
       {createdCreds ? (
-        <div style={{ background: "#eef", padding: "1rem", marginBottom: "1rem" }}>
+        <div className="callout">
           <p>
             Therapist account created: <strong>{createdCreds.email}</strong>
           </p>
           <p>
             Temporary password (shown once): <code>{createdCreds.tempPassword}</code>
           </p>
-          <button type="button" onClick={() => setCreatedCreds(null)}>
+          <button type="button" className="btn btn-secondary" onClick={() => setCreatedCreds(null)}>
             Dismiss
           </button>
         </div>
@@ -60,57 +61,62 @@ export function TherapistsPage() {
 
       {canEdit ? (
         <>
-          <button type="button" onClick={() => setShowForm((v) => !v)}>
-            {showForm ? "Cancel" : "New therapist"}
-          </button>
+          <div className="page-toolbar">
+            <button type="button" className="btn btn-secondary" onClick={() => setShowForm((v) => !v)}>
+              {showForm ? "Cancel" : "New therapist"}
+            </button>
+          </div>
           {showForm ? (
-            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 360, marginTop: "1rem" }}>
-              <label>
-                Name
-                <input name="name" required style={{ display: "block", width: "100%" }} />
+            <form onSubmit={handleCreate} className="form-panel">
+              <label className="field">
+                <span className="field-label">Name</span>
+                <input className="input" name="name" required />
               </label>
-              <label>
-                Email
-                <input name="email" type="email" required style={{ display: "block", width: "100%" }} />
+              <label className="field">
+                <span className="field-label">Email</span>
+                <input className="input" name="email" type="email" required />
               </label>
-              <fieldset>
+              <fieldset className="form-group">
                 <legend>Disciplines practiced</legend>
                 {disciplines
                   .filter((d) => d.enabled)
                   .map((d) => (
-                    <label key={d.id} style={{ display: "block" }}>
+                    <label key={d.id} className="checkbox-row">
                       <input type="checkbox" name={`discipline_${d.id}`} /> {d.name}
                     </label>
                   ))}
               </fieldset>
-              <button type="submit">Create therapist</button>
+              <button type="submit" className="btn btn-primary">
+                Create therapist
+              </button>
             </form>
           ) : null}
         </>
       ) : null}
 
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
+      {error ? <p className="error-text">{error}</p> : null}
 
-      <table style={{ marginTop: "1.5rem", borderCollapse: "collapse", width: "100%" }}>
-        <thead>
-          <tr>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Email</th>
-            <th style={cellStyle}>Disciplines</th>
-          </tr>
-        </thead>
-        <tbody>
-          {therapists.map((t) => (
-            <tr key={t.id}>
-              <td style={cellStyle}>{t.name}</td>
-              <td style={cellStyle}>{t.user.email}</td>
-              <td style={cellStyle}>{t.disciplineIds.map(disciplineName).join(", ") || "—"}</td>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Disciplines</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {therapists.map((t) => (
+              <tr key={t.id}>
+                <td>{t.name}</td>
+                <td>{t.user.email}</td>
+                <td>{t.disciplineIds.map(disciplineName).join(", ") || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {therapists.length === 0 ? <p className="empty-state">No therapists yet.</p> : null}
+      </div>
     </div>
   );
 }
-
-const cellStyle = { border: "1px solid #ddd", padding: "0.5rem", textAlign: "left" as const };

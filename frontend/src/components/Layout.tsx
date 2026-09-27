@@ -19,26 +19,26 @@ export function Layout() {
         ];
 
   return (
-    <div style={{ fontFamily: "sans-serif", minHeight: "100vh", display: "flex" }}>
-      <nav style={{ width: 200, borderRight: "1px solid #ddd", padding: "1rem", flexShrink: 0 }}>
-        <p style={{ fontWeight: "bold" }}>Pravnya Admin</p>
-        <p style={{ fontSize: "0.85rem", color: "#666" }}>
-          {user.name} ({user.role})
+    <div className="app-shell">
+      <nav className="sidebar">
+        <p className="sidebar-brand">Pravnya Admin</p>
+        <p className="sidebar-user">
+          {user.name} &middot; {user.role.replace("_", " ")}
         </p>
-        <ul style={{ listStyle: "none", padding: 0, marginTop: "1.5rem" }}>
+        <ul className="sidebar-nav">
           {links.map((link) => (
-            <li key={link.to} style={{ marginBottom: "0.5rem" }}>
-              <NavLink to={link.to} style={({ isActive }) => ({ fontWeight: isActive ? "bold" : "normal" })}>
+            <li key={link.to}>
+              <NavLink to={link.to} className={({ isActive }) => (isActive ? "active" : "")}>
                 {link.label}
               </NavLink>
             </li>
           ))}
         </ul>
-        <button type="button" onClick={logout} style={{ marginTop: "2rem" }}>
+        <button type="button" onClick={logout} className="btn btn-secondary">
           Log out
         </button>
       </nav>
-      <main style={{ flex: 1, padding: "1.5rem" }}>
+      <main className="content">
         <Outlet />
       </main>
     </div>
