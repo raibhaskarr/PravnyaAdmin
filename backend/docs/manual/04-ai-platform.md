@@ -29,9 +29,15 @@ bundle.
 | Provider | Package | SDK | Env var | Default model | Text | Image | Audio | Video | Streaming |
 |---|---|---|---|---|---|---|---|---|---|
 | **Fake** | `@pravnix/ai-provider-fake` | none — deterministic, in-process | none | `fake-model` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Claude** | `@pravnix/ai-provider-anthropic` | `@anthropic-ai/sdk` | `ANTHROPIC_API_KEY` | `claude-sonnet-4-5` | ✅ | ✅ (inline base64 only) | ❌ | ❌ | ✅ |
-| **Gemini** | `@pravnix/ai-provider-gemini` | `@google/generative-ai` | `GEMINI_API_KEY` | `gemini-2.0-flash` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **OpenAI** | `@pravnix/ai-provider-openai` | `openai` | `OPENAI_API_KEY` | `gpt-4o` | ✅ | ✅ (data URI) | ✅ (inline base64, `input_audio`) | ❌ | ✅ |
+| **Claude** | `@pravnix/ai-provider-anthropic` | `@anthropic-ai/sdk` | `ANTHROPIC_API_KEY` | `claude-sonnet-5` | ✅ | ✅ (inline base64 only) | ❌ | ❌ | ✅ |
+| **Gemini** | `@pravnix/ai-provider-gemini` | `@google/generative-ai` | `GEMINI_API_KEY` | `gemini-3.8-flash` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **OpenAI** | `@pravnix/ai-provider-openai` | `openai` | `OPENAI_API_KEY` | `gpt-6-astra` | ✅ | ✅ (data URI) | ✅ (inline base64, `input_audio`) | ❌ | ✅ |
+
+Each default tracks that vendor's own current recommended general-purpose model (last checked
+2026-09) and can be overridden per-request via `AiRequestOptions.modelOverride` without needing a
+platform change. Vendors ship new model lines faster than this page can track in real time —
+verify against `AIPlatformNode`'s own `packages/providers/*/src/options.ts` if precision matters
+for a specific integration.
 
 Notes:
 
