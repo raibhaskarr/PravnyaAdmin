@@ -42,6 +42,7 @@ export type CanonicalSkill = {
   defaultDisciplineId: string | null;
   defaultDiscipline?: CanonicalDiscipline;
   supportsItems: boolean;
+  supportedModalities: Modality[];
   sourceTag: "PROD" | "FRAMEWORK";
   _count?: { items: number };
 };

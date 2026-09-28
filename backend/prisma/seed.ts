@@ -47,6 +47,53 @@ type SkillSeed = {
   source: "PROD" | "FRAMEWORK";
 };
 
+type Modality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL";
+
+// Modality (how the child responds) only means something for communication-related domains --
+// a sitting-tolerance goal isn't "verbal" or "signed," it just is what it is. Defaulted per
+// domain, with per-skill overrides below where a specific skill's natural response is narrower
+// or wider than its domain's default (e.g. Speech Production is verbal-only; a domain otherwise
+// tagged [] can still have one genuinely communicative skill inside it).
+const DOMAIN_DEFAULT_MODALITIES: Record<string, Modality[]> = {
+  // Receptive: the natural response is pointing/selecting, not speaking.
+  RECEPTIVE_LANGUAGE: ["GESTURAL", "AAC"],
+  EXPRESSIVE_LANGUAGE: ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN"],
+  // Producing a speech sound is inherently vocal -- sign/AAC/written don't apply to articulation.
+  SPEECH_PRODUCTION: ["VERBAL"],
+  AUDITORY_PROCESSING: ["GESTURAL", "AAC", "VERBAL"],
+  SOCIAL_COMMUNICATION: ["VERBAL", "MANUAL_SIGN", "AAC", "GESTURAL"],
+  COGNITIVE_PRE_ACADEMIC: ["GESTURAL"],
+  FUNCTIONAL_ACADEMICS: ["VERBAL", "GESTURAL", "AAC"],
+  EXECUTIVE_FUNCTIONING: [],
+  BEHAVIOR_REGULATION: [],
+  SENSORY_PROCESSING: [],
+  GROSS_MOTOR: [],
+  FINE_MOTOR: [],
+  ADAPTIVE_DAILY_LIVING: [],
+  IMITATION_FOUNDATIONAL: ["GESTURAL"]
+};
+
+// Per-skill overrides where the domain default doesn't fit that one skill.
+const SKILL_MODALITY_OVERRIDES: Record<string, Modality[]> = {
+  // Functional Academics: writing-specific skills are WRITTEN only, not spoken/pointed.
+  "Writes letters/numbers from dictation": ["WRITTEN"],
+  "Writes/copies own name": ["WRITTEN"],
+  "Spells simple words from dictation/independently": ["WRITTEN"],
+  "Demonstrates letter-sound correspondence (phonics)": ["VERBAL", "WRITTEN"],
+  // Behavior & Self-Regulation is otherwise non-communicative, except this one replacement skill.
+  "Uses functional communication instead of challenging behavior": ["VERBAL", "MANUAL_SIGN", "AAC", "GESTURAL"],
+  // Imitation & Foundational: splits by imitation type rather than one blanket "Gestural".
+  "Imitates oral-motor (non-speech) movements": ["GESTURAL"],
+  "Imitates vowel and early consonant sounds (echoic)": ["VERBAL"],
+  "Produces spontaneous pre-verbal vocalizations": ["VERBAL"],
+  // Adaptive/Daily Living is otherwise non-communicative, except this comprehension-based skill.
+  "Understands and follows basic safety rules": ["GESTURAL", "AAC"]
+};
+
+function modalitiesFor(domain: string, name: string): Modality[] {
+  return SKILL_MODALITY_OVERRIDES[name] ?? DOMAIN_DEFAULT_MODALITIES[domain] ?? [];
+}
+
 // Matches canonical-taxonomy-master-list.md exactly, domain by domain. First-listed discipline
 // in the doc's "Primary discipline(s)" column is used as defaultDisciplineId (the schema models
 // one default; the doc's own framing is "default, not exclusive").
@@ -391,6 +438,7 @@ async function main() {
   const skillByName = new Map<string, string>();
   for (const s of SKILLS) {
     const key = `${s.domain}.${slug(s.name)}`;
+    const supportedModalities = modalitiesFor(s.domain, s.name);
     const row = await prisma.canonicalSkill.upsert({
       where: { key },
       update: {
@@ -398,7 +446,8 @@ async function main() {
         domainId: domainByKey.get(s.domain)!,
         defaultDisciplineId: disciplineByKey.get(s.discipline)!,
         supportsItems: s.supportsItems,
-        sourceTag: s.source
+        sourceTag: s.source,
+        supportedModalities
       },
       create: {
         key,
@@ -406,7 +455,8 @@ async function main() {
         domainId: domainByKey.get(s.domain)!,
         defaultDisciplineId: disciplineByKey.get(s.discipline)!,
         supportsItems: s.supportsItems,
-        sourceTag: s.source
+        sourceTag: s.source,
+        supportedModalities
       }
     });
     skillByName.set(s.name, row.id);

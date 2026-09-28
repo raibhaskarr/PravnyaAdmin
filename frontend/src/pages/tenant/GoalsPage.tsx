@@ -19,6 +19,7 @@ export function GoalsPage() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
   const canEdit = user?.role !== "VIEWER";
+  const suggestedModalities = selectedSkill?.supportedModalities ?? [];
 
   function load() {
     api.listGoals(token!).then(setGoals);
@@ -170,12 +171,34 @@ export function GoalsPage() {
               <label className="field">
                 <span className="field-label">Modality</span>
                 <select name="modality" required className="input">
-                  {MODALITIES.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
+                  {suggestedModalities.length > 0 && suggestedModalities.length < MODALITIES.length ? (
+                    <>
+                      <optgroup label="Suggested for this skill">
+                        {suggestedModalities.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Other modalities">
+                        {MODALITIES.filter((m) => !suggestedModalities.includes(m)).map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </>
+                  ) : (
+                    MODALITIES.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))
+                  )}
                 </select>
+                {selectedSkill && suggestedModalities.length === 0 ? (
+                  <span className="hint-text">This skill isn't typically tagged by communication modality.</span>
+                ) : null}
               </label>
               <label className="field">
                 <span className="field-label">Goal title (as written)</span>

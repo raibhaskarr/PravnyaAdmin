@@ -65,6 +65,22 @@ export function TaxonomyPage() {
         </div>
 
         <div className="taxonomy-col taxonomy-col-items">
+          {selectedSkill ? (
+            <div className="item-group">
+              <div className="item-group-name">Modalities</div>
+              <div className="item-group-values">
+                {selectedSkill.supportedModalities.length > 0 ? (
+                  selectedSkill.supportedModalities.map((m) => (
+                    <span key={m} className="tag tag-framework">
+                      {m}
+                    </span>
+                  ))
+                ) : (
+                  <span className="hint-text">Not modality-tagged</span>
+                )}
+              </div>
+            </div>
+          ) : null}
           <h2>Items</h2>
           {!selectedSkill ? (
             <p className="empty-state">Select a skill to see its item bank.</p>

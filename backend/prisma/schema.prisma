@@ -111,6 +111,10 @@ model CanonicalSkill {
   defaultDisciplineId  String?             @db.Uuid
   defaultDiscipline    CanonicalDiscipline? @relation("DefaultDiscipline", fields: [defaultDisciplineId], references: [id], onDelete: SetNull)
   supportsItems        Boolean             @default(false)
+  // Suggested response modalities for this skill (e.g. a receptive skill's natural response is
+  // pointing/selecting, not speaking) -- a default like defaultDisciplineId, not a hard lock.
+  // Empty for skills where "modality" doesn't apply at all (motor, sensory, behavior, adaptive).
+  supportedModalities  Modality[]          @default([])
   sourceTag            SkillSource         @default(FRAMEWORK)
   items                CanonicalSkillItem[]
   goals                Goal[]
