@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { CanonicalDomain, CanonicalSkill, Goal, Kid, Modality, TenantDiscipline } from "../../api/types";
+import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Kid, Modality, TenantDiscipline } from "../../api/types";
 
 const MODALITIES: Modality[] = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"];
 
@@ -11,8 +11,11 @@ export function GoalsPage() {
   const [kids, setKids] = useState<Kid[]>([]);
   const [domains, setDomains] = useState<CanonicalDomain[]>([]);
   const [disciplines, setDisciplines] = useState<TenantDiscipline[]>([]);
-  const [skills, setSkills] = useState<CanonicalSkill[]>([]);
+  const [skills, setSkills] = useState<{ id: string; name: string }[]>([]);
   const [selectedDomainId, setSelectedDomainId] = useState("");
+  const [selectedSkill, setSelectedSkill] = useState<CanonicalSkillDetail | null>(null);
+  const [pendingItems, setPendingItems] = useState<(GoalItemInput & { label: string })[]>([]);
+  const [customText, setCustomText] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
   const canEdit = user?.role !== "VIEWER";
@@ -34,6 +37,37 @@ export function GoalsPage() {
     api.listSkills(token!, selectedDomainId).then(setSkills);
   }, [token, selectedDomainId]);
 
+  function resetItemPicker() {
+    setSelectedSkill(null);
+    setPendingItems([]);
+    setCustomText("");
+  }
+
+  async function handleSkillChange(skillId: string) {
+    setPendingItems([]);
+    if (!skillId) {
+      setSelectedSkill(null);
+      return;
+    }
+    setSelectedSkill(await api.getSkill(token!, skillId));
+  }
+
+  function addCanonicalItem(itemId: string, displayName: string) {
+    if (pendingItems.some((i) => i.canonicalSkillItemId === itemId)) return;
+    setPendingItems((prev) => [...prev, { canonicalSkillItemId: itemId, label: displayName }]);
+  }
+
+  function addCustomItem() {
+    const value = customText.trim();
+    if (!value) return;
+    setPendingItems((prev) => [...prev, { customText: value, label: value }]);
+    setCustomText("");
+  }
+
+  function removeItem(index: number) {
+    setPendingItems((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -44,15 +78,21 @@ export function GoalsPage() {
         canonicalSkillId: String(form.get("canonicalSkillId")),
         disciplineId: String(form.get("disciplineId")),
         modality: form.get("modality") as Modality,
-        title: String(form.get("title"))
+        title: String(form.get("title")),
+        items: pendingItems.map(({ canonicalSkillItemId, customText: text }) => ({ canonicalSkillItemId, customText: text }))
       });
       setShowForm(false);
       event.currentTarget.reset();
       setSelectedDomainId("");
+      resetItemPicker();
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create goal");
     }
+  }
+
+  function goalItemLabel(item: Goal["items"][number]) {
+    return item.customText ?? item.canonicalSkillItem?.displayName ?? "—";
   }
 
   return (
@@ -62,12 +102,19 @@ export function GoalsPage() {
       {canEdit ? (
         <>
           <div className="page-toolbar">
-            <button type="button" className="btn btn-secondary" onClick={() => setShowForm((v) => !v)}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowForm((v) => !v);
+                resetItemPicker();
+              }}
+            >
               {showForm ? "Cancel" : "New goal"}
             </button>
           </div>
           {showForm ? (
-            <form onSubmit={handleCreate} className="form-panel" style={{ maxWidth: 460 }}>
+            <form onSubmit={handleCreate} className="form-panel" style={{ maxWidth: 480 }}>
               <label className="field">
                 <span className="field-label">Kid</span>
                 <select name="kidId" required className="input">
@@ -92,7 +139,13 @@ export function GoalsPage() {
               </label>
               <label className="field">
                 <span className="field-label">Canonical skill</span>
-                <select name="canonicalSkillId" required disabled={!skills.length} className="input">
+                <select
+                  name="canonicalSkillId"
+                  required
+                  disabled={!skills.length}
+                  className="input"
+                  onChange={(e) => handleSkillChange(e.target.value)}
+                >
                   <option value="">Select a skill</option>
                   {skills.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -128,6 +181,74 @@ export function GoalsPage() {
                 <span className="field-label">Goal title (as written)</span>
                 <input name="title" required className="input" />
               </label>
+
+              <fieldset className="form-group">
+                <legend>Items for this kid</legend>
+
+                {selectedSkill?.supportsItems && selectedSkill.items.length > 0 ? (
+                  <>
+                    <p className="hint-text" style={{ marginBottom: "0.4rem" }}>
+                      Pick from the shared bank for this skill:
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "0.75rem" }}>
+                      {selectedSkill.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => addCanonicalItem(item.id, item.displayName)}
+                        >
+                          + {item.displayName}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : selectedSkill && !selectedSkill.supportsItems ? (
+                  <p className="hint-text" style={{ marginBottom: "0.75rem" }}>
+                    This skill is tracked by duration/independence -- no item bank to pick from.
+                  </p>
+                ) : null}
+
+                <p className="hint-text" style={{ marginBottom: "0.4rem" }}>
+                  Or add this kid's own custom content (e.g. the actual question text):
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    className="input"
+                    value={customText}
+                    onChange={(e) => setCustomText(e.target.value)}
+                    placeholder="e.g. Where do you live?"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCustomItem();
+                      }
+                    }}
+                  />
+                  <button type="button" className="btn btn-secondary" onClick={addCustomItem}>
+                    Add
+                  </button>
+                </div>
+
+                {pendingItems.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginTop: "0.75rem" }}>
+                    {pendingItems.map((item, index) => (
+                      <span key={index} className="tag tag-framework" style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                        {item.label}
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          aria-label={`Remove ${item.label}`}
+                          style={{ border: "none", background: "none", cursor: "pointer", padding: 0, color: "inherit" }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </fieldset>
+
               <button type="submit" className="btn btn-primary">
                 Create goal
               </button>
@@ -147,6 +268,7 @@ export function GoalsPage() {
               <th>Canonical skill</th>
               <th>Discipline</th>
               <th>Modality</th>
+              <th>Items</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -160,6 +282,7 @@ export function GoalsPage() {
                 <td>{g.canonicalSkill.name}</td>
                 <td>{g.discipline.name}</td>
                 <td>{g.modality}</td>
+                <td>{g.items.length ? g.items.map(goalItemLabel).join(", ") : "—"}</td>
                 <td>{g.status}</td>
               </tr>
             ))}

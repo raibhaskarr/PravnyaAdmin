@@ -75,6 +75,15 @@ export type Kid = {
 
 export type Modality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL";
 
+export type GoalItem = {
+  id: string;
+  canonicalSkillItemId: string | null;
+  canonicalSkillItem: { id: string; displayName: string } | null;
+  customText: string | null;
+};
+
+export type GoalItemInput = { canonicalSkillItemId?: string; customText?: string };
+
 export type Goal = {
   id: string;
   tenantId: string;
@@ -88,4 +97,5 @@ export type Goal = {
   title: string;
   status: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
   notes: string | null;
+  items: GoalItem[];
 };

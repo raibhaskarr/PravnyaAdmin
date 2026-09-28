@@ -4,6 +4,7 @@ import type {
   CanonicalSkill,
   CanonicalSkillDetail,
   Goal,
+  GoalItemInput,
   Kid,
   Modality,
   Tenant,
@@ -111,7 +112,14 @@ export const api = {
   },
   createGoal(
     token: string,
-    input: { kidId: string; canonicalSkillId: string; disciplineId: string; modality: Modality; title: string }
+    input: {
+      kidId: string;
+      canonicalSkillId: string;
+      disciplineId: string;
+      modality: Modality;
+      title: string;
+      items?: GoalItemInput[];
+    }
   ) {
     return request<Goal>("/goals", { token, method: "POST", body: input });
   }

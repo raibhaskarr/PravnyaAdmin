@@ -128,6 +128,7 @@ model CanonicalSkillItem {
   displayName   String
   semanticGroup String         @default("OTHER")
   aliases       Json?
+  goalItems     GoalItem[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -204,6 +205,7 @@ model Goal {
   title            String
   status           GoalStatus          @default(ACTIVE)
   notes            String?
+  items            GoalItem[]
   createdById      String?             @db.Uuid
   updatedById      String?             @db.Uuid
   createdAt        DateTime            @default(now())
@@ -211,4 +213,21 @@ model Goal {
 
   @@index([tenantId, kidId])
   @@index([canonicalSkillId])
+}
+
+// The concrete, per-kid content a goal is actually practiced with -- e.g. which WH-question
+// type(s) and/or the literal question text ("Where do you live?"). Either field can carry the
+// row (enforced at the service layer, not the DB): canonicalSkillItemId for shared vocabulary
+// (an animal, a phoneme, a WH-question type), customText for content that's inherently personal
+// to this kid and was never meant to live in the shared canonical bank.
+model GoalItem {
+  id                   String              @id @default(uuid()) @db.Uuid
+  goalId               String              @db.Uuid
+  goal                 Goal                @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  canonicalSkillItemId String?             @db.Uuid
+  canonicalSkillItem   CanonicalSkillItem? @relation(fields: [canonicalSkillItemId], references: [id], onDelete: SetNull)
+  customText           String?
+  createdAt            DateTime            @default(now())
+
+  @@index([goalId])
 }

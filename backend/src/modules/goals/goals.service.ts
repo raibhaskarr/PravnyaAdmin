@@ -7,7 +7,8 @@ import { CreateGoalInput, UpdateGoalInput } from "./goals.schemas";
 const includeRelations = {
   kid: { select: { id: true, firstName: true, lastName: true } },
   canonicalSkill: { select: { id: true, name: true } },
-  discipline: { select: { id: true, name: true } }
+  discipline: { select: { id: true, name: true } },
+  items: { include: { canonicalSkillItem: { select: { id: true, displayName: true } } } }
 };
 
 export const goalsService = {
@@ -44,7 +45,13 @@ export const goalsService = {
         title: input.title,
         notes: input.notes,
         createdById: user.id,
-        updatedById: user.id
+        updatedById: user.id,
+        items: {
+          create: input.items.map((item) => ({
+            canonicalSkillItemId: item.canonicalSkillItemId,
+            customText: item.customText
+          }))
+        }
       },
       include: includeRelations
     });
@@ -55,9 +62,18 @@ export const goalsService = {
     if (!goal) throw notFound("Goal not found");
     await assertCanAccessKid(user, goal.kidId);
 
+    const { items, ...fields } = input;
+
+    if (items !== undefined) {
+      await prisma.goalItem.deleteMany({ where: { goalId } });
+      await prisma.goalItem.createMany({
+        data: items.map((item) => ({ goalId, canonicalSkillItemId: item.canonicalSkillItemId, customText: item.customText }))
+      });
+    }
+
     return prisma.goal.update({
       where: { id: goalId },
-      data: { ...input, updatedById: user.id },
+      data: { ...fields, updatedById: user.id },
       include: includeRelations
     });
   }
