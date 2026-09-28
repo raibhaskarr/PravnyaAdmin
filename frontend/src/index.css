@@ -535,10 +535,13 @@ table.data-table {
 }
 
 .manual-doc table {
-  width: 100%;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   margin: 0 0 1rem;
   font-size: 0.86rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .manual-doc th,
@@ -546,6 +549,7 @@ table.data-table {
   border: 1px solid var(--color-border);
   padding: 0.5rem 0.65rem;
   text-align: left;
+  white-space: nowrap;
 }
 
 .manual-doc th {
