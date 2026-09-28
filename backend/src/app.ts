@@ -11,6 +11,7 @@ import { tenantDisciplinesRoutes } from "./modules/tenant-disciplines/tenantDisc
 import { therapistsRoutes } from "./modules/therapists/therapists.routes";
 import { kidsRoutes } from "./modules/kids/kids.routes";
 import { goalsRoutes } from "./modules/goals/goals.routes";
+import { manualRoutes } from "./modules/manual/manual.routes";
 
 export function createApp() {
   const app = express();
@@ -38,6 +39,7 @@ export function createApp() {
   app.use("/api/therapists", therapistsRoutes);
   app.use("/api/kids", kidsRoutes);
   app.use("/api/goals", goalsRoutes);
+  app.use("/api/manual", manualRoutes);
 
   app.use(errorMiddleware);
 

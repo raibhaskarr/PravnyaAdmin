@@ -11,6 +11,7 @@ import { DisciplinesPage } from "./pages/tenant/DisciplinesPage";
 import { TherapistsPage } from "./pages/tenant/TherapistsPage";
 import { KidsPage } from "./pages/tenant/KidsPage";
 import { GoalsPage } from "./pages/tenant/GoalsPage";
+import { ManualPage } from "./pages/ManualPage";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -33,6 +34,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/tenant/therapists" element={<TherapistsPage />} />
               <Route path="/tenant/kids" element={<KidsPage />} />
               <Route path="/tenant/goals" element={<GoalsPage />} />
+            </Route>
+          </Route>
+
+          <Route element={<ProtectedRoute />}>
+            <Route element={<Layout />}>
+              <Route path="/manual" element={<ManualPage />} />
             </Route>
           </Route>
 

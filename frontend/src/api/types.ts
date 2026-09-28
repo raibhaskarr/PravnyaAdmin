@@ -8,6 +8,30 @@ export type AuthUser = {
   tenantId: string | null;
 };
 
+export type DocSection = {
+  slug: string;
+  title: string;
+  content: string;
+};
+
+export type DbField = {
+  name: string;
+  type: string;
+  kind: string;
+  isRequired: boolean;
+  isId: boolean;
+  isUnique: boolean;
+  isRelation: boolean;
+  relationFromFields?: string[];
+  documentation: string | null;
+};
+
+export type DbModel = {
+  name: string;
+  documentation: string | null;
+  fields: DbField[];
+};
+
 export type Tenant = {
   id: string;
   name: string;

@@ -3,6 +3,8 @@ import type {
   CanonicalDomain,
   CanonicalSkill,
   CanonicalSkillDetail,
+  DbModel,
+  DocSection,
   Goal,
   GoalItemInput,
   Kid,
@@ -122,6 +124,14 @@ export const api = {
     }
   ) {
     return request<Goal>("/goals", { token, method: "POST", body: input });
+  },
+
+  // Manual
+  listManualDocs(token: string) {
+    return request<DocSection[]>("/manual/docs", { token });
+  },
+  getDbStructure(token: string) {
+    return request<DbModel[]>("/manual/db-structure", { token });
   }
 };
 

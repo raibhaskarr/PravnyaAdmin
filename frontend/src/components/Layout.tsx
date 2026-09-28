@@ -17,6 +17,7 @@ export function Layout() {
           { to: "/tenant/kids", label: "Kids" },
           { to: "/tenant/goals", label: "Goals" }
         ];
+  links.push({ to: "/manual", label: "Manual" });
 
   return (
     <div className="app-shell">

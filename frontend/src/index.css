@@ -490,3 +490,69 @@ table.data-table {
   color: var(--color-text);
   line-height: 1.6;
 }
+
+/* ---------- Manual (rendered markdown) ---------- */
+
+.manual-doc {
+  max-width: 720px;
+}
+
+.manual-doc h1 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.manual-doc h2 {
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+  margin: 1.5rem 0 0.6rem;
+}
+
+.manual-doc p {
+  margin: 0 0 0.9rem;
+  line-height: 1.65;
+}
+
+.manual-doc ul,
+.manual-doc ol {
+  margin: 0 0 0.9rem;
+  padding-left: 1.4rem;
+  line-height: 1.65;
+}
+
+.manual-doc li {
+  margin-bottom: 0.3rem;
+}
+
+.manual-doc code {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.manual-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+  font-size: 0.86rem;
+}
+
+.manual-doc th,
+.manual-doc td {
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+}
+
+.manual-doc th {
+  background: var(--color-surface-muted);
+  font-weight: 700;
+}
+
+.manual-doc strong {
+  font-weight: 700;
+}
