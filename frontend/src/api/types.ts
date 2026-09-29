@@ -109,6 +109,19 @@ export type GoalItem = {
 
 export type GoalItemInput = { canonicalSkillItemId?: string; customText?: string };
 
+export type GoalSkillSuggestion = {
+  domainId: string;
+  canonicalSkillId: string;
+  disciplineId: string | null;
+  modality: Modality | null;
+  rationale: string;
+};
+
+export type GoalSkillSuggestionResponse = {
+  suggestion: GoalSkillSuggestion | null;
+  reason?: string;
+};
+
 export type Goal = {
   id: string;
   tenantId: string;

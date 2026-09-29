@@ -1,18 +1,20 @@
 # AI Platform
 
-Pravnya Admin has no AI features live yet. This page documents the shared AI execution platform
-that any future AI feature here will be built on — what LLMs it already supports, how a request
-gets routed to one, and how to add another — so the boundary and the mechanics are both clear
-before the first feature is built, rather than improvised after.
+Pravnya Admin has one live AI feature: on the tenant **Goals** page, typing a free-text goal title
+and clicking "Suggest skill from title (AI)" proposes a matching Canonical Skill (plus a derived
+Discipline and Modality) from the taxonomy, which the therapist can accept or override before
+saving — never blocks manual entry. This page documents the shared AI execution platform that
+feature (and any future one) is built on: what LLMs it supports, how a request gets routed, how
+Pravnya Admin actually consumes an unpublished sibling repo, and how to add another provider.
 
 ## AIPlatformNode
 
 `AIPlatformNode` (`github.com/raibhaskarr/AIPlatformNode`) is a separate repo: a TypeScript npm
 workspaces monorepo that owns generic AI execution — provider transport, retry, structured-output
-parsing and repair, telemetry, error normalization. It has no knowledge that Pravnya Admin exists,
-and Pravnya Admin does not depend on it yet. It's the shared execution layer every Pravnix product
-(this one, Pravnya, and eventually a rebuilt PranTrackingSystem AI module) is meant to sit on top
-of, instead of each product re-solving provider integration independently.
+parsing and repair, telemetry, error normalization. It has no knowledge that Pravnya Admin exists.
+It's the shared execution layer every Pravnix product (this one, Pravnya, and eventually a rebuilt
+PranTrackingSystem AI module) is meant to sit on top of, instead of each product re-solving
+provider integration independently.
 
 It ports the architecture of an earlier .NET platform (`pravnix-ai-platform`), built originally for
 a different product, and extends it with multimodal input (image/audio/video, not just text) and
@@ -53,6 +55,25 @@ Notes:
 - Every real provider wraps its network call in a bounded exponential-backoff retry (429 / 5xx /
   timeout only) before the orchestrator ever sees a failure. This is the *only* retry layer — see
   "Why there's no second retry layer" below.
+
+## How Pravnya Admin actually consumes it
+
+`AIPlatformNode` isn't published to any registry yet, and two interim approaches that looked viable
+turned out not to work for a production deploy:
+
+- **npm's `<git-url>#<commit>:<subdirectory>` syntax** silently ignores the subdirectory and
+  installs the whole (private, unbuilt) monorepo root — confirmed by testing it directly.
+- **A sibling git checkout via a `file:` dependency** works great locally, but this repo's deploy
+  script only has access to what `git` delivers to the server — there's no sibling `AIPlatformNode`
+  checkout there, and creating one would require editing the deploy script, which is out of reach
+  (see `reference_prod_db_ssh_access` — same server, same restriction).
+
+What's actually used: **`backend/vendor/pravnix/*.tgz`** — `npm pack` output for all 11 packages
+`@pravnix/ai-node` transitively needs, committed directly into this repo. `git reset --hard` on the
+server brings them along automatically, and `npm ci` resolves everything with zero server-side
+setup. See `backend/vendor/pravnix/README.md` for exactly how to regenerate these after an
+`AIPlatformNode` change (they need re-packing and re-committing — this doesn't happen automatically
+on every deploy).
 
 ## How a request gets routed to a provider
 
@@ -115,7 +136,7 @@ a different mechanism entirely (the model produced text that doesn't parse again
 schema — a semantic problem, not a network one) and is independently bounded
 (`maxRepairAttempts`, default 1).
 
-## The one rule that matters if this ever gets integrated here
+## The one rule that matters, applied
 
 **Prompts, schemas, and business validation never live in `AIPlatformNode`.** The platform gives a
 product an `orchestrator` with three operations — plain generate, structured generate (parsed
@@ -124,11 +145,24 @@ doesn't parse), and streaming generate. Everything about *what* to ask the model
 the answer, and *what to do* when it fails is the product's own responsibility, built as a facade on
 top of the orchestrator — never a controller calling the orchestrator directly.
 
-Concretely, if Pravnya Admin ever adds an AI feature (e.g. "suggest a Canonical Skill for this
-free-text goal title"), the prompt for that, the zod schema for the expected response, and the
-decision about what happens when the AI call fails (fall back silently? show an error? block the
-save?) would all be written and owned inside this repo — `backend/src/modules/`, same as every
-other module — not inside `AIPlatformNode`.
+`backend/src/modules/ai/` is that facade:
+
+- **`ai.platform.ts`** — builds the provider list from `env.ANTHROPIC_API_KEY`/`env.GEMINI_API_KEY`
+  (whichever is set; Claude wins as `defaultProvider` if both are), always also registers the fake
+  provider as an ultimate fallback so the feature degrades instead of crashing when neither key is
+  configured. Only Claude and Gemini are wired up — OpenAI support exists in the platform but isn't
+  used here.
+- **`goalSkillSuggestion.service.ts`** — the prompt, the zod schema (constrained to the actual
+  candidate skill ids fetched from the DB, so a hallucinated id is rejected before it ever reaches
+  the client), and the failure policy (any AI failure — no key configured, model output that never
+  parses, network error — returns `{ suggestion: null, reason }`; the frontend falls back to manual
+  selection, it never blocks or errors the page). Discipline and Modality are deliberately **not**
+  asked of the model at all — they're derived server-side from the chosen skill's own
+  `defaultDisciplineId`/`supportedModalities` (the "default, not exclusive" pattern from
+  `03-business-logic.md`), narrowed to what the tenant has enabled. This keeps the model's actual
+  job to exactly one constrained choice.
+- **`ai.routes.ts`** — `POST /api/ai/suggest-goal-skill`, same access rule as creating a goal
+  (Tenant Admin and Therapist; Viewer blocked).
 
 ## Why this boundary, specifically
 
@@ -140,9 +174,14 @@ be reused by a fourth or fifth product later without any of this platform's code
 
 ## Status
 
-Not integrated. No route, service, or dependency in this repo references `AIPlatformNode` today.
-When a real AI feature is scoped for Pravnya Admin, integrating it means adding `@pravnix/ai-node`
-as a dependency, building a small facade module under `backend/src/modules/` (prompt + schema +
-failure policy for that one feature), and wiring the orchestrator's provider list from
-environment-variable API keys (the table above) — the same pattern already documented in
-`AIPlatformNode`'s own `docs/product-integration.md`.
+Integrated and deployed. The Goal → Canonical Skill suggestion feature is live in the UI and the
+API responds correctly — but it's running against the fake provider only, because neither
+`ANTHROPIC_API_KEY` nor `GEMINI_API_KEY` has been added to the server's environment yet. Until one
+is, every suggestion request returns `{ suggestion: null, reason: "Couldn't generate a suggestion
+right now -- pick manually below." }` — the fake provider's canned response never matches a real
+Canonical Skill id, by design, so this fails closed rather than returning nonsense.
+
+To make it actually suggest real skills: add `ANTHROPIC_API_KEY` and/or `GEMINI_API_KEY` to the
+server's backend `.env` (same file `DATABASE_URL`/`JWT_SECRET` already live in) and restart the
+backend service. No code or deploy changes needed — `ai.platform.ts` picks up whichever key(s) are
+present at boot.

@@ -18,6 +18,15 @@ export function GoalsPage() {
   const [customText, setCustomText] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
+
+  const [title, setTitle] = useState("");
+  const [canonicalSkillId, setCanonicalSkillId] = useState("");
+  const [disciplineId, setDisciplineId] = useState("");
+  const [modality, setModality] = useState<Modality | "">("");
+  const [pendingSkillId, setPendingSkillId] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestNote, setSuggestNote] = useState("");
+
   const canEdit = user?.role !== "VIEWER";
   const suggestedModalities = selectedSkill?.supportedModalities ?? [];
 
@@ -38,10 +47,27 @@ export function GoalsPage() {
     api.listSkills(token!, selectedDomainId).then(setSkills);
   }, [token, selectedDomainId]);
 
-  function resetItemPicker() {
+  // Once an AI-suggested domain's skill list has loaded, finish selecting the suggested skill --
+  // the skills dropdown is domain-scoped, so this can't happen in the same tick as the domain pick.
+  useEffect(() => {
+    if (!pendingSkillId) return;
+    if (skills.some((s) => s.id === pendingSkillId)) {
+      handleSkillChange(pendingSkillId);
+      setCanonicalSkillId(pendingSkillId);
+      setPendingSkillId("");
+    }
+  }, [skills, pendingSkillId]);
+
+  function resetFormState() {
     setSelectedSkill(null);
     setPendingItems([]);
     setCustomText("");
+    setTitle("");
+    setCanonicalSkillId("");
+    setDisciplineId("");
+    setModality("");
+    setPendingSkillId("");
+    setSuggestNote("");
   }
 
   async function handleSkillChange(skillId: string) {
@@ -51,6 +77,33 @@ export function GoalsPage() {
       return;
     }
     setSelectedSkill(await api.getSkill(token!, skillId));
+  }
+
+  async function handleSuggest() {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      setSuggestNote("Type a goal title first.");
+      return;
+    }
+    setSuggesting(true);
+    setSuggestNote("");
+    try {
+      const result = await api.suggestGoalSkill(token!, trimmed);
+      if (!result.suggestion) {
+        setSuggestNote(result.reason ?? "No suggestion available -- pick manually below.");
+        return;
+      }
+      const { domainId, canonicalSkillId: skillId, disciplineId: discId, modality: mod, rationale } = result.suggestion;
+      setSelectedDomainId(domainId);
+      setPendingSkillId(skillId);
+      setDisciplineId(discId ?? "");
+      setModality(mod ?? "");
+      setSuggestNote(rationale);
+    } catch {
+      setSuggestNote("Couldn't reach the AI suggestion service -- pick manually below.");
+    } finally {
+      setSuggesting(false);
+    }
   }
 
   function addCanonicalItem(itemId: string, displayName: string) {
@@ -76,16 +129,16 @@ export function GoalsPage() {
     try {
       await api.createGoal(token!, {
         kidId: String(form.get("kidId")),
-        canonicalSkillId: String(form.get("canonicalSkillId")),
-        disciplineId: String(form.get("disciplineId")),
-        modality: form.get("modality") as Modality,
-        title: String(form.get("title")),
+        canonicalSkillId,
+        disciplineId,
+        modality: modality as Modality,
+        title,
         items: pendingItems.map(({ canonicalSkillItemId, customText: text }) => ({ canonicalSkillItemId, customText: text }))
       });
       setShowForm(false);
       event.currentTarget.reset();
       setSelectedDomainId("");
-      resetItemPicker();
+      resetFormState();
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create goal");
@@ -108,7 +161,7 @@ export function GoalsPage() {
               className="btn btn-secondary"
               onClick={() => {
                 setShowForm((v) => !v);
-                resetItemPicker();
+                resetFormState();
               }}
             >
               {showForm ? "Cancel" : "New goal"}
@@ -127,6 +180,22 @@ export function GoalsPage() {
                   ))}
                 </select>
               </label>
+
+              <label className="field">
+                <span className="field-label">Goal title (as written)</span>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} required className="input" />
+              </label>
+              <div style={{ marginTop: "-0.5rem", marginBottom: "0.75rem" }}>
+                <button type="button" className="btn btn-secondary" onClick={handleSuggest} disabled={suggesting}>
+                  {suggesting ? "Suggesting…" : "Suggest skill from title (AI)"}
+                </button>
+                {suggestNote ? (
+                  <p className="hint-text" style={{ marginTop: "0.4rem" }}>
+                    {suggestNote}
+                  </p>
+                ) : null}
+              </div>
+
               <label className="field">
                 <span className="field-label">Domain</span>
                 <select value={selectedDomainId} onChange={(e) => setSelectedDomainId(e.target.value)} className="input">
@@ -141,11 +210,14 @@ export function GoalsPage() {
               <label className="field">
                 <span className="field-label">Canonical skill</span>
                 <select
-                  name="canonicalSkillId"
                   required
                   disabled={!skills.length}
                   className="input"
-                  onChange={(e) => handleSkillChange(e.target.value)}
+                  value={canonicalSkillId}
+                  onChange={(e) => {
+                    setCanonicalSkillId(e.target.value);
+                    handleSkillChange(e.target.value);
+                  }}
                 >
                   <option value="">Select a skill</option>
                   {skills.map((s) => (
@@ -157,7 +229,7 @@ export function GoalsPage() {
               </label>
               <label className="field">
                 <span className="field-label">Discipline</span>
-                <select name="disciplineId" required className="input">
+                <select required className="input" value={disciplineId} onChange={(e) => setDisciplineId(e.target.value)}>
                   <option value="">Select a discipline</option>
                   {disciplines
                     .filter((d) => d.enabled)
@@ -170,7 +242,8 @@ export function GoalsPage() {
               </label>
               <label className="field">
                 <span className="field-label">Modality</span>
-                <select name="modality" required className="input">
+                <select required className="input" value={modality} onChange={(e) => setModality(e.target.value as Modality)}>
+                  <option value="">Select a modality</option>
                   {suggestedModalities.length > 0 && suggestedModalities.length < MODALITIES.length ? (
                     <>
                       <optgroup label="Suggested for this skill">
@@ -199,10 +272,6 @@ export function GoalsPage() {
                 {selectedSkill && suggestedModalities.length === 0 ? (
                   <span className="hint-text">This skill isn't typically tagged by communication modality.</span>
                 ) : null}
-              </label>
-              <label className="field">
-                <span className="field-label">Goal title (as written)</span>
-                <input name="title" required className="input" />
               </label>
 
               <fieldset className="form-group">

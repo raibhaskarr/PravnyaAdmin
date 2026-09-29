@@ -7,6 +7,7 @@ import type {
   DocSection,
   Goal,
   GoalItemInput,
+  GoalSkillSuggestionResponse,
   Kid,
   Modality,
   Tenant,
@@ -124,6 +125,9 @@ export const api = {
     }
   ) {
     return request<Goal>("/goals", { token, method: "POST", body: input });
+  },
+  suggestGoalSkill(token: string, title: string) {
+    return request<GoalSkillSuggestionResponse>("/ai/suggest-goal-skill", { token, method: "POST", body: { title } });
   },
 
   // Manual

@@ -10,7 +10,12 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("1d"),
   BCRYPT_SALT_ROUNDS: z.coerce.number().default(10),
-  CORS_ORIGIN: z.string().default("http://localhost:5176")
+  CORS_ORIGIN: z.string().default("http://localhost:5176"),
+  // Optional: the AI-assisted goal-skill suggestion feature degrades gracefully (returns
+  // "no suggestion") when neither is set, rather than failing to boot. See
+  // backend/src/modules/ai/ai.platform.ts.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);
