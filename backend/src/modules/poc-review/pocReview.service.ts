@@ -59,8 +59,9 @@ export const pocReviewService = {
     return child;
   },
 
-  // Re-importing wipes and replaces this child's rows -- idempotent across prompt/model
-  // iterations, matching the disposable "Pass N" framing rather than accumulating runs forever.
+  // Re-importing wipes and replaces this child's rows for that specific model provider only --
+  // idempotent across prompt iterations within one pass, while letting a Gemini pass and a Claude
+  // pass coexist side-by-side for comparison instead of one clobbering the other.
   async importData(payload: ImportPayload) {
     const child = await prisma.pocReviewChild.upsert({
       where: { sourceChildId: payload.sourceChildId },
@@ -69,8 +70,8 @@ export const pocReviewService = {
     });
 
     await prisma.$transaction([
-      prisma.pocGoalTag.deleteMany({ where: { childId: child.id } }),
-      prisma.pocLogEvidence.deleteMany({ where: { childId: child.id } }),
+      prisma.pocGoalTag.deleteMany({ where: { childId: child.id, modelProvider: payload.modelProvider } }),
+      prisma.pocLogEvidence.deleteMany({ where: { childId: child.id, modelProvider: payload.modelProvider } }),
       prisma.pocGoalTag.createMany({
         data: payload.goalTags.map((g) => ({
           childId: child.id,

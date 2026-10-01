@@ -3,11 +3,46 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import type { PocGoalTag, PocLogEvidenceRow, PocReviewChild, PocReviewChildDetail } from "../../api/types";
 
-function PassBadge({ provider, model }: { provider: string; model: string }) {
+function providerLabel(provider: string) {
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+/** Lets a reviewer flip between independently-run passes (one per AI provider) over the exact
+ * same goals/logs for this child, to compare how differently each model tags the same evidence. */
+function ProviderToggle({
+  providers,
+  selected,
+  onSelect,
+  modelNameByProvider
+}: {
+  providers: string[];
+  selected: string;
+  onSelect: (p: string) => void;
+  modelNameByProvider: Record<string, string>;
+}) {
+  if (providers.length <= 1) {
+    const only = providers[0];
+    return only ? (
+      <span className="tag tag-framework" title={modelNameByProvider[only]}>
+        {providerLabel(only)} pass
+      </span>
+    ) : null;
+  }
   return (
-    <span className="tag tag-framework" title={model}>
-      {provider.charAt(0).toUpperCase() + provider.slice(1)} &middot; Pass 1
-    </span>
+    <div style={{ display: "flex", gap: "0.4rem" }}>
+      {providers.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onSelect(p)}
+          title={modelNameByProvider[p]}
+          className={`btn ${p === selected ? "btn-primary" : "btn-secondary"}`}
+          style={{ padding: "0.25rem 0.75rem" }}
+        >
+          {providerLabel(p)} pass
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -127,8 +162,40 @@ export function PocReviewPage() {
   const [detail, setDetail] = useState<PocReviewChildDetail | null>(null);
   const [tab, setTab] = useState<"byskill" | "goals" | "logs">("byskill");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [provider, setProvider] = useState<string>("");
 
-  const skillView = useMemo(() => (detail ? buildSkillGroups(detail) : null), [detail]);
+  const availableProviders = useMemo(() => {
+    if (!detail) return [];
+    const set = new Set<string>();
+    for (const g of detail.goalTags) set.add(g.modelProvider);
+    for (const e of detail.logEvidence) set.add(e.modelProvider);
+    return [...set].sort();
+  }, [detail]);
+
+  const modelNameByProvider = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!detail) return map;
+    for (const g of detail.goalTags) map[g.modelProvider] = g.modelName;
+    for (const e of detail.logEvidence) map[e.modelProvider] = e.modelName;
+    return map;
+  }, [detail]);
+
+  useEffect(() => {
+    if (availableProviders.length && !availableProviders.includes(provider)) {
+      setProvider(availableProviders[0]);
+    }
+  }, [availableProviders, provider]);
+
+  const filteredDetail = useMemo<PocReviewChildDetail | null>(() => {
+    if (!detail) return null;
+    return {
+      ...detail,
+      goalTags: detail.goalTags.filter((g) => g.modelProvider === provider),
+      logEvidence: detail.logEvidence.filter((e) => e.modelProvider === provider)
+    };
+  }, [detail, provider]);
+
+  const skillView = useMemo(() => (filteredDetail ? buildSkillGroups(filteredDetail) : null), [filteredDetail]);
 
   function toggleExpanded(key: string) {
     setExpandedItems((prev) => {
@@ -149,12 +216,13 @@ export function PocReviewPage() {
   useEffect(() => {
     if (!selectedId) return;
     setDetail(null);
+    setProvider("");
     api.getPocReviewChild(token!, selectedId).then(setDetail);
   }, [token, selectedId]);
 
-  const taggedGoals = detail?.goalTags.filter((g) => g.status === "TAGGED") ?? [];
-  const noMatchGoals = detail?.goalTags.filter((g) => g.status === "NO_MATCH") ?? [];
-  const evidenceCount = detail?.logEvidence.length ?? 0;
+  const taggedGoals = filteredDetail?.goalTags.filter((g) => g.status === "TAGGED") ?? [];
+  const noMatchGoals = filteredDetail?.goalTags.filter((g) => g.status === "NO_MATCH") ?? [];
+  const evidenceCount = filteredDetail?.logEvidence.length ?? 0;
 
   return (
     <div>
@@ -184,20 +252,25 @@ export function PocReviewPage() {
         </div>
 
         <div className="taxonomy-col-items" style={{ flex: 1 }}>
-          {!detail ? (
+          {!detail || !filteredDetail ? (
             <p className="empty-state">{children.length ? "Loading..." : "No review children imported yet."}</p>
           ) : (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.6rem", marginBottom: "1rem", flexWrap: "wrap" }}>
                 <h2 style={{ margin: 0 }}>{detail.label}</h2>
-                {detail.goalTags[0] ? <PassBadge provider={detail.goalTags[0].modelProvider} model={detail.goalTags[0].modelName} /> : null}
+                <ProviderToggle
+                  providers={availableProviders}
+                  selected={provider}
+                  onSelect={setProvider}
+                  modelNameByProvider={modelNameByProvider}
+                />
               </div>
 
               <div className="card" style={{ marginBottom: "1.25rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
                 <div>
                   <div className="field-label">Goals tagged</div>
                   <div style={{ fontSize: "1.3rem", fontWeight: 700 }}>
-                    {taggedGoals.length} / {detail.goalTags.length}
+                    {taggedGoals.length} / {filteredDetail.goalTags.length}
                   </div>
                 </div>
                 <div>
@@ -215,10 +288,10 @@ export function PocReviewPage() {
                   By skill ({skillView?.groups.length ?? 0})
                 </button>
                 <button type="button" className={`btn ${tab === "goals" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("goals")}>
-                  Goal tags ({detail.goalTags.length})
+                  Goal tags ({filteredDetail.goalTags.length})
                 </button>
                 <button type="button" className={`btn ${tab === "logs" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("logs")}>
-                  Log evidence ({detail.logEvidence.length})
+                  Log evidence ({filteredDetail.logEvidence.length})
                 </button>
               </div>
 
@@ -358,7 +431,7 @@ export function PocReviewPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {detail.goalTags.map((g) => (
+                      {filteredDetail.goalTags.map((g) => (
                         <tr key={g.id}>
                           <td>{g.goalTitle}</td>
                           <td>{g.centreName ?? "—"}</td>
@@ -375,7 +448,7 @@ export function PocReviewPage() {
                       ))}
                     </tbody>
                   </table>
-                  {detail.goalTags.length === 0 ? <p className="empty-state">No goal tags for this child.</p> : null}
+                  {filteredDetail.goalTags.length === 0 ? <p className="empty-state">No goal tags for this child.</p> : null}
                 </div>
               ) : (
                 <div className="table-wrap">
@@ -403,7 +476,7 @@ export function PocReviewPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {detail.logEvidence.map((e) => (
+                      {filteredDetail.logEvidence.map((e) => (
                         <tr key={e.id}>
                           <td>{e.logDate ? new Date(e.logDate).toLocaleDateString() : "—"}</td>
                           <td>{e.centreName ?? "—"}</td>
@@ -428,7 +501,7 @@ export function PocReviewPage() {
                       ))}
                     </tbody>
                   </table>
-                  {detail.logEvidence.length === 0 ? <p className="empty-state">No log evidence for this child.</p> : null}
+                  {filteredDetail.logEvidence.length === 0 ? <p className="empty-state">No log evidence for this child.</p> : null}
                 </div>
               )}
             </>
