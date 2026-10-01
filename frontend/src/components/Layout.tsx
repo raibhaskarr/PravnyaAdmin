@@ -9,7 +9,8 @@ export function Layout() {
     user.role === "SUPERADMIN"
       ? [
           { to: "/admin/tenants", label: "Tenants" },
-          { to: "/admin/taxonomy", label: "Taxonomy" }
+          { to: "/admin/taxonomy", label: "Taxonomy" },
+          { to: "/admin/poc-review", label: "AI Tagging POC" }
         ]
       : [
           { to: "/tenant/disciplines", label: "Disciplines" },

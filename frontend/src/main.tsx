@@ -7,6 +7,7 @@ import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { TenantsPage } from "./pages/admin/TenantsPage";
 import { TaxonomyPage } from "./pages/admin/TaxonomyPage";
+import { PocReviewPage } from "./pages/admin/PocReviewPage";
 import { DisciplinesPage } from "./pages/tenant/DisciplinesPage";
 import { TherapistsPage } from "./pages/tenant/TherapistsPage";
 import { KidsPage } from "./pages/tenant/KidsPage";
@@ -25,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route element={<Layout />}>
               <Route path="/admin/tenants" element={<TenantsPage />} />
               <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
+              <Route path="/admin/poc-review" element={<PocReviewPage />} />
             </Route>
           </Route>
 

@@ -10,6 +10,8 @@ import type {
   GoalSkillSuggestionResponse,
   Kid,
   Modality,
+  PocReviewChild,
+  PocReviewChildDetail,
   Tenant,
   TenantDiscipline,
   Therapist,
@@ -136,6 +138,14 @@ export const api = {
   },
   getDbStructure(token: string) {
     return request<DbModel[]>("/manual/db-structure", { token });
+  },
+
+  // AI tagging POC review (superadmin)
+  listPocReviewChildren(token: string) {
+    return request<PocReviewChild[]>("/poc-review/children", { token });
+  },
+  getPocReviewChild(token: string, childId: string) {
+    return request<PocReviewChildDetail>(`/poc-review/children/${childId}`, { token });
   }
 };
 

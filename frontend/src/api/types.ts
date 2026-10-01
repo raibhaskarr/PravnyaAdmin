@@ -122,6 +122,55 @@ export type GoalSkillSuggestionResponse = {
   reason?: string;
 };
 
+export type PocEvidenceOutcome = "CORRECT" | "INCORRECT" | "PARTIAL" | "ATTEMPTED" | "NOT_OBSERVED" | "UNKNOWN";
+export type PocSupportLevel =
+  | "INDEPENDENT"
+  | "VISUAL_PROMPT"
+  | "VERBAL_PROMPT"
+  | "GESTURAL_PROMPT"
+  | "PHYSICAL_PROMPT"
+  | "PARTIAL_ASSISTANCE"
+  | "FULL_ASSISTANCE"
+  | "UNKNOWN";
+export type PocGoalTagStatus = "TAGGED" | "NO_MATCH" | "ERROR";
+
+export type PocSkillRef = { id: string; name: string; domain: { name: string } };
+
+export type PocReviewChild = {
+  id: string;
+  label: string;
+  sourceChildId: string;
+  _count?: { goalTags: number; logEvidence: number };
+};
+
+export type PocGoalTag = {
+  id: string;
+  goalTitle: string;
+  predictedSkill: PocSkillRef | null;
+  confidence: number | null;
+  rationale: string | null;
+  status: PocGoalTagStatus;
+  modelProvider: string;
+  modelName: string;
+};
+
+export type PocLogEvidenceRow = {
+  id: string;
+  logDate: string | null;
+  predictedSkill: PocSkillRef | null;
+  itemHint: string | null;
+  outcome: PocEvidenceOutcome;
+  supportLevel: PocSupportLevel;
+  confidence: number | null;
+  modelProvider: string;
+  modelName: string;
+};
+
+export type PocReviewChildDetail = PocReviewChild & {
+  goalTags: PocGoalTag[];
+  logEvidence: PocLogEvidenceRow[];
+};
+
 export type Goal = {
   id: string;
   tenantId: string;
