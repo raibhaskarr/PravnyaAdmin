@@ -37,6 +37,12 @@ function MatchedItemCell({ row }: { row: { predictedItem: { displayName: string 
   if (row.itemMatchMethod === "ai_no_match") {
     return <span className="hint-text">no real item fit</span>;
   }
+  if (row.itemMatchMethod === "no_hint") {
+    return <span className="hint-text">no item mentioned</span>;
+  }
+  if (row.itemMatchMethod === "not_applicable") {
+    return <span className="hint-text">n/a</span>;
+  }
   return "—";
 }
 
@@ -94,9 +100,12 @@ function groupEvidenceByItem(evidence: PocLogEvidenceRow[]): ItemGroup[] {
     } else if (e.itemMatchMethod === "ai_no_match") {
       key = `nomatch:${e.itemHint ?? ""}`;
       label = e.itemHint ? `"${e.itemHint}" (no real item fit)` : "No real item fit";
+    } else if (e.itemMatchMethod === "no_hint") {
+      key = "no_hint";
+      label = "No specific item mentioned in log";
     } else {
-      key = "none";
-      label = "No item tracked";
+      key = "not_applicable";
+      label = "Skill doesn't track items";
     }
     let group = map.get(key);
     if (!group) {
@@ -380,7 +389,7 @@ export function PocReviewPage() {
                         <Th tip="The free-text item/vocabulary/task the first AI pass pulled from the log, before any matching against the real item bank.">
                           Item hint
                         </Th>
-                        <Th tip="The real Canonical Skill Item the hint was matched to, via a second AI call constrained to just that skill's own item candidates. 'no match' means the AI found no real item that fit; 'n/a' means this skill doesn't track items or no hint was given.">
+                        <Th tip="The real Canonical Skill Item the hint was matched to, via a second AI call constrained to just that skill's own item candidates. 'no real item fit' means a hint existed but didn't match a real item; 'no item mentioned' means the log didn't name a specific item for this skill; 'n/a' means this skill doesn't track items at all.">
                           Matched item
                         </Th>
                         <Th tip="What happened, as judged by the AI from the log text: correct, incorrect, partial, attempted, not observed, or unknown.">Outcome</Th>
