@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
-import type { PocReviewChild, PocReviewChildDetail } from "../../api/types";
+import type { PocGoalTag, PocLogEvidenceRow, PocReviewChild, PocReviewChildDetail } from "../../api/types";
 
 function PassBadge({ provider, model }: { provider: string; model: string }) {
   return (
@@ -40,12 +40,49 @@ function MatchedItemCell({ row }: { row: { predictedItem: { displayName: string 
   return "—";
 }
 
+interface SkillGroup {
+  skillId: string;
+  skillName: string;
+  domainName: string;
+  goals: PocGoalTag[];
+  evidence: PocLogEvidenceRow[];
+}
+
+/** One row per Canonical Skill that either a goal or a piece of log evidence resolved to for this
+ * child -- lets a reviewer look at a single skill and see the goal(s) about it next to every real
+ * log that showed evidence for it, instead of cross-referencing two separate flat tables. */
+function buildSkillGroups(detail: PocReviewChildDetail): { groups: SkillGroup[]; unmatchedGoals: PocGoalTag[] } {
+  const groups = new Map<string, SkillGroup>();
+
+  function groupFor(skill: { id: string; name: string; domain: { name: string } }): SkillGroup {
+    let group = groups.get(skill.id);
+    if (!group) {
+      group = { skillId: skill.id, skillName: skill.name, domainName: skill.domain.name, goals: [], evidence: [] };
+      groups.set(skill.id, group);
+    }
+    return group;
+  }
+
+  for (const g of detail.goalTags) {
+    if (g.predictedSkill) groupFor(g.predictedSkill).goals.push(g);
+  }
+  for (const e of detail.logEvidence) {
+    if (e.predictedSkill) groupFor(e.predictedSkill).evidence.push(e);
+  }
+
+  const groupsList = [...groups.values()].sort((a, b) => b.evidence.length - a.evidence.length || b.goals.length - a.goals.length);
+  const unmatchedGoals = detail.goalTags.filter((g) => !g.predictedSkill);
+  return { groups: groupsList, unmatchedGoals };
+}
+
 export function PocReviewPage() {
   const { token } = useAuth();
   const [children, setChildren] = useState<PocReviewChild[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<PocReviewChildDetail | null>(null);
-  const [tab, setTab] = useState<"goals" | "logs">("goals");
+  const [tab, setTab] = useState<"byskill" | "goals" | "logs">("byskill");
+
+  const skillView = useMemo(() => (detail ? buildSkillGroups(detail) : null), [detail]);
 
   useEffect(() => {
     api.listPocReviewChildren(token!).then((rows) => {
@@ -119,6 +156,9 @@ export function PocReviewPage() {
               </div>
 
               <div className="page-toolbar" style={{ marginBottom: "0.75rem" }}>
+                <button type="button" className={`btn ${tab === "byskill" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("byskill")}>
+                  By skill ({skillView?.groups.length ?? 0})
+                </button>
                 <button type="button" className={`btn ${tab === "goals" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("goals")}>
                   Goal tags ({detail.goalTags.length})
                 </button>
@@ -127,7 +167,97 @@ export function PocReviewPage() {
                 </button>
               </div>
 
-              {tab === "goals" ? (
+              {tab === "byskill" && skillView ? (
+                <>
+                  {skillView.groups.map((group) => (
+                    <div key={group.skillId} className="card" style={{ marginBottom: "1rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.6rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                        <div>
+                          <strong>{group.skillName}</strong>
+                          <div className="hint-text">{group.domainName}</div>
+                        </div>
+                        <span className="hint-text">
+                          {group.evidence.length} evidence &middot; {group.goals.length} goal{group.goals.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+
+                      {group.goals.length > 0 ? (
+                        <div style={{ marginBottom: "0.75rem" }}>
+                          {group.goals.map((g) => (
+                            <div key={g.id} className="hint-text" style={{ marginBottom: "0.25rem" }}>
+                              Goal: <span style={{ color: "var(--color-text)" }}>{g.goalTitle}</span> ({confidencePct(g.confidence)} confidence)
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="hint-text" style={{ marginBottom: "0.75rem" }}>
+                          No goal was tagged to this skill for this child -- only log evidence references it.
+                        </p>
+                      )}
+
+                      {group.evidence.length > 0 ? (
+                        <div className="table-wrap">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <Th tip="The date this daily log entry was recorded.">Date</Th>
+                                <Th tip="The free-text item/vocabulary/task the first AI pass pulled from the log, before any matching against the real item bank.">
+                                  Item hint
+                                </Th>
+                                <Th tip="The real Canonical Skill Item the hint was matched to, via a second AI call constrained to just this skill's own item candidates.">
+                                  Matched item
+                                </Th>
+                                <Th tip="What happened, as judged by the AI from the log text: correct, incorrect, partial, attempted, not observed, or unknown.">
+                                  Outcome
+                                </Th>
+                                <Th tip="The level of prompting/assistance the child needed, as judged by the AI from the log text. 'Unknown' usually means the log didn't state it explicitly.">
+                                  Support
+                                </Th>
+                                <Th tip="The AI's self-reported confidence in this extraction (0-100%). Not independently verified.">Confidence</Th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.evidence.map((e) => (
+                                <tr key={e.id}>
+                                  <td>{e.logDate ? new Date(e.logDate).toLocaleDateString() : "—"}</td>
+                                  <td>{e.itemHint ?? "—"}</td>
+                                  <td>
+                                    <MatchedItemCell row={e} />
+                                  </td>
+                                  <td>{e.outcome.replace("_", " ")}</td>
+                                  <td>{e.supportLevel.replace("_", " ")}</td>
+                                  <td>{confidencePct(e.confidence)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="hint-text">No log evidence matched this skill yet.</p>
+                      )}
+                    </div>
+                  ))}
+
+                  {skillView.unmatchedGoals.length > 0 ? (
+                    <div className="card">
+                      <strong>Goals with no taxonomy match</strong>
+                      <p className="hint-text" style={{ marginTop: "0.3rem", marginBottom: "0.6rem" }}>
+                        These goals didn't group under any skill above because the AI found no reasonable match in the taxonomy.
+                      </p>
+                      {skillView.unmatchedGoals.map((g) => (
+                        <div key={g.id} style={{ marginBottom: "0.5rem" }}>
+                          <span>{g.goalTitle}</span>
+                          <div className="hint-text">{g.rationale ?? "No rationale given."}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {skillView.groups.length === 0 && skillView.unmatchedGoals.length === 0 ? (
+                    <p className="empty-state">No goal tags or log evidence for this child.</p>
+                  ) : null}
+                </>
+              ) : tab === "goals" ? (
                 <div className="table-wrap">
                   <table className="data-table">
                     <thead>
