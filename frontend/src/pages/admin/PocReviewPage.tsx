@@ -98,8 +98,11 @@ function groupEvidenceByItem(evidence: PocLogEvidenceRow[]): ItemGroup[] {
       key = `item:${e.predictedItem.id}`;
       label = e.predictedItem.displayName;
     } else if (e.itemMatchMethod === "ai_no_match") {
-      key = `nomatch:${e.itemHint ?? ""}`;
-      label = e.itemHint ? `"${e.itemHint}" (no real item fit)` : "No real item fit";
+      // Normalize casing/whitespace so "cow" and "Cow " collapse into one bucket instead of
+      // fragmenting -- the raw hint text comes straight from free-form log extraction.
+      const normalizedHint = e.itemHint?.trim().toLowerCase() || null;
+      key = `nomatch:${normalizedHint ?? ""}`;
+      label = normalizedHint ? `"${normalizedHint}" (no real item fit)` : "No real item fit";
     } else if (e.itemMatchMethod === "no_hint") {
       key = "no_hint";
       label = "No specific item mentioned in log";
