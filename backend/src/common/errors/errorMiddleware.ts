@@ -11,6 +11,10 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
     res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Invalid request", details: err.flatten() } });
     return;
   }
+  if (err && typeof err === "object" && "type" in err && err.type === "entity.too.large") {
+    res.status(413).json({ error: { code: "PAYLOAD_TOO_LARGE", message: "Request body is too large" } });
+    return;
+  }
   console.error(err);
   res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong" } });
 }

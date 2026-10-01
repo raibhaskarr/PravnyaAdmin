@@ -20,7 +20,9 @@ export function createApp() {
 
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN.split(",") }));
-  app.use(express.json());
+  // Default 100kb is too small for the poc-review bulk-import endpoint (hundreds of rows per
+  // child); every other route's payloads are small CRUD bodies well under this.
+  app.use(express.json({ limit: "2mb" }));
 
   app.get("/health", async (_req, res) => {
     try {
