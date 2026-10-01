@@ -75,14 +75,57 @@ function buildSkillGroups(detail: PocReviewChildDetail): { groups: SkillGroup[];
   return { groups: groupsList, unmatchedGoals };
 }
 
+interface ItemGroup {
+  key: string;
+  label: string;
+  evidence: PocLogEvidenceRow[];
+}
+
+/** Groups one skill's evidence by the real item it resolved to (or by hint/absence when it
+ * didn't), so a reviewer sees "Apple: 6" rather than six separate rows that all say "Apple". */
+function groupEvidenceByItem(evidence: PocLogEvidenceRow[]): ItemGroup[] {
+  const map = new Map<string, ItemGroup>();
+  for (const e of evidence) {
+    let key: string;
+    let label: string;
+    if (e.itemMatchMethod === "ai" && e.predictedItem) {
+      key = `item:${e.predictedItem.id}`;
+      label = e.predictedItem.displayName;
+    } else if (e.itemMatchMethod === "ai_no_match") {
+      key = `nomatch:${e.itemHint ?? ""}`;
+      label = e.itemHint ? `"${e.itemHint}" (no real item fit)` : "No real item fit";
+    } else {
+      key = "none";
+      label = "No item tracked";
+    }
+    let group = map.get(key);
+    if (!group) {
+      group = { key, label, evidence: [] };
+      map.set(key, group);
+    }
+    group.evidence.push(e);
+  }
+  return [...map.values()].sort((a, b) => b.evidence.length - a.evidence.length);
+}
+
 export function PocReviewPage() {
   const { token } = useAuth();
   const [children, setChildren] = useState<PocReviewChild[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<PocReviewChildDetail | null>(null);
   const [tab, setTab] = useState<"byskill" | "goals" | "logs">("byskill");
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const skillView = useMemo(() => (detail ? buildSkillGroups(detail) : null), [detail]);
+
+  function toggleExpanded(key: string) {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   useEffect(() => {
     api.listPocReviewChildren(token!).then((rows) => {
@@ -196,41 +239,60 @@ export function PocReviewPage() {
                       )}
 
                       {group.evidence.length > 0 ? (
-                        <div className="table-wrap">
-                          <table className="data-table">
-                            <thead>
-                              <tr>
-                                <Th tip="The date this daily log entry was recorded.">Date</Th>
-                                <Th tip="The free-text item/vocabulary/task the first AI pass pulled from the log, before any matching against the real item bank.">
-                                  Item hint
-                                </Th>
-                                <Th tip="The real Canonical Skill Item the hint was matched to, via a second AI call constrained to just this skill's own item candidates.">
-                                  Matched item
-                                </Th>
-                                <Th tip="What happened, as judged by the AI from the log text: correct, incorrect, partial, attempted, not observed, or unknown.">
-                                  Outcome
-                                </Th>
-                                <Th tip="The level of prompting/assistance the child needed, as judged by the AI from the log text. 'Unknown' usually means the log didn't state it explicitly.">
-                                  Support
-                                </Th>
-                                <Th tip="The AI's self-reported confidence in this extraction (0-100%). Not independently verified.">Confidence</Th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {group.evidence.map((e) => (
-                                <tr key={e.id}>
-                                  <td>{e.logDate ? new Date(e.logDate).toLocaleDateString() : "—"}</td>
-                                  <td>{e.itemHint ?? "—"}</td>
-                                  <td>
-                                    <MatchedItemCell row={e} />
-                                  </td>
-                                  <td>{e.outcome.replace("_", " ")}</td>
-                                  <td>{e.supportLevel.replace("_", " ")}</td>
-                                  <td>{confidencePct(e.confidence)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                          {groupEvidenceByItem(group.evidence).map((itemGroup) => {
+                            const expandKey = `${group.skillId}:${itemGroup.key}`;
+                            const isOpen = expandedItems.has(expandKey);
+                            return (
+                              <div key={itemGroup.key}>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpanded(expandKey)}
+                                  className="taxonomy-item-btn"
+                                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", border: "1px solid var(--color-border)" }}
+                                >
+                                  <span>
+                                    {isOpen ? "▾" : "▸"} {itemGroup.label}
+                                  </span>
+                                  <span className="tag tag-framework">{itemGroup.evidence.length}</span>
+                                </button>
+                                {isOpen ? (
+                                  <div className="table-wrap" style={{ marginTop: "0.4rem" }}>
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <Th tip="The date this daily log entry was recorded.">Date</Th>
+                                          <Th tip="What happened, as judged by the AI from the log text: correct, incorrect, partial, attempted, not observed, or unknown.">
+                                            Outcome
+                                          </Th>
+                                          <Th tip="The level of prompting/assistance the child needed, as judged by the AI from the log text. 'Unknown' usually means the log didn't state it explicitly.">
+                                            Support
+                                          </Th>
+                                          <Th tip="The AI's self-reported confidence in this extraction (0-100%). Not independently verified.">
+                                            Extraction confidence
+                                          </Th>
+                                          <Th tip="The AI's self-reported confidence that this evidence really belongs to the item shown above (0-100%).">
+                                            Item match confidence
+                                          </Th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {itemGroup.evidence.map((e) => (
+                                          <tr key={e.id}>
+                                            <td>{e.logDate ? new Date(e.logDate).toLocaleDateString() : "—"}</td>
+                                            <td>{e.outcome.replace("_", " ")}</td>
+                                            <td>{e.supportLevel.replace("_", " ")}</td>
+                                            <td>{confidencePct(e.confidence)}</td>
+                                            <td>{e.itemMatchMethod === "ai" ? confidencePct(e.itemMatchScore) : "—"}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="hint-text">No log evidence matched this skill yet.</p>
