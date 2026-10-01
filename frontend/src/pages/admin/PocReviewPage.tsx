@@ -229,6 +229,7 @@ export function PocReviewPage() {
                           {group.goals.map((g) => (
                             <div key={g.id} className="hint-text" style={{ marginBottom: "0.25rem" }}>
                               Goal: <span style={{ color: "var(--color-text)" }}>{g.goalTitle}</span> ({confidencePct(g.confidence)} confidence)
+                              {g.centreName ? <span className="tag tag-framework" style={{ marginLeft: "0.5rem" }}>{g.centreName}</span> : null}
                             </div>
                           ))}
                         </div>
@@ -262,6 +263,9 @@ export function PocReviewPage() {
                                       <thead>
                                         <tr>
                                           <Th tip="The date this daily log entry was recorded.">Date</Th>
+                                          <Th tip="The therapy centre this log's enrollment pointed to in PranTrackingSystem. Most logs are home logs with no centre set.">
+                                            Centre
+                                          </Th>
                                           <Th tip="What happened, as judged by the AI from the log text: correct, incorrect, partial, attempted, not observed, or unknown.">
                                             Outcome
                                           </Th>
@@ -280,6 +284,7 @@ export function PocReviewPage() {
                                         {itemGroup.evidence.map((e) => (
                                           <tr key={e.id}>
                                             <td>{e.logDate ? new Date(e.logDate).toLocaleDateString() : "—"}</td>
+                                            <td>{e.centreName ?? "—"}</td>
                                             <td>{e.outcome.replace("_", " ")}</td>
                                             <td>{e.supportLevel.replace("_", " ")}</td>
                                             <td>{confidencePct(e.confidence)}</td>
@@ -325,6 +330,7 @@ export function PocReviewPage() {
                     <thead>
                       <tr>
                         <Th tip="The goal's title as written by the therapist, exactly as stored in PranTrackingSystem.">Goal title</Th>
+                        <Th tip="The therapy centre(s) this goal is linked to in PranTrackingSystem. Null means home-only/unlinked.">Centre</Th>
                         <Th tip="The domain and category this goal was originally filed under in PranTrackingSystem -- not from the canonical taxonomy, and not something the AI saw as a fixed option.">
                           Original domain / category
                         </Th>
@@ -343,6 +349,7 @@ export function PocReviewPage() {
                       {detail.goalTags.map((g) => (
                         <tr key={g.id}>
                           <td>{g.goalTitle}</td>
+                          <td>{g.centreName ?? "—"}</td>
                           <td>
                             {g.originalDomainName ?? "—"}
                             {g.originalCategory ? <div className="hint-text">{g.originalCategory}</div> : null}
@@ -364,6 +371,9 @@ export function PocReviewPage() {
                     <thead>
                       <tr>
                         <Th tip="The date this daily log entry was recorded.">Date</Th>
+                        <Th tip="The therapy centre this log's enrollment pointed to in PranTrackingSystem. Most logs are home logs with no centre set.">
+                          Centre
+                        </Th>
                         <Th tip="The Canonical Skill (and its Domain) this specific piece of evidence was matched to. A single log can yield several evidence rows against different skills.">
                           Predicted skill
                         </Th>
@@ -384,6 +394,7 @@ export function PocReviewPage() {
                       {detail.logEvidence.map((e) => (
                         <tr key={e.id}>
                           <td>{e.logDate ? new Date(e.logDate).toLocaleDateString() : "—"}</td>
+                          <td>{e.centreName ?? "—"}</td>
                           <td>
                             {e.predictedSkill ? (
                               <>

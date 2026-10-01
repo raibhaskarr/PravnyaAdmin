@@ -30,6 +30,7 @@ const importSchema = z.object({
       goalTitle: z.string().min(1).max(300),
       originalDomainName: z.string().max(200).nullable(),
       originalCategory: z.string().max(200).nullable(),
+      centreName: z.string().max(200).nullable(),
       predictedSkillId: z.string().uuid().nullable(),
       confidence: z.number().min(0).max(1).nullable(),
       rationale: z.string().max(1000).nullable(),
@@ -39,6 +40,7 @@ const importSchema = z.object({
   logEvidence: z.array(
     z.object({
       logDate: z.string().nullable(),
+      centreName: z.string().max(200).nullable(),
       predictedSkillId: z.string().uuid().nullable(),
       itemHint: z.string().max(200).nullable(),
       predictedItemId: z.string().uuid().nullable(),

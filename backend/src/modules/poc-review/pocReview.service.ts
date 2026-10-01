@@ -9,6 +9,7 @@ export interface GoalTagImport {
   goalTitle: string;
   originalDomainName: string | null;
   originalCategory: string | null;
+  centreName: string | null;
   predictedSkillId: string | null;
   confidence: number | null;
   rationale: string | null;
@@ -17,6 +18,7 @@ export interface GoalTagImport {
 
 export interface LogEvidenceImport {
   logDate: string | null;
+  centreName: string | null;
   predictedSkillId: string | null;
   itemHint: string | null;
   predictedItemId: string | null;
@@ -75,6 +77,7 @@ export const pocReviewService = {
           goalTitle: g.goalTitle,
           originalDomainName: g.originalDomainName,
           originalCategory: g.originalCategory,
+          centreName: g.centreName,
           predictedSkillId: g.predictedSkillId,
           confidence: g.confidence,
           rationale: g.rationale,
@@ -87,6 +90,7 @@ export const pocReviewService = {
         data: payload.logEvidence.map((e) => ({
           childId: child.id,
           logDate: e.logDate ? new Date(e.logDate) : null,
+          centreName: e.centreName,
           predictedSkillId: e.predictedSkillId,
           itemHint: e.itemHint,
           predictedItemId: e.predictedItemId,

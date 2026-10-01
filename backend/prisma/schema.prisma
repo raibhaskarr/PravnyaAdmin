@@ -290,6 +290,9 @@ model PocGoalTag {
   /// .category) -- never encrypted, kept for comparison against the AI-predicted skill's domain.
   originalDomainName String?
   originalCategory   String?
+  /// Therapy centre(s) this goal is linked to in PranTrackingSystem (IEPGoalCenterEnrollment ->
+  /// CenterEnrollment.centerName), comma-joined if more than one. Null means home-only/unlinked.
+  centreName         String?
   predictedSkillId   String?            @db.Uuid
   predictedSkill   CanonicalSkill?    @relation(fields: [predictedSkillId], references: [id], onDelete: SetNull)
   confidence       Float?
@@ -310,6 +313,9 @@ model PocLogEvidence {
   childId          String             @db.Uuid
   child            PocReviewChild     @relation(fields: [childId], references: [id], onDelete: Cascade)
   logDate          DateTime?
+  /// The therapy centre this daily log's CenterEnrollment pointed to in PranTrackingSystem. Null
+  /// for most logs -- the source field is rarely set at log-creation time (home logs especially).
+  centreName       String?
   predictedSkillId String?            @db.Uuid
   predictedSkill   CanonicalSkill?    @relation(fields: [predictedSkillId], references: [id], onDelete: SetNull)
   itemHint         String?

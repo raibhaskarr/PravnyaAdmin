@@ -148,6 +148,7 @@ export type PocGoalTag = {
   goalTitle: string;
   originalDomainName: string | null;
   originalCategory: string | null;
+  centreName: string | null;
   predictedSkill: PocSkillRef | null;
   confidence: number | null;
   rationale: string | null;
@@ -159,6 +160,7 @@ export type PocGoalTag = {
 export type PocLogEvidenceRow = {
   id: string;
   logDate: string | null;
+  centreName: string | null;
   predictedSkill: PocSkillRef | null;
   itemHint: string | null;
   predictedItem: { id: string; displayName: string } | null;
