@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import type { PocReviewChild, PocReviewChildDetail } from "../../api/types";
@@ -8,6 +8,16 @@ function PassBadge({ provider, model }: { provider: string; model: string }) {
     <span className="tag tag-framework" title={model}>
       {provider.charAt(0).toUpperCase() + provider.slice(1)} &middot; Pass 1
     </span>
+  );
+}
+
+// Dotted underline is the visual cue that a column header has an explanatory tooltip (native
+// title attribute) -- plain <th title="..."> gives no hint that hovering does anything.
+function Th({ tip, children }: { tip: string; children: ReactNode }) {
+  return (
+    <th title={tip} style={{ textDecoration: "underline dotted", textDecorationColor: "var(--color-border)", cursor: "help" }}>
+      {children}
+    </th>
   );
 }
 
@@ -107,13 +117,19 @@ export function PocReviewPage() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Goal title</th>
-                        <th>Original domain / category</th>
-                        <th>Predicted domain</th>
-                        <th>Predicted skill</th>
-                        <th>Confidence</th>
-                        <th>Status</th>
-                        <th>Rationale</th>
+                        <Th tip="The goal's title as written by the therapist, exactly as stored in PranTrackingSystem.">Goal title</Th>
+                        <Th tip="The domain and category this goal was originally filed under in PranTrackingSystem -- not from the canonical taxonomy, and not something the AI saw as a fixed option.">
+                          Original domain / category
+                        </Th>
+                        <Th tip="The Domain of the AI-predicted Canonical Skill (right), from PravnyaAdmin's live taxonomy. Compare against 'Original domain / category' to spot mismatches.">
+                          Predicted domain
+                        </Th>
+                        <Th tip="The single best-matching Canonical Skill the AI selected from the full 148-skill taxonomy for this goal.">Predicted skill</Th>
+                        <Th tip="The AI's self-reported confidence in this match (0-100%). Not independently verified.">Confidence</Th>
+                        <Th tip="TAGGED = matched to a skill. NO_MATCH = the AI found no reasonable skill in the taxonomy for this goal -- a real finding, not an error. ERROR = the AI call itself failed.">
+                          Status
+                        </Th>
+                        <Th tip="The AI's one-sentence explanation for why it chose this skill, or why it found no match.">Rationale</Th>
                       </tr>
                     </thead>
                     <tbody>
@@ -140,12 +156,18 @@ export function PocReviewPage() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Predicted skill</th>
-                        <th>Item hint</th>
-                        <th>Outcome</th>
-                        <th>Support</th>
-                        <th>Confidence</th>
+                        <Th tip="The date this daily log entry was recorded.">Date</Th>
+                        <Th tip="The Canonical Skill (and its Domain) this specific piece of evidence was matched to. A single log can yield several evidence rows against different skills.">
+                          Predicted skill
+                        </Th>
+                        <Th tip="A free-text description of the specific item/vocabulary/task mentioned, if any. Not validated against the 1081-item canonical bank -- a deliberate scope cut for this POC.">
+                          Item hint
+                        </Th>
+                        <Th tip="What happened, as judged by the AI from the log text: correct, incorrect, partial, attempted, not observed, or unknown.">Outcome</Th>
+                        <Th tip="The level of prompting/assistance the child needed, as judged by the AI from the log text. 'Unknown' usually means the log didn't state it explicitly.">
+                          Support
+                        </Th>
+                        <Th tip="The AI's self-reported confidence in this extraction (0-100%). Not independently verified.">Confidence</Th>
                       </tr>
                     </thead>
                     <tbody>
