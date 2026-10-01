@@ -41,6 +41,9 @@ const importSchema = z.object({
       logDate: z.string().nullable(),
       predictedSkillId: z.string().uuid().nullable(),
       itemHint: z.string().max(200).nullable(),
+      predictedItemId: z.string().uuid().nullable(),
+      itemMatchScore: z.number().min(0).max(1).nullable(),
+      itemMatchMethod: z.string().max(50).nullable(),
       outcome: z.enum(["CORRECT", "INCORRECT", "PARTIAL", "ATTEMPTED", "NOT_OBSERVED", "UNKNOWN"]),
       supportLevel: z.enum(["INDEPENDENT", "VISUAL_PROMPT", "VERBAL_PROMPT", "GESTURAL_PROMPT", "PHYSICAL_PROMPT", "PARTIAL_ASSISTANCE", "FULL_ASSISTANCE", "UNKNOWN"]),
       confidence: z.number().min(0).max(1).nullable()

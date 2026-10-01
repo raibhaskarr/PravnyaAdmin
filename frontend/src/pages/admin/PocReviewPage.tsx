@@ -25,6 +25,21 @@ function confidencePct(value: number | null) {
   return value == null ? "—" : `${Math.round(value * 100)}%`;
 }
 
+function MatchedItemCell({ row }: { row: { predictedItem: { displayName: string } | null; itemMatchMethod: string | null; itemMatchScore: number | null } }) {
+  if (row.itemMatchMethod === "ai" && row.predictedItem) {
+    return (
+      <>
+        {row.predictedItem.displayName}
+        <div className="hint-text">{confidencePct(row.itemMatchScore)} match</div>
+      </>
+    );
+  }
+  if (row.itemMatchMethod === "ai_no_match") {
+    return <span className="hint-text">no real item fit</span>;
+  }
+  return "—";
+}
+
 export function PocReviewPage() {
   const { token } = useAuth();
   const [children, setChildren] = useState<PocReviewChild[]>([]);
@@ -160,8 +175,11 @@ export function PocReviewPage() {
                         <Th tip="The Canonical Skill (and its Domain) this specific piece of evidence was matched to. A single log can yield several evidence rows against different skills.">
                           Predicted skill
                         </Th>
-                        <Th tip="A free-text description of the specific item/vocabulary/task mentioned, if any. Not validated against the 1081-item canonical bank -- a deliberate scope cut for this POC.">
+                        <Th tip="The free-text item/vocabulary/task the first AI pass pulled from the log, before any matching against the real item bank.">
                           Item hint
+                        </Th>
+                        <Th tip="The real Canonical Skill Item the hint was matched to, via a second AI call constrained to just that skill's own item candidates. 'no match' means the AI found no real item that fit; 'n/a' means this skill doesn't track items or no hint was given.">
+                          Matched item
                         </Th>
                         <Th tip="What happened, as judged by the AI from the log text: correct, incorrect, partial, attempted, not observed, or unknown.">Outcome</Th>
                         <Th tip="The level of prompting/assistance the child needed, as judged by the AI from the log text. 'Unknown' usually means the log didn't state it explicitly.">
@@ -185,6 +203,9 @@ export function PocReviewPage() {
                             )}
                           </td>
                           <td>{e.itemHint ?? "—"}</td>
+                          <td>
+                            <MatchedItemCell row={e} />
+                          </td>
                           <td>{e.outcome.replace("_", " ")}</td>
                           <td>{e.supportLevel.replace("_", " ")}</td>
                           <td>{confidencePct(e.confidence)}</td>

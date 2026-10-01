@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma";
 import { notFound } from "../../common/errors/AppError";
 
 const skillSelect = { select: { id: true, name: true, domain: { select: { name: true } } } };
+const itemSelect = { select: { id: true, displayName: true } };
 
 export interface GoalTagImport {
   goalTitle: string;
@@ -18,6 +19,9 @@ export interface LogEvidenceImport {
   logDate: string | null;
   predictedSkillId: string | null;
   itemHint: string | null;
+  predictedItemId: string | null;
+  itemMatchScore: number | null;
+  itemMatchMethod: string | null;
   outcome: PocEvidenceOutcome;
   supportLevel: PocSupportLevel;
   confidence: number | null;
@@ -46,7 +50,7 @@ export const pocReviewService = {
       where: { id: childId },
       include: {
         goalTags: { include: { predictedSkill: skillSelect }, orderBy: { createdAt: "asc" } },
-        logEvidence: { include: { predictedSkill: skillSelect }, orderBy: { logDate: "asc" } }
+        logEvidence: { include: { predictedSkill: skillSelect, predictedItem: itemSelect }, orderBy: { logDate: "asc" } }
       }
     });
     if (!child) throw notFound("Review child not found");
@@ -85,6 +89,9 @@ export const pocReviewService = {
           logDate: e.logDate ? new Date(e.logDate) : null,
           predictedSkillId: e.predictedSkillId,
           itemHint: e.itemHint,
+          predictedItemId: e.predictedItemId,
+          itemMatchScore: e.itemMatchScore,
+          itemMatchMethod: e.itemMatchMethod,
           outcome: e.outcome,
           supportLevel: e.supportLevel,
           confidence: e.confidence,

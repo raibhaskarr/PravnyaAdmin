@@ -161,6 +161,9 @@ export type PocLogEvidenceRow = {
   logDate: string | null;
   predictedSkill: PocSkillRef | null;
   itemHint: string | null;
+  predictedItem: { id: string; displayName: string } | null;
+  itemMatchScore: number | null;
+  itemMatchMethod: string | null;
   outcome: PocEvidenceOutcome;
   supportLevel: PocSupportLevel;
   confidence: number | null;

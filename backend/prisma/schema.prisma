@@ -134,6 +134,7 @@ model CanonicalSkillItem {
   semanticGroup String         @default("OTHER")
   aliases       Json?
   goalItems     GoalItem[]
+  pocLogEvidence PocLogEvidence[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -312,6 +313,13 @@ model PocLogEvidence {
   predictedSkillId String?            @db.Uuid
   predictedSkill   CanonicalSkill?    @relation(fields: [predictedSkillId], references: [id], onDelete: SetNull)
   itemHint         String?
+  /// The real CanonicalSkillItem itemHint was matched to, if any -- an AI-based second pass
+  /// (constrained to just that skill's own item candidates), not the same call that picked the
+  /// skill above. itemMatchMethod records how: ai | ai_no_match | no_hint | not_applicable.
+  predictedItemId  String?            @db.Uuid
+  predictedItem    CanonicalSkillItem? @relation(fields: [predictedItemId], references: [id], onDelete: SetNull)
+  itemMatchScore   Float?
+  itemMatchMethod  String?
   outcome          PocEvidenceOutcome
   supportLevel     PocSupportLevel
   confidence       Float?
