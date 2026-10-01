@@ -6,6 +6,8 @@ const skillSelect = { select: { id: true, name: true, domain: { select: { name: 
 
 export interface GoalTagImport {
   goalTitle: string;
+  originalDomainName: string | null;
+  originalCategory: string | null;
   predictedSkillId: string | null;
   confidence: number | null;
   rationale: string | null;
@@ -67,6 +69,8 @@ export const pocReviewService = {
         data: payload.goalTags.map((g) => ({
           childId: child.id,
           goalTitle: g.goalTitle,
+          originalDomainName: g.originalDomainName,
+          originalCategory: g.originalCategory,
           predictedSkillId: g.predictedSkillId,
           confidence: g.confidence,
           rationale: g.rationale,

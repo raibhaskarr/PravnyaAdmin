@@ -146,6 +146,8 @@ export type PocReviewChild = {
 export type PocGoalTag = {
   id: string;
   goalTitle: string;
+  originalDomainName: string | null;
+  originalCategory: string | null;
   predictedSkill: PocSkillRef | null;
   confidence: number | null;
   rationale: string | null;

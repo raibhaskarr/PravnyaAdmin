@@ -28,6 +28,8 @@ const importSchema = z.object({
   goalTags: z.array(
     z.object({
       goalTitle: z.string().min(1).max(300),
+      originalDomainName: z.string().max(200).nullable(),
+      originalCategory: z.string().max(200).nullable(),
       predictedSkillId: z.string().uuid().nullable(),
       confidence: z.number().min(0).max(1).nullable(),
       rationale: z.string().max(1000).nullable(),

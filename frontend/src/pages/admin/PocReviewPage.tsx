@@ -108,6 +108,8 @@ export function PocReviewPage() {
                     <thead>
                       <tr>
                         <th>Goal title</th>
+                        <th>Original domain / category</th>
+                        <th>Predicted domain</th>
                         <th>Predicted skill</th>
                         <th>Confidence</th>
                         <th>Status</th>
@@ -119,15 +121,11 @@ export function PocReviewPage() {
                         <tr key={g.id}>
                           <td>{g.goalTitle}</td>
                           <td>
-                            {g.predictedSkill ? (
-                              <>
-                                {g.predictedSkill.name}
-                                <div className="hint-text">{g.predictedSkill.domain.name}</div>
-                              </>
-                            ) : (
-                              "—"
-                            )}
+                            {g.originalDomainName ?? "—"}
+                            {g.originalCategory ? <div className="hint-text">{g.originalCategory}</div> : null}
                           </td>
+                          <td>{g.predictedSkill?.domain.name ?? "—"}</td>
+                          <td>{g.predictedSkill?.name ?? "—"}</td>
                           <td>{confidencePct(g.confidence)}</td>
                           <td>{g.status.replace("_", " ")}</td>
                           <td style={{ maxWidth: 360 }}>{g.rationale ?? "—"}</td>

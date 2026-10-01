@@ -281,11 +281,15 @@ model PocReviewChild {
 /// predictedSkillId is nullable because a goal can legitimately have no reasonable taxonomy match
 /// (status = NO_MATCH) -- that's a real, useful finding, not an error.
 model PocGoalTag {
-  id               String             @id @default(uuid()) @db.Uuid
-  childId          String             @db.Uuid
-  child            PocReviewChild     @relation(fields: [childId], references: [id], onDelete: Cascade)
-  goalTitle        String
-  predictedSkillId String?            @db.Uuid
+  id                 String             @id @default(uuid()) @db.Uuid
+  childId            String             @db.Uuid
+  child              PocReviewChild     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  goalTitle          String
+  /// The goal's own domain/category exactly as entered by the therapist (IEPGoal.domainName /
+  /// .category) -- never encrypted, kept for comparison against the AI-predicted skill's domain.
+  originalDomainName String?
+  originalCategory   String?
+  predictedSkillId   String?            @db.Uuid
   predictedSkill   CanonicalSkill?    @relation(fields: [predictedSkillId], references: [id], onDelete: SetNull)
   confidence       Float?
   rationale        String?
