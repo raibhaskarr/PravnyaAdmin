@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import type { PocGoalTag, PocLogEvidenceRow, PocReviewChild, PocReviewChildDetail } from "../../api/types";
+import { GrowthPreviewView } from "./growthPreview";
 
 function providerLabel(provider: string) {
   return provider.charAt(0).toUpperCase() + provider.slice(1);
@@ -394,7 +395,7 @@ export function PocReviewPage() {
   const [children, setChildren] = useState<PocReviewChild[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<PocReviewChildDetail | null>(null);
-  const [tab, setTab] = useState<"byskill" | "goals" | "logs">("byskill");
+  const [tab, setTab] = useState<"byskill" | "goals" | "logs" | "growth">("byskill");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [provider, setProvider] = useState<string>("");
 
@@ -531,6 +532,9 @@ export function PocReviewPage() {
                 </button>
                 <button type="button" className={`btn ${tab === "logs" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("logs")}>
                   Log evidence ({filteredDetail.logEvidence.length})
+                </button>
+                <button type="button" className={`btn ${tab === "growth" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("growth")}>
+                  Growth preview
                 </button>
               </div>
 
@@ -693,6 +697,8 @@ export function PocReviewPage() {
                   </table>
                   {filteredDetail.goalTags.length === 0 ? <p className="empty-state">No goal tags for this child.</p> : null}
                 </div>
+              ) : tab === "growth" ? (
+                <GrowthPreviewView childLabel={detail.label} goalTags={filteredDetail.goalTags} logEvidence={filteredDetail.logEvidence} />
               ) : (
                 <div className="table-wrap">
                   <table className="data-table">
