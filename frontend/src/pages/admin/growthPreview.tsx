@@ -212,6 +212,25 @@ function Glyph({ levels }: { levels: number[] }) {
   );
 }
 
+/** Tap-to-expand, not hover-only -- a native `title` tooltip never fires on a touch screen, and
+ * this preview is standing in for a touch-first mobile app, not this admin tool's own desktop UI. */
+function GlyphLegend() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="gp-legend">
+      <button type="button" className="gp-legend-trigger" onClick={() => setOpen((o) => !o)}>
+        <span className="gp-legend-icon">i</span> What do the colored bars mean?
+      </button>
+      {open ? (
+        <div className="gp-legend-body">
+          Each bar is one of the most recent tries at that skill, oldest on the left. Taller and greener means more
+          independent; shorter and lighter means more help was needed.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function SkillRow({ skill, showEvidence }: { skill: GrowthSkillView; showEvidence: boolean }) {
   return (
     <div className="gp-skill-row">
@@ -264,6 +283,7 @@ function NarrativeConcept({ skills, childLabel }: { skills: GrowthSkillView[]; c
           <div className="gp-stat-lbl">Skills with evidence</div>
         </div>
       </div>
+      <GlyphLegend />
       {byDomain.map(([domainName, domainSkills]) => (
         <div key={domainName}>
           <div className="gp-domain-label">
@@ -413,6 +433,7 @@ function HybridConcept({ skills, moments, childLabel }: { skills: GrowthSkillVie
           Detailed
         </button>
       </div>
+      <GlyphLegend />
 
       {detailed && crossEnv.length > 0 ? (
         <div className="gp-trust-strip">
@@ -544,6 +565,10 @@ const GROWTH_PREVIEW_CSS = `
 .gp-detail-toggle { display: flex; background: var(--gp-border); border-radius: 999px; padding: 3px; margin-bottom: 0.9rem; width: fit-content; }
 .gp-detail-toggle button { font-family: var(--gpf); border: none; background: none; color: var(--gp-ink-soft); font-size: 0.76rem; font-weight: 700; padding: 0.4rem 0.9rem; border-radius: 999px; cursor: pointer; }
 .gp-detail-toggle button.gp-active { background: var(--gp-panel); color: var(--gp-green-700); box-shadow: var(--gp-shadow-sm); }
+.gp-legend { margin-bottom: 0.9rem; }
+.gp-legend-trigger { font-family: var(--gpf); display: inline-flex; align-items: center; gap: 0.4rem; border: none; background: none; color: var(--gp-green-600); font-size: 0.76rem; font-weight: 700; padding: 0; cursor: pointer; }
+.gp-legend-icon { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid var(--gp-green-600); font-size: 0.64rem; font-weight: 800; font-style: italic; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.gp-legend-body { margin-top: 0.5rem; background: var(--gp-green-50); border: 1px solid var(--gp-green-100); border-radius: var(--gp-radius-s); padding: 0.7rem 0.85rem; font-size: 0.78rem; color: var(--gp-ink-soft); line-height: 1.5; }
 .gp-skill-row { display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 0.2rem; border-bottom: 1px solid var(--gp-border); }
 .gp-skill-row:last-child { border-bottom: none; }
 .gp-skill-txt { flex: 1; min-width: 0; }
