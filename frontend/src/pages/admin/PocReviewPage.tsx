@@ -158,8 +158,19 @@ function pct(part: number, total: number): string {
   return total ? `${Math.round((part / total) * 100)}%` : "—";
 }
 
-const OUTCOME_ORDER = ["correct", "partial", "attempted", "incorrect", "not_observed", "unknown"];
-const SUPPORT_ORDER = ["independent", "visual_prompt", "verbal_prompt", "gestural_prompt", "physical_prompt", "partial_assistance", "full_assistance", "unknown"];
+// PocEvidenceOutcome/PocSupportLevel values from the API are upper-case ("CORRECT",
+// "INDEPENDENT", ...) -- these must match exactly, or every lookup below silently misses.
+const OUTCOME_ORDER = ["CORRECT", "PARTIAL", "ATTEMPTED", "INCORRECT", "NOT_OBSERVED", "UNKNOWN"];
+const SUPPORT_ORDER = [
+  "INDEPENDENT",
+  "VISUAL_PROMPT",
+  "VERBAL_PROMPT",
+  "GESTURAL_PROMPT",
+  "PHYSICAL_PROMPT",
+  "PARTIAL_ASSISTANCE",
+  "FULL_ASSISTANCE",
+  "UNKNOWN"
+];
 
 /** Side-by-side quality comparison between two independently-run AI provider passes over the same
  * goals and logs -- lets a reviewer see volume/confidence/outcome differences at a glance instead
