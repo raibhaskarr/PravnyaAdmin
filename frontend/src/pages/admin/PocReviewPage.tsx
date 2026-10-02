@@ -81,6 +81,212 @@ function MatchedItemCell({ row }: { row: { predictedItem: { displayName: string 
   return "—";
 }
 
+interface ProviderStats {
+  provider: string;
+  goalsTotal: number;
+  goalsTagged: number;
+  goalsNoMatch: number;
+  goalsError: number;
+  avgGoalConfidence: number | null;
+  evidenceTotal: number;
+  avgEvidenceConfidence: number | null;
+  outcomeCounts: Record<string, number>;
+  supportCounts: Record<string, number>;
+  itemMatchCounts: Record<string, number>;
+}
+
+function average(values: number[]): number | null {
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+}
+
+function computeProviderStats(provider: string, goalTags: PocGoalTag[], logEvidence: PocLogEvidenceRow[]): ProviderStats {
+  const goals = goalTags.filter((g) => g.modelProvider === provider);
+  const evidence = logEvidence.filter((e) => e.modelProvider === provider);
+  const outcomeCounts: Record<string, number> = {};
+  const supportCounts: Record<string, number> = {};
+  const itemMatchCounts: Record<string, number> = {};
+  for (const e of evidence) {
+    outcomeCounts[e.outcome] = (outcomeCounts[e.outcome] ?? 0) + 1;
+    supportCounts[e.supportLevel] = (supportCounts[e.supportLevel] ?? 0) + 1;
+    const method = e.itemMatchMethod ?? "none";
+    itemMatchCounts[method] = (itemMatchCounts[method] ?? 0) + 1;
+  }
+  return {
+    provider,
+    goalsTotal: goals.length,
+    goalsTagged: goals.filter((g) => g.status === "TAGGED").length,
+    goalsNoMatch: goals.filter((g) => g.status === "NO_MATCH").length,
+    goalsError: goals.filter((g) => g.status === "ERROR").length,
+    avgGoalConfidence: average(goals.map((g) => g.confidence).filter((v): v is number => v != null)),
+    evidenceTotal: evidence.length,
+    avgEvidenceConfidence: average(evidence.map((e) => e.confidence).filter((v): v is number => v != null)),
+    outcomeCounts,
+    supportCounts,
+    itemMatchCounts
+  };
+}
+
+interface GoalAgreement {
+  comparable: number;
+  agree: number;
+}
+
+/** Matches goal tags across the two providers by goal title (the same source goal, tagged twice --
+ * once per provider) to see how often they land on the same Canonical Skill. */
+function computeGoalAgreement(goalTags: PocGoalTag[], providerA: string, providerB: string): GoalAgreement {
+  const byTitleA = new Map<string, PocGoalTag>();
+  for (const g of goalTags) if (g.modelProvider === providerA) byTitleA.set(g.goalTitle, g);
+
+  let comparable = 0;
+  let agree = 0;
+  for (const g of goalTags) {
+    if (g.modelProvider !== providerB) continue;
+    const other = byTitleA.get(g.goalTitle);
+    if (!other) continue;
+    if (!g.predictedSkill && !other.predictedSkill) {
+      comparable += 1;
+      agree += 1;
+      continue;
+    }
+    comparable += 1;
+    if (g.predictedSkill && other.predictedSkill && g.predictedSkill.id === other.predictedSkill.id) agree += 1;
+  }
+  return { comparable, agree };
+}
+
+function pct(part: number, total: number): string {
+  return total ? `${Math.round((part / total) * 100)}%` : "—";
+}
+
+const OUTCOME_ORDER = ["correct", "partial", "attempted", "incorrect", "not_observed", "unknown"];
+const SUPPORT_ORDER = ["independent", "visual_prompt", "verbal_prompt", "gestural_prompt", "physical_prompt", "partial_assistance", "full_assistance", "unknown"];
+
+/** Side-by-side quality comparison between two independently-run AI provider passes over the same
+ * goals and logs -- lets a reviewer see volume/confidence/outcome differences at a glance instead
+ * of having to flip the pass toggle back and forth and remember numbers. */
+function ComparePassesCard({ detail, providers }: { detail: PocReviewChildDetail; providers: string[] }) {
+  const [open, setOpen] = useState(true);
+  if (providers.length < 2) return null;
+  const [providerA, providerB] = providers;
+  const statsA = computeProviderStats(providerA, detail.goalTags, detail.logEvidence);
+  const statsB = computeProviderStats(providerB, detail.goalTags, detail.logEvidence);
+  const agreement = computeGoalAgreement(detail.goalTags, providerA, providerB);
+
+  return (
+    <div className="card" style={{ marginBottom: "1.25rem" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="taxonomy-item-btn"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", border: "none", fontWeight: 600 }}
+      >
+        <span>
+          {open ? "▾" : "▸"} Compare {providerLabel(providerA)} vs {providerLabel(providerB)}
+        </span>
+      </button>
+      {open ? (
+        <>
+          <p className="hint-text" style={{ marginTop: "0.4rem", marginBottom: "0.75rem" }}>
+            Both passes ran against the exact same {detail.label} goals and daily logs. Confidence is each model's own
+            self-report, not independently verified.
+          </p>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>{providerLabel(providerA)}</th>
+                  <th>{providerLabel(providerB)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Goals tagged</td>
+                  <td>
+                    {statsA.goalsTagged} / {statsA.goalsTotal} ({pct(statsA.goalsTagged, statsA.goalsTotal)})
+                  </td>
+                  <td>
+                    {statsB.goalsTagged} / {statsB.goalsTotal} ({pct(statsB.goalsTagged, statsB.goalsTotal)})
+                  </td>
+                </tr>
+                <tr>
+                  <td>No taxonomy match</td>
+                  <td>{statsA.goalsNoMatch}</td>
+                  <td>{statsB.goalsNoMatch}</td>
+                </tr>
+                <tr>
+                  <td>Tagging errors</td>
+                  <td>{statsA.goalsError}</td>
+                  <td>{statsB.goalsError}</td>
+                </tr>
+                <tr>
+                  <td>Avg goal confidence</td>
+                  <td>{confidencePct(statsA.avgGoalConfidence)}</td>
+                  <td>{confidencePct(statsB.avgGoalConfidence)}</td>
+                </tr>
+                <tr>
+                  <td>Log evidence rows extracted</td>
+                  <td>{statsA.evidenceTotal}</td>
+                  <td>{statsB.evidenceTotal}</td>
+                </tr>
+                <tr>
+                  <td>Avg evidence confidence</td>
+                  <td>{confidencePct(statsA.avgEvidenceConfidence)}</td>
+                  <td>{confidencePct(statsB.avgEvidenceConfidence)}</td>
+                </tr>
+                <tr>
+                  <td>Item match rate (of evidence with a hint)</td>
+                  <td>
+                    {pct(statsA.itemMatchCounts.ai ?? 0, (statsA.itemMatchCounts.ai ?? 0) + (statsA.itemMatchCounts.ai_no_match ?? 0))}
+                  </td>
+                  <td>
+                    {pct(statsB.itemMatchCounts.ai ?? 0, (statsB.itemMatchCounts.ai ?? 0) + (statsB.itemMatchCounts.ai_no_match ?? 0))}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Evidence with no specific item named</td>
+                  <td>
+                    {statsA.itemMatchCounts.no_hint ?? 0} ({pct(statsA.itemMatchCounts.no_hint ?? 0, statsA.evidenceTotal)})
+                  </td>
+                  <td>
+                    {statsB.itemMatchCounts.no_hint ?? 0} ({pct(statsB.itemMatchCounts.no_hint ?? 0, statsB.evidenceTotal)})
+                  </td>
+                </tr>
+                {OUTCOME_ORDER.map((outcome) => (
+                  <tr key={outcome}>
+                    <td className="hint-text">Outcome: {outcome.replace("_", " ")}</td>
+                    <td>
+                      {statsA.outcomeCounts[outcome] ?? 0} ({pct(statsA.outcomeCounts[outcome] ?? 0, statsA.evidenceTotal)})
+                    </td>
+                    <td>
+                      {statsB.outcomeCounts[outcome] ?? 0} ({pct(statsB.outcomeCounts[outcome] ?? 0, statsB.evidenceTotal)})
+                    </td>
+                  </tr>
+                ))}
+                {SUPPORT_ORDER.map((support) => (
+                  <tr key={support}>
+                    <td className="hint-text">Support: {support.replace("_", " ")}</td>
+                    <td>
+                      {statsA.supportCounts[support] ?? 0} ({pct(statsA.supportCounts[support] ?? 0, statsA.evidenceTotal)})
+                    </td>
+                    <td>
+                      {statsB.supportCounts[support] ?? 0} ({pct(statsB.supportCounts[support] ?? 0, statsB.evidenceTotal)})
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint-text" style={{ marginTop: "0.75rem" }}>
+            <strong>Goal-skill agreement:</strong> of {agreement.comparable} goals both passes tagged, they picked the
+            same Canonical Skill (or both found no match) {agreement.agree} times ({pct(agreement.agree, agreement.comparable)}).
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 interface SkillGroup {
   skillId: string;
   skillName: string;
@@ -265,6 +471,8 @@ export function PocReviewPage() {
                   modelNameByProvider={modelNameByProvider}
                 />
               </div>
+
+              <ComparePassesCard detail={detail} providers={availableProviders} />
 
               <div className="card" style={{ marginBottom: "1.25rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
                 <div>
