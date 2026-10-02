@@ -160,7 +160,7 @@ interface DomainSummary {
   bandLabel: string;
 }
 
-function buildDomainSummaries(skills: GrowthSkillView[], maxDomains = 5): DomainSummary[] {
+function buildDomainSummaries(skills: GrowthSkillView[], maxDomains = 25): DomainSummary[] {
   const byDomain = new Map<string, GrowthSkillView[]>();
   for (const s of skills) {
     const arr = byDomain.get(s.domainName) ?? [];
@@ -209,7 +209,7 @@ function NarrativeConcept({ skills, childLabel }: { skills: GrowthSkillView[]; c
   const up = skills.filter((s) => s.trend === "up");
   const crossEnv = skills.filter((s) => s.environments.length > 1);
   const topSkill = up[0] ?? skills[0];
-  const byDomain = groupByDomain(skills).slice(0, 3);
+  const byDomain = groupByDomain(skills);
 
   return (
     <>
@@ -237,9 +237,11 @@ function NarrativeConcept({ skills, childLabel }: { skills: GrowthSkillView[]; c
       </div>
       {byDomain.map(([domainName, domainSkills]) => (
         <div key={domainName}>
-          <div className="gp-domain-label">{domainName}</div>
+          <div className="gp-domain-label">
+            {domainName} <span className="gp-domain-count">({domainSkills.length})</span>
+          </div>
           <div className="gp-card gp-rows-card">
-            {domainSkills.slice(0, 4).map((s) => (
+            {domainSkills.map((s) => (
               <SkillRow key={s.skillId} skill={s} showEvidence={false} />
             ))}
           </div>
@@ -317,7 +319,7 @@ function DashboardConcept({ skills }: { skills: GrowthSkillView[] }) {
         </div>
       </div>
       <div className="gp-card gp-rows-card">
-        {active.skills.slice(0, 6).map((s) => (
+        {active.skills.map((s) => (
           <div key={s.skillId} className="gp-dash-skill">
             <div className="gp-dash-row1">
               <span className="gp-dash-name">{s.skillName}</span>
@@ -340,7 +342,7 @@ function HybridConcept({ skills, moments, childLabel }: { skills: GrowthSkillVie
   const up = skills.filter((s) => s.trend === "up");
   const crossEnv = skills.filter((s) => s.environments.length > 1);
   const topSkill = up[0] ?? skills[0];
-  const byDomain = groupByDomain(skills).slice(0, 2);
+  const byDomain = groupByDomain(skills);
   const recentMoments = moments.slice(0, 2);
 
   return (
@@ -382,9 +384,11 @@ function HybridConcept({ skills, moments, childLabel }: { skills: GrowthSkillVie
 
       {byDomain.map(([domainName, domainSkills]) => (
         <div key={domainName}>
-          <div className="gp-domain-label">{domainName}</div>
+          <div className="gp-domain-label">
+            {domainName} <span className="gp-domain-count">({domainSkills.length})</span>
+          </div>
           <div className="gp-card gp-rows-card">
-            {domainSkills.slice(0, 3).map((s) => (
+            {domainSkills.map((s) => (
               <SkillRow key={s.skillId} skill={s} showEvidence={true} />
             ))}
           </div>
@@ -492,6 +496,7 @@ const GROWTH_PREVIEW_CSS = `
 .gp-stat-num { font-size: 1.3rem; font-weight: 800; color: var(--gp-green-700); }
 .gp-stat-lbl { font-size: 0.66rem; color: var(--gp-ink-faint); font-weight: 700; margin-top: 0.15rem; line-height: 1.3; }
 .gp-domain-label { font-size: 0.78rem; font-weight: 800; color: var(--gp-ink-faint); text-transform: uppercase; letter-spacing: 0.05em; margin: 1.1rem 0 0.5rem 0.1rem; }
+.gp-domain-count { font-weight: 700; text-transform: none; letter-spacing: 0; opacity: 0.7; }
 .gp-skill-row { display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 0.2rem; border-bottom: 1px solid var(--gp-border); }
 .gp-skill-row:last-child { border-bottom: none; }
 .gp-skill-txt { flex: 1; min-width: 0; }
