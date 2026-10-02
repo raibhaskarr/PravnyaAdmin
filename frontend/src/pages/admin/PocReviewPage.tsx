@@ -7,8 +7,11 @@ function providerLabel(provider: string) {
   return provider.charAt(0).toUpperCase() + provider.slice(1);
 }
 
+const COMPARE_VIEW = "__compare__";
+
 /** Lets a reviewer flip between independently-run passes (one per AI provider) over the exact
- * same goals/logs for this child, to compare how differently each model tags the same evidence. */
+ * same goals/logs for this child, to compare how differently each model tags the same evidence --
+ * plus a third "Compare" view sitting alongside the real passes once there's more than one. */
 function ProviderToggle({
   providers,
   selected,
@@ -42,6 +45,14 @@ function ProviderToggle({
           {providerLabel(p)} pass
         </button>
       ))}
+      <button
+        type="button"
+        onClick={() => onSelect(COMPARE_VIEW)}
+        className={`btn ${selected === COMPARE_VIEW ? "btn-primary" : "btn-secondary"}`}
+        style={{ padding: "0.25rem 0.75rem" }}
+      >
+        Compare
+      </button>
     </div>
   );
 }
@@ -175,33 +186,24 @@ const SUPPORT_ORDER = [
 /** Side-by-side quality comparison between two independently-run AI provider passes over the same
  * goals and logs -- lets a reviewer see volume/confidence/outcome differences at a glance instead
  * of having to flip the pass toggle back and forth and remember numbers. */
-function ComparePassesCard({ detail, providers }: { detail: PocReviewChildDetail; providers: string[] }) {
-  const [open, setOpen] = useState(true);
-  if (providers.length < 2) return null;
+function ComparePassesView({ detail, providers }: { detail: PocReviewChildDetail; providers: string[] }) {
+  if (providers.length < 2) return <p className="empty-state">Only one pass has been run for this child so far.</p>;
   const [providerA, providerB] = providers;
   const statsA = computeProviderStats(providerA, detail.goalTags, detail.logEvidence);
   const statsB = computeProviderStats(providerB, detail.goalTags, detail.logEvidence);
   const agreement = computeGoalAgreement(detail.goalTags, providerA, providerB);
 
   return (
-    <div className="card" style={{ marginBottom: "1.25rem" }}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="taxonomy-item-btn"
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", border: "none", fontWeight: 600 }}
-      >
-        <span>
-          {open ? "▾" : "▸"} Compare {providerLabel(providerA)} vs {providerLabel(providerB)}
-        </span>
-      </button>
-      {open ? (
-        <>
-          <p className="hint-text" style={{ marginTop: "0.4rem", marginBottom: "0.75rem" }}>
-            Both passes ran against the exact same {detail.label} goals and daily logs. Confidence is each model's own
-            self-report, not independently verified.
-          </p>
-          <div className="table-wrap">
+    <div className="card">
+      <strong>
+        {providerLabel(providerA)} vs {providerLabel(providerB)}
+      </strong>
+      <>
+        <p className="hint-text" style={{ marginTop: "0.4rem", marginBottom: "0.75rem" }}>
+          Both passes ran against the exact same {detail.label} goals and daily logs. Confidence is each model's own
+          self-report, not independently verified.
+        </p>
+        <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
@@ -288,12 +290,11 @@ function ComparePassesCard({ detail, providers }: { detail: PocReviewChildDetail
               </tbody>
             </table>
           </div>
-          <p className="hint-text" style={{ marginTop: "0.75rem" }}>
-            <strong>Goal-skill agreement:</strong> of {agreement.comparable} goals both passes tagged, they picked the
-            same Canonical Skill (or both found no match) {agreement.agree} times ({pct(agreement.agree, agreement.comparable)}).
-          </p>
-        </>
-      ) : null}
+        <p className="hint-text" style={{ marginTop: "0.75rem" }}>
+          <strong>Goal-skill agreement:</strong> of {agreement.comparable} goals both passes tagged, they picked the
+          same Canonical Skill (or both found no match) {agreement.agree} times ({pct(agreement.agree, agreement.comparable)}).
+        </p>
+      </>
     </div>
   );
 }
@@ -398,7 +399,8 @@ export function PocReviewPage() {
   }, [detail]);
 
   useEffect(() => {
-    if (availableProviders.length && !availableProviders.includes(provider)) {
+    if (!availableProviders.length || provider === COMPARE_VIEW) return;
+    if (!availableProviders.includes(provider)) {
       setProvider(availableProviders[0]);
     }
   }, [availableProviders, provider]);
@@ -483,8 +485,10 @@ export function PocReviewPage() {
                 />
               </div>
 
-              <ComparePassesCard detail={detail} providers={availableProviders} />
-
+              {provider === COMPARE_VIEW ? (
+                <ComparePassesView detail={detail} providers={availableProviders} />
+              ) : (
+                <>
               <div className="card" style={{ marginBottom: "1.25rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
                 <div>
                   <div className="field-label">Goals tagged</div>
@@ -722,6 +726,8 @@ export function PocReviewPage() {
                   </table>
                   {filteredDetail.logEvidence.length === 0 ? <p className="empty-state">No log evidence for this child.</p> : null}
                 </div>
+              )}
+                </>
               )}
             </>
           )}
