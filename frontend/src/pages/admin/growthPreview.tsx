@@ -339,6 +339,7 @@ function DashboardConcept({ skills }: { skills: GrowthSkillView[] }) {
 }
 
 function HybridConcept({ skills, moments, childLabel }: { skills: GrowthSkillView[]; moments: GrowthMoment[]; childLabel: string }) {
+  const [detailed, setDetailed] = useState(false);
   const up = skills.filter((s) => s.trend === "up");
   const crossEnv = skills.filter((s) => s.environments.length > 1);
   const topSkill = up[0] ?? skills[0];
@@ -370,7 +371,16 @@ function HybridConcept({ skills, moments, childLabel }: { skills: GrowthSkillVie
         </div>
       </div>
 
-      {crossEnv.length > 0 ? (
+      <div className="gp-detail-toggle">
+        <button type="button" className={!detailed ? "gp-active" : ""} onClick={() => setDetailed(false)}>
+          Simple
+        </button>
+        <button type="button" className={detailed ? "gp-active" : ""} onClick={() => setDetailed(true)}>
+          Detailed
+        </button>
+      </div>
+
+      {detailed && crossEnv.length > 0 ? (
         <div className="gp-trust-strip">
           <div className="gp-trust-icon">✓</div>
           <div>
@@ -389,7 +399,7 @@ function HybridConcept({ skills, moments, childLabel }: { skills: GrowthSkillVie
           </div>
           <div className="gp-card gp-rows-card">
             {domainSkills.map((s) => (
-              <SkillRow key={s.skillId} skill={s} showEvidence={true} />
+              <SkillRow key={s.skillId} skill={s} showEvidence={detailed} />
             ))}
           </div>
         </div>
@@ -497,6 +507,9 @@ const GROWTH_PREVIEW_CSS = `
 .gp-stat-lbl { font-size: 0.66rem; color: var(--gp-ink-faint); font-weight: 700; margin-top: 0.15rem; line-height: 1.3; }
 .gp-domain-label { font-size: 0.78rem; font-weight: 800; color: var(--gp-ink-faint); text-transform: uppercase; letter-spacing: 0.05em; margin: 1.1rem 0 0.5rem 0.1rem; }
 .gp-domain-count { font-weight: 700; text-transform: none; letter-spacing: 0; opacity: 0.7; }
+.gp-detail-toggle { display: flex; background: var(--gp-border); border-radius: 999px; padding: 3px; margin-bottom: 0.9rem; width: fit-content; }
+.gp-detail-toggle button { font-family: var(--gpf); border: none; background: none; color: var(--gp-ink-soft); font-size: 0.76rem; font-weight: 700; padding: 0.4rem 0.9rem; border-radius: 999px; cursor: pointer; }
+.gp-detail-toggle button.gp-active { background: var(--gp-panel); color: var(--gp-green-700); box-shadow: var(--gp-shadow-sm); }
 .gp-skill-row { display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 0.2rem; border-bottom: 1px solid var(--gp-border); }
 .gp-skill-row:last-child { border-bottom: none; }
 .gp-skill-txt { flex: 1; min-width: 0; }
