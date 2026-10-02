@@ -33,6 +33,37 @@ function formatEnvironments(envs: string[]): string {
   return envs.join(" & ");
 }
 
+const OUTCOME_LABEL: Record<string, string> = {
+  CORRECT: "Did it on their own",
+  PARTIAL: "Needed a little help",
+  ATTEMPTED: "Gave it a try",
+  INCORRECT: "Still learning this",
+  NOT_OBSERVED: "Didn't get a chance to try",
+  UNKNOWN: "Logged, outcome unclear"
+};
+
+function outcomeLabel(outcome: string): string {
+  return OUTCOME_LABEL[outcome] ?? outcome;
+}
+
+const MODALITY_LABEL: Record<string, string> = {
+  VERBAL: "Said it",
+  MANUAL_SIGN: "Signed it",
+  AAC: "Used AAC",
+  WRITTEN: "Wrote it",
+  GESTURAL: "Pointed / gestured"
+};
+
+/** Returns null for UNKNOWN/NOT_APPLICABLE -- nothing worth showing a parent in those cases. */
+function modalityLabel(modality: string): string | null {
+  return MODALITY_LABEL[modality] ?? null;
+}
+
+function formatDate(date: string | null): string {
+  if (!date) return "Undated";
+  return new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 interface GrowthSkillView {
   skillId: string;
   skillName: string;
@@ -231,9 +262,9 @@ function GlyphLegend() {
   );
 }
 
-function SkillRow({ skill, showEvidence }: { skill: GrowthSkillView; showEvidence: boolean }) {
+function SkillRow({ skill, showEvidence, onSelect }: { skill: GrowthSkillView; showEvidence: boolean; onSelect?: (skillId: string) => void }) {
   return (
-    <div className="gp-skill-row">
+    <button type="button" className="gp-skill-row" onClick={onSelect ? () => onSelect(skill.skillId) : undefined}>
       <div className="gp-skill-txt">
         <div className="gp-skill-name">{skill.skillName}</div>
         <div className="gp-skill-status">{skill.statusPhrase}</div>
@@ -249,11 +280,139 @@ function SkillRow({ skill, showEvidence }: { skill: GrowthSkillView; showEvidenc
         ) : null}
       </div>
       <Glyph levels={skill.glyphLevels} />
+      {onSelect ? <span className="gp-skill-chev">›</span> : null}
+    </button>
+  );
+}
+
+interface ItemHistoryGroup {
+  key: string;
+  label: string;
+  evidence: PocLogEvidenceRow[];
+  glyphLevels: number[];
+}
+
+/** Same grouping idea as the admin POC review page's by-item view (group evidence by the real
+ * matched item, falling back to the raw hint, falling back to a catch-all bucket) -- re-used here
+ * because it's already the right shape for "what did my kid actually practice", just relabeled. */
+function groupEvidenceByItemForDetail(evidence: PocLogEvidenceRow[]): ItemHistoryGroup[] {
+  const map = new Map<string, { label: string; rows: PocLogEvidenceRow[] }>();
+  for (const e of evidence) {
+    const name = e.itemMatchMethod === "ai" && e.predictedItem ? e.predictedItem.displayName : e.itemHint?.trim();
+    const key = name ? name.toLowerCase() : "general-practice";
+    const label = name ?? "General practice (no specific item)";
+    let group = map.get(key);
+    if (!group) {
+      group = { label, rows: [] };
+      map.set(key, group);
+    }
+    group.rows.push(e);
+  }
+  return [...map.entries()]
+    .map(([key, { label, rows }]) => {
+      const sorted = [...rows].sort((a, b) => (b.logDate ?? "").localeCompare(a.logDate ?? ""));
+      return { key, label, evidence: sorted, glyphLevels: [...sorted].reverse().slice(-5).map((e) => levelFor(e.outcome)) };
+    })
+    .sort((a, b) => b.evidence.length - a.evidence.length);
+}
+
+function SkillDetailView({
+  skillId,
+  skillName,
+  domainName,
+  childLabel,
+  goalTags,
+  logEvidence,
+  onBack
+}: {
+  skillId: string;
+  skillName: string;
+  domainName: string;
+  childLabel: string;
+  goalTags: PocGoalTag[];
+  logEvidence: PocLogEvidenceRow[];
+  onBack: () => void;
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const goals = goalTags.filter((g) => g.predictedSkill?.id === skillId);
+  const evidence = logEvidence.filter((e) => e.predictedSkill?.id === skillId);
+  const itemGroups = groupEvidenceByItemForDetail(evidence);
+
+  function toggle(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  return (
+    <div>
+      <button type="button" className="gp-back-btn" onClick={onBack}>
+        ← Back
+      </button>
+      <div className="gp-detail-head">
+        <div className="gp-domain-label">{domainName}</div>
+        <h2>{skillName}</h2>
+      </div>
+
+      {goals.length > 0 ? (
+        <div className="gp-card gp-goal-card">
+          <div className="gp-goal-label">{goals.length > 1 ? "Goals this connects to" : "The goal this connects to"}</div>
+          {goals.map((g) => (
+            <div key={g.id} className="gp-goal-row">
+              <div className="gp-goal-title">{g.goalTitle}</div>
+              {g.centreName ? <span className="gp-tag gp-tag-clinic">{g.centreName}</span> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="gp-empty">No specific goal is linked to this skill yet -- only daily logs reference it.</p>
+      )}
+
+      <div className="gp-domain-label">
+        {childLabel} has practiced {itemGroups.length} thing{itemGroups.length === 1 ? "" : "s"} for this
+      </div>
+      {itemGroups.map((group) => {
+        const isOpen = expanded.has(group.key);
+        return (
+          <div key={group.key} className="gp-card" style={{ padding: "0.2rem 1.1rem" }}>
+            <button type="button" className="gp-item-toggle" onClick={() => toggle(group.key)}>
+              <span className="gp-item-toggle-left">
+                <span className="gp-item-chev">{isOpen ? "▾" : "▸"}</span>
+                <span className="gp-item-name">{group.label}</span>
+              </span>
+              <span className="gp-item-right">
+                <Glyph levels={group.glyphLevels} />
+                <span className="gp-item-count">{group.evidence.length}×</span>
+              </span>
+            </button>
+            {isOpen ? (
+              <div className="gp-item-history">
+                {group.evidence.map((e) => {
+                  const mLabel = modalityLabel(e.modality);
+                  return (
+                    <div key={e.id} className="gp-history-row">
+                      <div className="gp-history-date">{formatDate(e.logDate)}</div>
+                      <div className="gp-history-mid">
+                        <div className="gp-history-outcome">{outcomeLabel(e.outcome)}</div>
+                        {mLabel ? <div className="gp-history-modality">{mLabel}</div> : null}
+                      </div>
+                      <span className={`gp-tag ${(e.centreName ?? "Home") === "Home" ? "gp-tag-home" : "gp-tag-clinic"}`}>{e.centreName ?? "Home"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function NarrativeConcept({ skills, childLabel }: { skills: GrowthSkillView[]; childLabel: string }) {
+function NarrativeConcept({ skills, childLabel, onSelectSkill }: { skills: GrowthSkillView[]; childLabel: string; onSelectSkill: (skillId: string) => void }) {
   const up = skills.filter((s) => s.trend === "up");
   const crossEnv = skills.filter((s) => s.environments.length > 1);
   const topSkill = up[0] ?? skills[0];
@@ -291,7 +450,7 @@ function NarrativeConcept({ skills, childLabel }: { skills: GrowthSkillView[]; c
           </div>
           <div className="gp-card gp-rows-card">
             {domainSkills.map((s) => (
-              <SkillRow key={s.skillId} skill={s} showEvidence={false} />
+              <SkillRow key={s.skillId} skill={s} showEvidence={false} onSelect={onSelectSkill} />
             ))}
           </div>
         </div>
@@ -339,7 +498,7 @@ function groupByDomain(skills: GrowthSkillView[]): [string, GrowthSkillView[]][]
   return [...map.entries()].sort((a, b) => b[1].reduce((n, s) => n + s.evidenceCount, 0) - a[1].reduce((n, s) => n + s.evidenceCount, 0));
 }
 
-function DashboardConcept({ skills }: { skills: GrowthSkillView[] }) {
+function DashboardConcept({ skills, onSelectSkill }: { skills: GrowthSkillView[]; onSelectSkill: (skillId: string) => void }) {
   const domains = buildDomainSummaries(skills);
   const [activeIdx, setActiveIdx] = useState(0);
   const active = domains[activeIdx];
@@ -369,7 +528,7 @@ function DashboardConcept({ skills }: { skills: GrowthSkillView[] }) {
       </div>
       <div className="gp-card gp-rows-card">
         {active.skills.map((s) => (
-          <div key={s.skillId} className="gp-dash-skill">
+          <button key={s.skillId} type="button" className="gp-dash-skill" onClick={() => onSelectSkill(s.skillId)}>
             <div className="gp-dash-row1">
               <span className="gp-dash-name">{s.skillName}</span>
               <span className={`gp-trend-chip gp-trend-${s.trend}`}>{s.trend === "up" ? "↗ improving" : s.trend === "emerging" ? "● emerging" : "steady"}</span>
@@ -385,14 +544,24 @@ function DashboardConcept({ skills }: { skills: GrowthSkillView[] }) {
             <div className="gp-evidence-line">
               {s.evidenceCount} moment{s.evidenceCount === 1 ? "" : "s"} · <b>{formatEnvironments(s.environments)}</b>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </>
   );
 }
 
-function HybridConcept({ skills, moments, childLabel }: { skills: GrowthSkillView[]; moments: GrowthMoment[]; childLabel: string }) {
+function HybridConcept({
+  skills,
+  moments,
+  childLabel,
+  onSelectSkill
+}: {
+  skills: GrowthSkillView[];
+  moments: GrowthMoment[];
+  childLabel: string;
+  onSelectSkill: (skillId: string) => void;
+}) {
   const [detailed, setDetailed] = useState(false);
   const up = skills.filter((s) => s.trend === "up");
   const crossEnv = skills.filter((s) => s.environments.length > 1);
@@ -454,7 +623,7 @@ function HybridConcept({ skills, moments, childLabel }: { skills: GrowthSkillVie
           </div>
           <div className="gp-card gp-rows-card">
             {domainSkills.map((s) => (
-              <SkillRow key={s.skillId} skill={s} showEvidence={detailed} />
+              <SkillRow key={s.skillId} skill={s} showEvidence={detailed} onSelect={onSelectSkill} />
             ))}
           </div>
         </div>
@@ -491,19 +660,30 @@ type ConceptId = (typeof CONCEPTS)[number]["id"];
 
 export function GrowthPreviewView({ childLabel, goalTags, logEvidence }: { childLabel: string; goalTags: PocGoalTag[]; logEvidence: PocLogEvidenceRow[] }) {
   const [concept, setConcept] = useState<ConceptId>("hybrid");
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const skills = buildGrowthSkills(goalTags, logEvidence);
   const moments = buildGrowthMoments(logEvidence);
+  const selectedSkill = skills.find((s) => s.skillId === selectedSkillId) ?? null;
 
   return (
     <div className="gp-root">
       <style>{GROWTH_PREVIEW_CSS}</style>
       <p className="hint-text" style={{ marginBottom: "0.75rem" }}>
         Preview of the real parent-facing Growth page concepts, computed live from this child's tagged POC
-        data (not sample data). Internal review only — this view isn't part of the parent app.
+        data (not sample data). Internal review only — this view isn't part of the parent app. Tap any skill
+        row to see the goal and item-level history behind it.
       </p>
       <div className="gp-switcher">
         {CONCEPTS.map((c) => (
-          <button key={c.id} type="button" className={`btn ${concept === c.id ? "btn-primary" : "btn-secondary"}`} onClick={() => setConcept(c.id)}>
+          <button
+            key={c.id}
+            type="button"
+            className={`btn ${concept === c.id ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => {
+              setConcept(c.id);
+              setSelectedSkillId(null);
+            }}
+          >
             {c.label}
           </button>
         ))}
@@ -514,19 +694,35 @@ export function GrowthPreviewView({ childLabel, goalTags, logEvidence }: { child
             <span />
           </div>
           <div className="gp-screen-inner">
-            <div className="gp-app-topbar">
-              <div className="gp-avatar">{childLabel.charAt(0)}</div>
-              <div>
-                <div className="gp-child-name">{childLabel}'s Growth</div>
-                <div className="gp-child-sub">
-                  {skills.length} skill{skills.length === 1 ? "" : "s"} with evidence
+            {selectedSkill ? (
+              <SkillDetailView
+                skillId={selectedSkill.skillId}
+                skillName={selectedSkill.skillName}
+                domainName={selectedSkill.domainName}
+                childLabel={childLabel}
+                goalTags={goalTags}
+                logEvidence={logEvidence}
+                onBack={() => setSelectedSkillId(null)}
+              />
+            ) : (
+              <>
+                <div className="gp-app-topbar">
+                  <div className="gp-avatar">{childLabel.charAt(0)}</div>
+                  <div>
+                    <div className="gp-child-name">{childLabel}'s Growth</div>
+                    <div className="gp-child-sub">
+                      {skills.length} skill{skills.length === 1 ? "" : "s"} with evidence
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            {concept === "narrative" ? <NarrativeConcept skills={skills} childLabel={childLabel} /> : null}
-            {concept === "timeline" ? <TimelineConcept moments={moments} childLabel={childLabel} /> : null}
-            {concept === "dashboard" ? <DashboardConcept skills={skills} /> : null}
-            {concept === "hybrid" ? <HybridConcept skills={skills} moments={moments} childLabel={childLabel} /> : null}
+                {concept === "narrative" ? <NarrativeConcept skills={skills} childLabel={childLabel} onSelectSkill={setSelectedSkillId} /> : null}
+                {concept === "timeline" ? <TimelineConcept moments={moments} childLabel={childLabel} /> : null}
+                {concept === "dashboard" ? <DashboardConcept skills={skills} onSelectSkill={setSelectedSkillId} /> : null}
+                {concept === "hybrid" ? (
+                  <HybridConcept skills={skills} moments={moments} childLabel={childLabel} onSelectSkill={setSelectedSkillId} />
+                ) : null}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -569,7 +765,27 @@ const GROWTH_PREVIEW_CSS = `
 .gp-legend-trigger { font-family: var(--gpf); display: inline-flex; align-items: center; gap: 0.4rem; border: none; background: none; color: var(--gp-green-600); font-size: 0.76rem; font-weight: 700; padding: 0; cursor: pointer; }
 .gp-legend-icon { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid var(--gp-green-600); font-size: 0.64rem; font-weight: 800; font-style: italic; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .gp-legend-body { margin-top: 0.5rem; background: var(--gp-green-50); border: 1px solid var(--gp-green-100); border-radius: var(--gp-radius-s); padding: 0.7rem 0.85rem; font-size: 0.78rem; color: var(--gp-ink-soft); line-height: 1.5; }
-.gp-skill-row { display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 0.2rem; border-bottom: 1px solid var(--gp-border); }
+.gp-skill-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 0.2rem; border-bottom: 1px solid var(--gp-border); width: 100%; font-family: var(--gpf); background: none; border-left: none; border-right: none; border-top: none; text-align: left; cursor: pointer; }
+.gp-skill-chev { color: var(--gp-ink-faint); font-size: 1.1rem; flex-shrink: 0; }
+.gp-back-btn { font-family: var(--gpf); border: none; background: none; color: var(--gp-green-600); font-size: 0.82rem; font-weight: 700; padding: 0.5rem 0.1rem; margin-bottom: 0.3rem; cursor: pointer; }
+.gp-detail-head { margin-bottom: 0.9rem; }
+.gp-detail-head h2 { font-size: 1.15rem; font-weight: 800; margin: 0.15rem 0 0; }
+.gp-goal-card { padding: 0.9rem 1rem; }
+.gp-goal-label { font-size: 0.7rem; font-weight: 800; color: var(--gp-ink-faint); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.gp-goal-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.35rem 0; }
+.gp-goal-title { font-size: 0.88rem; font-weight: 700; line-height: 1.4; }
+.gp-item-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; font-family: var(--gpf); background: none; border: none; padding: 0.85rem 0.1rem; cursor: pointer; text-align: left; }
+.gp-item-toggle-left { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.gp-item-chev { color: var(--gp-ink-faint); font-size: 0.8rem; flex-shrink: 0; }
+.gp-item-name { font-weight: 700; font-size: 0.88rem; }
+.gp-item-right { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+.gp-item-count { font-size: 0.74rem; font-weight: 700; color: var(--gp-ink-faint); }
+.gp-item-history { border-top: 1px solid var(--gp-border); padding: 0.3rem 0 0.7rem; }
+.gp-history-row { display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem 0.1rem; }
+.gp-history-date { font-size: 0.72rem; font-weight: 700; color: var(--gp-ink-faint); width: 72px; flex-shrink: 0; }
+.gp-history-mid { flex: 1; min-width: 0; }
+.gp-history-outcome { font-size: 0.82rem; font-weight: 600; color: var(--gp-ink); }
+.gp-history-modality { font-size: 0.72rem; color: var(--gp-ink-faint); margin-top: 0.1rem; }
 .gp-skill-row:last-child { border-bottom: none; }
 .gp-skill-txt { flex: 1; min-width: 0; }
 .gp-skill-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 0.2rem; }
@@ -613,7 +829,7 @@ const GROWTH_PREVIEW_CSS = `
 .gp-band { position: relative; height: 10px; border-radius: 999px; background: linear-gradient(90deg, var(--gp-border) 0%, var(--gp-orange-100) 35%, var(--gp-orange-500) 65%, var(--gp-green-500) 100%); margin-bottom: 0.5rem; }
 .gp-band-marker { position: absolute; top: -5px; width: 20px; height: 20px; border-radius: 50%; background: white; border: 3px solid var(--gp-green-600); box-shadow: var(--gp-shadow-sm); transform: translateX(-50%); }
 .gp-band-labels { display: flex; justify-content: space-between; font-size: 0.64rem; color: var(--gp-ink-faint); font-weight: 700; }
-.gp-dash-skill { padding: 0.85rem 0.1rem; border-bottom: 1px solid var(--gp-border); }
+.gp-dash-skill { display: block; width: 100%; padding: 0.85rem 0.1rem; border-bottom: 1px solid var(--gp-border); border-left: none; border-right: none; border-top: none; background: none; font-family: var(--gpf); text-align: left; cursor: pointer; }
 .gp-dash-skill:last-child { border-bottom: none; }
 .gp-dash-row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; gap: 0.5rem; }
 .gp-dash-name { font-weight: 700; font-size: 0.86rem; }
