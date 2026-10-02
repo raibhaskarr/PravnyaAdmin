@@ -103,6 +103,7 @@ interface ProviderStats {
   avgEvidenceConfidence: number | null;
   outcomeCounts: Record<string, number>;
   supportCounts: Record<string, number>;
+  modalityCounts: Record<string, number>;
   itemMatchCounts: Record<string, number>;
 }
 
@@ -115,10 +116,12 @@ function computeProviderStats(provider: string, goalTags: PocGoalTag[], logEvide
   const evidence = logEvidence.filter((e) => e.modelProvider === provider);
   const outcomeCounts: Record<string, number> = {};
   const supportCounts: Record<string, number> = {};
+  const modalityCounts: Record<string, number> = {};
   const itemMatchCounts: Record<string, number> = {};
   for (const e of evidence) {
     outcomeCounts[e.outcome] = (outcomeCounts[e.outcome] ?? 0) + 1;
     supportCounts[e.supportLevel] = (supportCounts[e.supportLevel] ?? 0) + 1;
+    modalityCounts[e.modality] = (modalityCounts[e.modality] ?? 0) + 1;
     const method = e.itemMatchMethod ?? "none";
     itemMatchCounts[method] = (itemMatchCounts[method] ?? 0) + 1;
   }
@@ -133,6 +136,7 @@ function computeProviderStats(provider: string, goalTags: PocGoalTag[], logEvide
     avgEvidenceConfidence: average(evidence.map((e) => e.confidence).filter((v): v is number => v != null)),
     outcomeCounts,
     supportCounts,
+    modalityCounts,
     itemMatchCounts
   };
 }
@@ -182,6 +186,7 @@ const SUPPORT_ORDER = [
   "FULL_ASSISTANCE",
   "UNKNOWN"
 ];
+const MODALITY_ORDER = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL", "UNKNOWN", "NOT_APPLICABLE"];
 
 /** Side-by-side quality comparison between two independently-run AI provider passes over the same
  * goals and logs -- lets a reviewer see volume/confidence/outcome differences at a glance instead
@@ -284,6 +289,17 @@ function ComparePassesView({ detail, providers }: { detail: PocReviewChildDetail
                     </td>
                     <td>
                       {statsB.supportCounts[support] ?? 0} ({pct(statsB.supportCounts[support] ?? 0, statsB.evidenceTotal)})
+                    </td>
+                  </tr>
+                ))}
+                {MODALITY_ORDER.map((modality) => (
+                  <tr key={modality}>
+                    <td className="hint-text">Modality: {modality.replace("_", " ")}</td>
+                    <td>
+                      {statsA.modalityCounts[modality] ?? 0} ({pct(statsA.modalityCounts[modality] ?? 0, statsA.evidenceTotal)})
+                    </td>
+                    <td>
+                      {statsB.modalityCounts[modality] ?? 0} ({pct(statsB.modalityCounts[modality] ?? 0, statsB.evidenceTotal)})
                     </td>
                   </tr>
                 ))}
@@ -580,6 +596,9 @@ export function PocReviewPage() {
                                           <Th tip="The level of prompting/assistance the child needed, as judged by the AI from the log text. 'Unknown' usually means the log didn't state it explicitly.">
                                             Support
                                           </Th>
+                                          <Th tip="The response modality the child actually used, as judged by the AI from the log text (e.g. pointed to AAC vs. said the word aloud). 'N/A' means this skill isn't a communication response. 'Unknown' means the log didn't say.">
+                                            Modality
+                                          </Th>
                                           <Th tip="The AI's self-reported confidence in this extraction (0-100%). Not independently verified.">
                                             Extraction confidence
                                           </Th>
@@ -595,6 +614,7 @@ export function PocReviewPage() {
                                             <td>{e.centreName ?? "—"}</td>
                                             <td>{e.outcome.replace("_", " ")}</td>
                                             <td>{e.supportLevel.replace("_", " ")}</td>
+                                            <td>{e.modality.replace("_", " ")}</td>
                                             <td>{confidencePct(e.confidence)}</td>
                                             <td>{e.itemMatchMethod === "ai" ? confidencePct(e.itemMatchScore) : "—"}</td>
                                           </tr>
@@ -695,6 +715,9 @@ export function PocReviewPage() {
                         <Th tip="The level of prompting/assistance the child needed, as judged by the AI from the log text. 'Unknown' usually means the log didn't state it explicitly.">
                           Support
                         </Th>
+                        <Th tip="The response modality the child actually used, as judged by the AI from the log text (e.g. pointed to AAC vs. said the word aloud). 'N/A' means this skill isn't a communication response. 'Unknown' means the log didn't say.">
+                          Modality
+                        </Th>
                         <Th tip="The AI's self-reported confidence in this extraction (0-100%). Not independently verified.">Confidence</Th>
                       </tr>
                     </thead>
@@ -719,6 +742,7 @@ export function PocReviewPage() {
                           </td>
                           <td>{e.outcome.replace("_", " ")}</td>
                           <td>{e.supportLevel.replace("_", " ")}</td>
+                          <td>{e.modality.replace("_", " ")}</td>
                           <td>{confidencePct(e.confidence)}</td>
                         </tr>
                       ))}

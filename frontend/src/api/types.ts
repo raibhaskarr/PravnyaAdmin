@@ -133,6 +133,7 @@ export type PocSupportLevel =
   | "FULL_ASSISTANCE"
   | "UNKNOWN";
 export type PocGoalTagStatus = "TAGGED" | "NO_MATCH" | "ERROR";
+export type PocModality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL" | "UNKNOWN" | "NOT_APPLICABLE";
 
 export type PocSkillRef = { id: string; name: string; domain: { name: string } };
 
@@ -168,6 +169,7 @@ export type PocLogEvidenceRow = {
   itemMatchMethod: string | null;
   outcome: PocEvidenceOutcome;
   supportLevel: PocSupportLevel;
+  modality: PocModality;
   confidence: number | null;
   modelProvider: string;
   modelName: string;

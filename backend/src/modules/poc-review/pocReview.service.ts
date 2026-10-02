@@ -1,4 +1,4 @@
-import { PocEvidenceOutcome, PocGoalTagStatus, PocSupportLevel } from "@prisma/client";
+import { PocEvidenceOutcome, PocGoalTagStatus, PocModality, PocSupportLevel } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { notFound } from "../../common/errors/AppError";
 
@@ -26,6 +26,7 @@ export interface LogEvidenceImport {
   itemMatchMethod: string | null;
   outcome: PocEvidenceOutcome;
   supportLevel: PocSupportLevel;
+  modality: PocModality;
   confidence: number | null;
 }
 
@@ -99,6 +100,7 @@ export const pocReviewService = {
           itemMatchMethod: e.itemMatchMethod,
           outcome: e.outcome,
           supportLevel: e.supportLevel,
+          modality: e.modality,
           confidence: e.confidence,
           modelProvider: payload.modelProvider,
           modelName: payload.modelName

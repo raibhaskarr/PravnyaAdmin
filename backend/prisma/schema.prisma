@@ -264,6 +264,20 @@ enum PocGoalTagStatus {
   ERROR
 }
 
+/// The response modality the child actually used in this piece of evidence, as judged by the AI
+/// from the log text (e.g. pointed to an AAC device vs. said the word aloud) -- not the same thing
+/// as the Canonical Skill's own `supportedModalities`, which is what the skill is designed to
+/// allow, not what happened in any one real instance.
+enum PocModality {
+  VERBAL
+  MANUAL_SIGN
+  AAC
+  WRITTEN
+  GESTURAL
+  UNKNOWN
+  NOT_APPLICABLE
+}
+
 /// Not tenant-scoped -- this is a superadmin-only review surface for the AI goal/log tagging POC
 /// (see PranTrackingSystem's docs/l12-growth-intelligence-*.md), covering two real children who
 /// aren't PravnyaAdmin Kids yet. Exists to let a human judge tagging quality against the real
@@ -328,6 +342,7 @@ model PocLogEvidence {
   itemMatchMethod  String?
   outcome          PocEvidenceOutcome
   supportLevel     PocSupportLevel
+  modality         PocModality        @default(UNKNOWN)
   confidence       Float?
   modelProvider    String
   modelName        String
