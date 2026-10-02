@@ -1,0 +1,7 @@
+node_modules/
+.env
+
+# Real decrypted clinical data and AI pipeline output -- never committed. See README.md.
+data/
+poc.sqlite
+*.log

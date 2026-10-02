@@ -1,0 +1,25 @@
+{
+  "name": "l12-poc-tagging",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "load": "tsx scripts/load-source-data.ts",
+    "tag-goals": "tsx scripts/tag-goals.ts",
+    "extract-evidence": "tsx scripts/extract-log-evidence.ts",
+    "match-items": "tsx scripts/match-items.ts",
+    "tag-items": "tsx scripts/tag-items.ts",
+    "report": "tsx scripts/report.ts"
+  },
+  "dependencies": {
+    "@pravnix/ai-core": "file:../AIPlatformNode/packages/core",
+    "@pravnix/ai-node": "file:../AIPlatformNode/packages/node",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

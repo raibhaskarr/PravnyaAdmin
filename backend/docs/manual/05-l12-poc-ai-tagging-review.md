@@ -136,11 +136,11 @@ Live for Ananya and Pranava, both Gemini and Claude passes, including centre tag
 matching against the real taxonomy, and response modality. Superadmin-only, read-only, not wired to
 any tenant-facing feature.
 
-**The local pipeline scripts (goal tagging, log evidence extraction, item matching, the
-PravnyaAdmin-push script, and the one-off taxonomy-item-review scripts) live only in an ephemeral
-local working directory outside this repo and were never committed anywhere.** If continuing this
-work beyond ad hoc review passes, those scripts should be committed somewhere durable first — this
-page documents the pipeline's *behavior*, not its exact source.
+The local pipeline scripts (goal tagging, log evidence extraction, item matching, the
+PravnyaAdmin-push script, and the one-off taxonomy-item-review scripts) are committed at
+`tools/l12-poc-tagging/` in this repo — see that directory's own `README.md` for setup and run
+order. The real decrypted clinical data and the local SQLite snapshot built from it are
+deliberately **not** committed (`.gitignore`d) — only the code is.
 
 No decision has been made about promoting any of this into a real product feature (e.g. replacing
 or augmenting `growth-beta`'s regex matching, or importing these two children as real Kids) — this
