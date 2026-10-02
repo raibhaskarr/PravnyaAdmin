@@ -43,6 +43,26 @@ interface GrowthSkillView {
   glyphLevels: number[];
   statusPhrase: string;
   trend: "up" | "steady" | "emerging";
+  recentItems: string[];
+}
+
+/** The actual words/actions a parent would recognize -- "Apple", "Ball", "roti" -- not the
+ * clinical skill name. Prefers the real taxonomy item when one matched; falls back to the raw
+ * extracted item hint (still AI-derived structured text, never a log excerpt) when it didn't. */
+function recentItemNames(evidence: PocLogEvidenceRow[], limit = 4): string[] {
+  const sorted = [...evidence].sort((a, b) => (b.logDate ?? "").localeCompare(a.logDate ?? ""));
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const e of sorted) {
+    const name = e.itemMatchMethod === "ai" && e.predictedItem ? e.predictedItem.displayName : e.itemHint?.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+    if (names.length >= limit) break;
+  }
+  return names;
 }
 
 function buildGrowthSkills(goalTags: PocGoalTag[], logEvidence: PocLogEvidenceRow[]): GrowthSkillView[] {
@@ -94,7 +114,8 @@ function buildGrowthSkills(goalTags: PocGoalTag[], logEvidence: PocLogEvidenceRo
       environments,
       glyphLevels,
       statusPhrase,
-      trend
+      trend,
+      recentItems: recentItemNames(sorted)
     });
   }
   return views.sort((a, b) => b.evidenceCount - a.evidenceCount);
@@ -180,10 +201,13 @@ function buildDomainSummaries(skills: GrowthSkillView[], maxDomains = 25): Domai
 
 function Glyph({ levels }: { levels: number[] }) {
   return (
-    <div className="gp-glyph">
-      {levels.map((lvl, i) => (
-        <span key={i} className={`gp-glyph-bar gp-lvl${lvl}`} />
-      ))}
+    <div className="gp-glyph-wrap">
+      <div className="gp-glyph">
+        {levels.map((lvl, i) => (
+          <span key={i} className={`gp-glyph-bar gp-lvl${lvl}`} />
+        ))}
+      </div>
+      <div className="gp-glyph-caption">last {levels.length}</div>
     </div>
   );
 }
@@ -194,6 +218,11 @@ function SkillRow({ skill, showEvidence }: { skill: GrowthSkillView; showEvidenc
       <div className="gp-skill-txt">
         <div className="gp-skill-name">{skill.skillName}</div>
         <div className="gp-skill-status">{skill.statusPhrase}</div>
+        {skill.recentItems.length > 0 ? (
+          <div className="gp-recent-items">
+            Recently: <b>{skill.recentItems.join(", ")}</b>
+          </div>
+        ) : null}
         {showEvidence ? (
           <div className="gp-evidence-line">
             {skill.evidenceCount} moment{skill.evidenceCount === 1 ? "" : "s"} · <b>{formatEnvironments(skill.environments)}</b>
@@ -328,6 +357,11 @@ function DashboardConcept({ skills }: { skills: GrowthSkillView[] }) {
             <div className="gp-mini-band">
               <i style={{ width: `${Math.min(100, (average(s.glyphLevels) / 4) * 100)}%` }} />
             </div>
+            {s.recentItems.length > 0 ? (
+              <div className="gp-recent-items">
+                Recently: <b>{s.recentItems.join(", ")}</b>
+              </div>
+            ) : null}
             <div className="gp-evidence-line">
               {s.evidenceCount} moment{s.evidenceCount === 1 ? "" : "s"} · <b>{formatEnvironments(s.environments)}</b>
             </div>
@@ -517,7 +551,11 @@ const GROWTH_PREVIEW_CSS = `
 .gp-skill-status { font-size: 0.78rem; color: var(--gp-ink-soft); }
 .gp-evidence-line { font-size: 0.72rem; color: var(--gp-ink-faint); margin-top: 0.2rem; }
 .gp-evidence-line b { color: var(--gp-green-600); font-weight: 700; }
-.gp-glyph { display: flex; gap: 3px; align-items: flex-end; height: 20px; flex-shrink: 0; }
+.gp-glyph-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; flex-shrink: 0; }
+.gp-glyph { display: flex; gap: 3px; align-items: flex-end; height: 20px; }
+.gp-glyph-caption { font-size: 0.58rem; color: var(--gp-ink-faint); font-weight: 700; white-space: nowrap; }
+.gp-recent-items { font-size: 0.78rem; color: var(--gp-ink-soft); margin-top: 0.2rem; line-height: 1.4; }
+.gp-recent-items b { color: var(--gp-ink); font-weight: 700; }
 .gp-glyph-bar { width: 6px; border-radius: 3px; }
 .gp-lvl1 { height: 30%; background: var(--gp-border); }
 .gp-lvl2 { height: 55%; background: var(--gp-orange-100); }
