@@ -134,6 +134,7 @@ export type PocSupportLevel =
   | "UNKNOWN";
 export type PocGoalTagStatus = "TAGGED" | "NO_MATCH" | "ERROR";
 export type PocModality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL" | "UNKNOWN" | "NOT_APPLICABLE";
+export type PocMeasurementType = "TRIALS" | "FREQUENCY" | "DURATION" | "PERCENTAGE" | "PROMPT_LEVEL" | "YES_NO" | "RATING" | "FREE_OBSERVATION";
 
 export type PocSkillRef = { id: string; name: string; domain: { name: string } };
 
@@ -170,6 +171,13 @@ export type PocLogEvidenceRow = {
   outcome: PocEvidenceOutcome;
   supportLevel: PocSupportLevel;
   modality: PocModality;
+  measurementType: PocMeasurementType | null;
+  measurementNumerator: number | null;
+  measurementDenominator: number | null;
+  measurementValue: number | null;
+  measurementUnit: string | null;
+  measurementBoolean: boolean | null;
+  measurementText: string | null;
   confidence: number | null;
   modelProvider: string;
   modelName: string;

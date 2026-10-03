@@ -278,6 +278,22 @@ enum PocModality {
   NOT_APPLICABLE
 }
 
+/// What a skill/target is actually measured by, clinically -- a discrete right/wrong trial is only
+/// one shape among several (duration, frequency, prompt level, yes/no, ...). Declared once per
+/// skill in the extraction pipeline's own classification (not on CanonicalSkill itself -- this POC
+/// never writes to the real production taxonomy), null means "not yet classified, falls back to
+/// outcome/supportLevel" so unclassified skills are unaffected.
+enum PocMeasurementType {
+  TRIALS
+  FREQUENCY
+  DURATION
+  PERCENTAGE
+  PROMPT_LEVEL
+  YES_NO
+  RATING
+  FREE_OBSERVATION
+}
+
 /// Not tenant-scoped -- this is a superadmin-only review surface for the AI goal/log tagging POC
 /// (see PranTrackingSystem's docs/l12-growth-intelligence-*.md), covering two real children who
 /// aren't PravnyaAdmin Kids yet. Exists to let a human judge tagging quality against the real
@@ -343,6 +359,20 @@ model PocLogEvidence {
   outcome          PocEvidenceOutcome
   supportLevel     PocSupportLevel
   modality         PocModality        @default(UNKNOWN)
+  /// Only set for the handful of skills hand-classified for this proof-of-concept (see
+  /// tools/l12-poc-tagging/scripts/skill-measurement-types.ts) -- most evidence has this null and
+  /// is unaffected. When set, one of the value fields below is also set, matching the type:
+  /// TRIALS -> numerator/denominator, FREQUENCY -> numericValue (count) + unitLabel, DURATION ->
+  /// numericValue (seconds) + unitLabel, PERCENTAGE -> numericValue (0-100), PROMPT_LEVEL -> reuse
+  /// supportLevel above (no separate field), YES_NO -> booleanValue, RATING -> numericValue,
+  /// FREE_OBSERVATION -> textValue.
+  measurementType        PocMeasurementType?
+  measurementNumerator   Int?
+  measurementDenominator Int?
+  measurementValue       Float?
+  measurementUnit        String?
+  measurementBoolean     Boolean?
+  measurementText        String?
   confidence       Float?
   modelProvider    String
   modelName        String

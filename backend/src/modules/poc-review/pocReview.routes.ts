@@ -49,6 +49,13 @@ const importSchema = z.object({
       outcome: z.enum(["CORRECT", "INCORRECT", "PARTIAL", "ATTEMPTED", "NOT_OBSERVED", "UNKNOWN"]),
       supportLevel: z.enum(["INDEPENDENT", "VISUAL_PROMPT", "VERBAL_PROMPT", "GESTURAL_PROMPT", "PHYSICAL_PROMPT", "PARTIAL_ASSISTANCE", "FULL_ASSISTANCE", "UNKNOWN"]),
       modality: z.enum(["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL", "UNKNOWN", "NOT_APPLICABLE"]),
+      measurementType: z.enum(["TRIALS", "FREQUENCY", "DURATION", "PERCENTAGE", "PROMPT_LEVEL", "YES_NO", "RATING", "FREE_OBSERVATION"]).nullable(),
+      measurementNumerator: z.number().int().nullable(),
+      measurementDenominator: z.number().int().nullable(),
+      measurementValue: z.number().nullable(),
+      measurementUnit: z.string().max(50).nullable(),
+      measurementBoolean: z.boolean().nullable(),
+      measurementText: z.string().max(500).nullable(),
       confidence: z.number().min(0).max(1).nullable()
     })
   )
