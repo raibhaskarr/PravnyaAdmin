@@ -64,6 +64,38 @@ function formatDate(date: string | null): string {
   return new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  if (mins === 0) return `${secs} sec`;
+  if (secs === 0) return `${mins} min`;
+  return `${mins} min ${secs} sec`;
+}
+
+/** Each skill was hand-classified with a measurement type (see tools/l12-poc-tagging/scripts/
+ * skill-measurement-types.ts) -- a plain correct/partial/incorrect outcome is actively wrong for
+ * anything that isn't a discrete trial (e.g. a behavior-reduction goal forced through "correct"
+ * loses the one number that matters: how often, how long). Returns null when there's nothing to
+ * add beyond the outcome label already shown (TRIALS, PROMPT_LEVEL, or no value was extracted). */
+function measurementLabel(e: PocLogEvidenceRow): string | null {
+  switch (e.measurementType) {
+    case "FREQUENCY":
+      return e.measurementValue != null ? `${e.measurementValue} ${e.measurementUnit ?? "times"}` : null;
+    case "DURATION":
+      return e.measurementValue != null ? formatDuration(e.measurementValue) : null;
+    case "PERCENTAGE":
+      return e.measurementValue != null ? `${Math.round(e.measurementValue)}%` : null;
+    case "RATING":
+      return e.measurementValue != null ? `Rated ${e.measurementValue}/5` : null;
+    case "YES_NO":
+      return e.measurementBoolean == null ? null : e.measurementBoolean ? "✓ Yes" : "✗ Not yet";
+    case "FREE_OBSERVATION":
+      return e.measurementText ?? null;
+    default:
+      return null;
+  }
+}
+
 interface GrowthSkillView {
   skillId: string;
   skillName: string;
@@ -392,11 +424,13 @@ function SkillDetailView({
               <div className="gp-item-history">
                 {group.evidence.map((e) => {
                   const mLabel = modalityLabel(e.modality);
+                  const measureLabel = measurementLabel(e);
                   return (
                     <div key={e.id} className="gp-history-row">
                       <div className="gp-history-date">{formatDate(e.logDate)}</div>
                       <div className="gp-history-mid">
-                        <div className="gp-history-outcome">{outcomeLabel(e.outcome)}</div>
+                        <div className="gp-history-outcome">{measureLabel ?? outcomeLabel(e.outcome)}</div>
+                        {measureLabel ? <div className="gp-history-modality">{outcomeLabel(e.outcome)}</div> : null}
                         {mLabel ? <div className="gp-history-modality">{mLabel}</div> : null}
                       </div>
                       <span className={`gp-tag ${(e.centreName ?? "Home") === "Home" ? "gp-tag-home" : "gp-tag-clinic"}`}>{e.centreName ?? "Home"}</span>
