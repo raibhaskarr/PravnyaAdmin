@@ -3,8 +3,12 @@ import { textMessage, createExecutionContext } from "@pravnix/ai-core";
 import { openDb } from "../lib/db";
 import { orchestrator, ACTIVE_PROVIDER } from "../lib/aiPlatform";
 import { mapWithConcurrency } from "../lib/concurrency";
+import { SKILL_MEASUREMENT_TYPE } from "./skill-measurement-types";
 
-const CONCURRENCY = 4;
+// Lower this (POC_CONCURRENCY=2) when redoing a batch of logs that failed due to rate-limit
+// exhaustion from a prior sustained run -- the transport-level retry's backoff (~2s max) can't
+// survive a real per-minute quota window, so the fix is less concurrent pressure, not more retries.
+const CONCURRENCY = process.env.POC_CONCURRENCY ? Number(process.env.POC_CONCURRENCY) : 4;
 
 const OUTCOMES = ["correct", "incorrect", "partial", "attempted", "not_observed", "unknown"] as const;
 const SUPPORTS = ["independent", "visual_prompt", "verbal_prompt", "gestural_prompt", "physical_prompt", "partial_assistance", "full_assistance", "unknown"] as const;
@@ -19,6 +23,14 @@ const MODALITIES = ["verbal", "manual_sign", "aac", "written", "gestural", "unkn
 // e.g. pointed to an AAC device vs. said the word aloud -- distinct from the Canonical Skill's own
 // supportedModalities (what the skill is designed to allow), which this never reads or is
 // constrained by.
+//
+// measurementType (added 2026-10-03) fixes a real problem confirmed against live data: forcing
+// every skill through outcome/supportLevel was actively wrong for anything that isn't a discrete
+// trial -- e.g. "Reduces frequency/duration of a target behavior" had every real evidence row
+// forced to INCORRECT, misrepresenting behavior-incident logs as failed trials. Each candidate
+// skill now carries its pre-classified measurement type (see skill-measurement-types.ts, covering
+// all 148 real skills); outcome/supportLevel/modality are still always extracted as a universal
+// fallback, but a type-matched value is ADDITIONALLY extracted when the skill's type calls for it.
 const SYSTEM_PROMPT =
   "You are helping test a clinical skill taxonomy (Domain > Skill) against real daily activity logs " +
   "written by therapists or parents. A single log entry can contain evidence for zero, one, or " +
@@ -42,12 +54,36 @@ const SYSTEM_PROMPT =
   "performance -- not attendance notes, scheduling, or unrelated remarks. This is a product-evidence " +
   "categorization aid, not a clinical or diagnostic judgment. Never invent a canonicalSkillId that " +
   "isn't in the candidate list.\n\n" +
+  "Each candidate skill is annotated with its measurement type in brackets, e.g. \"[measures: " +
+  "frequency]\". Always fill outcome/supportLevel/modality as described above regardless of type -- " +
+  "they're a universal fallback. Additionally, based on the matched skill's declared type, fill " +
+  "exactly the matching field(s) below when the log text actually supports it (leave them null " +
+  "rather than guessing a number that isn't stated or clearly implied):\n" +
+  "- [measures: trials] or no bracket at all: no extra fields -- outcome/supportLevel already cover it.\n" +
+  "- [measures: frequency]: measurementValue = count of occurrences/incidents this log describes for " +
+  "this skill (default 1 for a single described incident), measurementUnit = \"times\".\n" +
+  "- [measures: duration]: measurementValue = duration in seconds if a duration is stated or clearly " +
+  "implied (e.g. \"5 minutes\" -> 300), measurementUnit = \"seconds\". Leave null if no duration is " +
+  "given.\n" +
+  "- [measures: percentage]: measurementValue = 0-100 if a percentage or convertible fraction is " +
+  "stated (e.g. \"4 out of 5\" -> 80). Leave null otherwise.\n" +
+  "- [measures: prompt_level]: no extra fields -- supportLevel already covers it.\n" +
+  "- [measures: yes_no]: measurementBoolean = true/false based on whether the log says the child did " +
+  "or did not complete/achieve it (independently, unless the skill is specifically about " +
+  "independence).\n" +
+  "- [measures: rating]: measurementValue = a 1-5 rating ONLY if the log gives an explicit or clearly " +
+  "ordinal rating (e.g. \"rated 4/5\", \"mostly consistent\" ~4, \"inconsistent\" ~2). Leave null if " +
+  "the log doesn't support picking a specific number.\n" +
+  "- [measures: free_observation]: measurementText = a short (<=200 char) plain restatement of what " +
+  "was actually observed, only when outcome/supportLevel genuinely don't capture it.\n\n" +
   "Respond with ONLY a single JSON object, no markdown fences, no prose before or after it, in " +
   'exactly this shape: {"hasEvidence": boolean, "evidence": [{"canonicalSkillId": string, ' +
   '"itemHint": string or null, "outcome": one of ["correct","incorrect","partial","attempted",' +
   '"not_observed","unknown"], "supportLevel": one of ["independent","visual_prompt","verbal_prompt",' +
   '"gestural_prompt","physical_prompt","partial_assistance","full_assistance","unknown"], ' +
   '"modality": one of ["verbal","manual_sign","aac","written","gestural","unknown","not_applicable"], ' +
+  '"measurementValue": number or null, "measurementUnit": string or null, "measurementBoolean": ' +
+  'boolean or null, "measurementText": string or null, ' +
   '"confidence": number between 0 and 1, "excerpt": string}]}. "evidence" must be an empty array ' +
   "when hasEvidence is false. Up to 15 evidence items per log.";
 
@@ -73,6 +109,10 @@ function buildSchema(validSkillIds: Set<string>) {
     outcome: z.enum(OUTCOMES),
     supportLevel: z.enum(SUPPORTS),
     modality: z.enum(MODALITIES),
+    measurementValue: z.number().nullable(),
+    measurementUnit: z.string().max(20).nullable(),
+    measurementBoolean: z.boolean().nullable(),
+    measurementText: z.string().max(200).nullable(),
     confidence: z.number().min(0).max(1),
     excerpt: z.string().min(1).max(300)
   });
@@ -89,9 +129,14 @@ function buildSchema(validSkillIds: Set<string>) {
     });
 }
 
+function measurementAnnotation(skillId: string): string {
+  const type = SKILL_MEASUREMENT_TYPE[skillId];
+  return type ? ` [measures: ${type.toLowerCase()}]` : "";
+}
+
 async function extractOneLog(log: SourceLog, candidates: SkillCandidate[]) {
   const validIds = new Set(candidates.map((c) => c.id));
-  const candidateLines = candidates.map((c) => `${c.id}\t${c.domain_name} > ${c.name}`).join("\n");
+  const candidateLines = candidates.map((c) => `${c.id}\t${c.domain_name} > ${c.name}${measurementAnnotation(c.id)}`).join("\n");
   const logText = [
     `Date: ${log.log_date ?? "unknown"}`,
     log.category ? `Category: ${log.category}` : null,
@@ -127,6 +172,16 @@ async function main() {
   ensureProcessedLogTable(db);
   const cols = (db.prepare("PRAGMA table_info(poc_log_skill_evidence)").all() as any[]).map((c) => c.name);
   if (!cols.includes("modality")) db.exec("ALTER TABLE poc_log_skill_evidence ADD COLUMN modality TEXT");
+  const measurementCols: [string, string][] = [
+    ["measurement_type", "TEXT"],
+    ["measurement_value", "REAL"],
+    ["measurement_unit", "TEXT"],
+    ["measurement_boolean", "INTEGER"],
+    ["measurement_text", "TEXT"]
+  ];
+  for (const [col, type] of measurementCols) {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE poc_log_skill_evidence ADD COLUMN ${col} ${type}`);
+  }
 
   const limit = process.env.POC_LIMIT ? Number(process.env.POC_LIMIT) : undefined;
   const resumeRunId = process.env.POC_RUN_ID ? Number(process.env.POC_RUN_ID) : undefined;
@@ -156,8 +211,8 @@ async function main() {
   console.log(`Extracting evidence from ${targetLogs.length} logs against ${candidates.length} candidate skills, provider=${ACTIVE_PROVIDER}, concurrency=${CONCURRENCY}...`);
 
   const insert = db.prepare(
-    `INSERT INTO poc_log_skill_evidence (run_id, source_log_id, child_id, predicted_skill_id, predicted_skill_name, predicted_item_id, predicted_item_name, outcome, support_level, modality, confidence, excerpt, rationale)
-     VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, NULL)`
+    `INSERT INTO poc_log_skill_evidence (run_id, source_log_id, child_id, predicted_skill_id, predicted_skill_name, predicted_item_id, predicted_item_name, outcome, support_level, modality, measurement_type, measurement_value, measurement_unit, measurement_boolean, measurement_text, confidence, excerpt, rationale)
+     VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`
   );
   const markProcessed = db.prepare("INSERT OR REPLACE INTO poc_processed_logs (run_id, source_log_id, status) VALUES (?, ?, ?)");
 
@@ -174,6 +229,9 @@ async function main() {
       } else {
         succeeded += 1;
         for (const item of result.value.evidence) {
+          // Stored lowercase locally, same convention as outcome/supportLevel/modality -- uppercased
+          // at push time by push-to-pravnyaadmin.ts's mapMeasurementType, mirroring mapOutcome etc.
+          const measurementType = SKILL_MEASUREMENT_TYPE[item.canonicalSkillId]?.toLowerCase() ?? null;
           insert.run(
             runId,
             log.id,
@@ -184,6 +242,11 @@ async function main() {
             item.outcome,
             item.supportLevel,
             item.modality,
+            measurementType,
+            item.measurementValue,
+            item.measurementUnit,
+            item.measurementBoolean === null ? null : item.measurementBoolean ? 1 : 0,
+            item.measurementText,
             item.confidence,
             item.excerpt
           );

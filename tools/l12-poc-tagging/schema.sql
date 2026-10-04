@@ -91,6 +91,11 @@ CREATE TABLE IF NOT EXISTS poc_log_skill_evidence (
   outcome TEXT,                        -- correct | incorrect | partial | attempted | not_observed | unknown
   support_level TEXT,                  -- independent | visual_prompt | ... | unknown
   modality TEXT,                       -- verbal | manual_sign | aac | written | gestural | unknown | not_applicable
+  measurement_type TEXT,               -- trials | frequency | duration | percentage | prompt_level | yes_no | rating | free_observation | NULL
+  measurement_value REAL,              -- meaning depends on measurement_type: count (frequency), seconds (duration), 0-100 (percentage), 1-5 (rating)
+  measurement_unit TEXT,               -- e.g. "times", "seconds" -- paired with measurement_value
+  measurement_boolean INTEGER,         -- 0/1, only set when measurement_type = yes_no
+  measurement_text TEXT,               -- only set when measurement_type = free_observation
   confidence REAL,
   excerpt TEXT,                        -- the exact span of free_text this evidence came from
   rationale TEXT,
