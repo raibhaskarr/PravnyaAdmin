@@ -188,6 +188,40 @@ export type PocReviewChildDetail = PocReviewChild & {
   logEvidence: PocLogEvidenceRow[];
 };
 
+export type PocReviewFlagKind = "GOAL_DISAGREEMENT" | "EVIDENCE_WITHOUT_GOAL";
+
+export type PocReviewDecision = {
+  id: string;
+  kind: PocReviewFlagKind;
+  sourceGoalId: string | null;
+  canonicalSkillId: string | null;
+  resolvedSkillId: string | null;
+  resolvedSource: string | null;
+  note: string | null;
+  decidedById: string | null;
+  decidedAt: string;
+};
+
+export type PocGoalDisagreement = {
+  sourceGoalId: string;
+  goalTitle: string;
+  tags: { modelProvider: string; predictedSkill: PocSkillRef | null; confidence: number | null; rationale: string | null }[];
+  decision: PocReviewDecision | null;
+};
+
+export type PocEvidenceWithoutGoal = {
+  canonicalSkillId: string;
+  skill: PocSkillRef | null;
+  evidenceCount: number;
+  providers: string[];
+  decision: PocReviewDecision | null;
+};
+
+export type PocReviewFlags = {
+  disagreements: PocGoalDisagreement[];
+  evidenceWithoutGoal: PocEvidenceWithoutGoal[];
+};
+
 export type Goal = {
   id: string;
   tenantId: string;

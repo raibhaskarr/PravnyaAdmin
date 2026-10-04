@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
-import type { PocGoalTag, PocLogEvidenceRow, PocReviewChild, PocReviewChildDetail } from "../../api/types";
+import type { PocGoalTag, PocLogEvidenceRow, PocReviewChild, PocReviewChildDetail, PocReviewFlags } from "../../api/types";
 import { GrowthPreviewView } from "./growthPreview";
 
 function providerLabel(provider: string) {
@@ -390,14 +390,149 @@ function groupEvidenceByItem(evidence: PocLogEvidenceRow[]): ItemGroup[] {
   return [...map.values()].sort((a, b) => b.evidence.length - a.evidence.length);
 }
 
+/** Surfaces the two situations AI confidence alone can't resolve -- the providers disagreeing about
+ * a goal's skill, or a skill having log evidence with no goal ever tagged to it -- and lets a
+ * reviewer resolve each with one click. This is the human-judgment gate the future "promotion" path
+ * (turning a reviewed mapping into a real Goal/GoalItem) depends on; nothing here writes outside the
+ * POC tables yet. */
+function ReviewFlagsView({ flags, onResolve }: { flags: PocReviewFlags; onResolve: (args: Parameters<typeof api.resolvePocReviewFlag>[2]) => void }) {
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const openDisagreements = flags.disagreements.filter((d) => !d.decision);
+  const resolvedDisagreements = flags.disagreements.filter((d) => d.decision);
+  const openEvidence = flags.evidenceWithoutGoal.filter((e) => !e.decision);
+  const resolvedEvidence = flags.evidenceWithoutGoal.filter((e) => e.decision);
+
+  if (!flags.disagreements.length && !flags.evidenceWithoutGoal.length) {
+    return <p className="empty-state">No review flags for this child -- every goal the providers tagged agrees, and every skill with evidence has a tagged goal.</p>;
+  }
+
+  return (
+    <>
+      {openDisagreements.length > 0 || resolvedDisagreements.length > 0 ? (
+        <div style={{ marginBottom: "1.5rem" }}>
+          <h3 style={{ marginBottom: "0.5rem" }}>
+            Provider disagreements ({openDisagreements.length} open{resolvedDisagreements.length ? `, ${resolvedDisagreements.length} resolved` : ""})
+          </h3>
+          <p className="hint-text" style={{ marginBottom: "0.75rem" }}>
+            Same real goal, tagged to a different skill by each provider -- pick which one is right, or note why neither is.
+          </p>
+          {flags.disagreements.map((d) => (
+            <div key={d.sourceGoalId} className="card" style={{ marginBottom: "0.75rem", opacity: d.decision ? 0.7 : 1 }}>
+              <div style={{ marginBottom: "0.5rem" }}>
+                <strong>{d.goalTitle}</strong>
+              </div>
+              {d.tags.map((t) => (
+                <div key={t.modelProvider} style={{ marginBottom: "0.4rem", display: "flex", alignItems: "baseline", gap: "0.6rem", flexWrap: "wrap" }}>
+                  <span className="hint-text" style={{ textTransform: "capitalize", minWidth: "4.5rem" }}>
+                    {t.modelProvider}:
+                  </span>
+                  <span>
+                    {t.predictedSkill?.name ?? "—"} <span className="hint-text">({t.predictedSkill?.domain.name}, {confidencePct(t.confidence)} confidence)</span>
+                  </span>
+                  {!d.decision && t.predictedSkill ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: "0.15rem 0.6rem", fontSize: "0.8rem" }}
+                      onClick={() =>
+                        onResolve({
+                          kind: "GOAL_DISAGREEMENT",
+                          sourceGoalId: d.sourceGoalId,
+                          canonicalSkillId: null,
+                          resolvedSkillId: t.predictedSkill!.id,
+                          resolvedSource: t.modelProvider,
+                          note: noteDrafts[d.sourceGoalId] ?? null
+                        })
+                      }
+                    >
+                      Use {t.modelProvider}
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {d.tags.find((t) => t.rationale) ? (
+                <details style={{ marginTop: "0.3rem" }}>
+                  <summary className="hint-text" style={{ cursor: "pointer" }}>
+                    Rationale
+                  </summary>
+                  {d.tags.map((t) =>
+                    t.rationale ? (
+                      <div key={t.modelProvider} className="hint-text" style={{ marginTop: "0.2rem" }}>
+                        <span style={{ textTransform: "capitalize" }}>{t.modelProvider}</span>: {t.rationale}
+                      </div>
+                    ) : null
+                  )}
+                </details>
+              ) : null}
+              {d.decision ? (
+                <div className="hint-text" style={{ marginTop: "0.5rem" }}>
+                  Resolved: used <strong>{d.decision.resolvedSource}</strong>'s answer on {new Date(d.decision.decidedAt).toLocaleDateString()}
+                  {d.decision.note ? ` — "${d.decision.note}"` : ""}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  placeholder="Optional note (why this one's right, or what's actually going on)"
+                  value={noteDrafts[d.sourceGoalId] ?? ""}
+                  onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [d.sourceGoalId]: e.target.value }))}
+                  style={{ marginTop: "0.5rem", width: "100%" }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {openEvidence.length > 0 || resolvedEvidence.length > 0 ? (
+        <div>
+          <h3 style={{ marginBottom: "0.5rem" }}>
+            Evidence without a tagged goal ({openEvidence.length} open{resolvedEvidence.length ? `, ${resolvedEvidence.length} resolved` : ""})
+          </h3>
+          <p className="hint-text" style={{ marginBottom: "0.75rem" }}>
+            Logs reference this skill, but no goal (from either provider) was tagged to it -- may be a missed goal tag, or genuinely incidental evidence.
+          </p>
+          {flags.evidenceWithoutGoal.map((e) => (
+            <div
+              key={e.canonicalSkillId}
+              className="card"
+              style={{ marginBottom: "0.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", opacity: e.decision ? 0.7 : 1 }}
+            >
+              <div>
+                <strong>{e.skill?.name ?? "—"}</strong>
+                <div className="hint-text">
+                  {e.skill?.domain.name} &middot; {e.evidenceCount} evidence &middot; {e.providers.join(", ")}
+                </div>
+              </div>
+              {e.decision ? (
+                <span className="hint-text">Acknowledged on {new Date(e.decision.decidedAt).toLocaleDateString()}</span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() =>
+                    onResolve({ kind: "EVIDENCE_WITHOUT_GOAL", sourceGoalId: null, canonicalSkillId: e.canonicalSkillId, resolvedSkillId: null, resolvedSource: "acknowledged", note: null })
+                  }
+                >
+                  Acknowledge
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export function PocReviewPage() {
   const { token } = useAuth();
   const [children, setChildren] = useState<PocReviewChild[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<PocReviewChildDetail | null>(null);
-  const [tab, setTab] = useState<"byskill" | "goals" | "logs" | "growth">("byskill");
+  const [tab, setTab] = useState<"byskill" | "goals" | "logs" | "growth" | "flags">("byskill");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [provider, setProvider] = useState<string>("");
+  const [reviewFlags, setReviewFlags] = useState<PocReviewFlags | null>(null);
 
   const availableProviders = useMemo(() => {
     if (!detail) return [];
@@ -454,7 +589,18 @@ export function PocReviewPage() {
     setDetail(null);
     setProvider("");
     api.getPocReviewChild(token!, selectedId).then(setDetail);
+    refreshFlags();
   }, [token, selectedId]);
+
+  function refreshFlags() {
+    if (!selectedId) return;
+    api.getPocReviewFlags(token!, selectedId).then(setReviewFlags);
+  }
+
+  async function handleResolveFlag(args: Parameters<typeof api.resolvePocReviewFlag>[2]) {
+    await api.resolvePocReviewFlag(token!, selectedId, args);
+    refreshFlags();
+  }
 
   const taggedGoals = filteredDetail?.goalTags.filter((g) => g.status === "TAGGED") ?? [];
   const noMatchGoals = filteredDetail?.goalTags.filter((g) => g.status === "NO_MATCH") ?? [];
@@ -535,6 +681,10 @@ export function PocReviewPage() {
                 </button>
                 <button type="button" className={`btn ${tab === "growth" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("growth")}>
                   Growth preview
+                </button>
+                <button type="button" className={`btn ${tab === "flags" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("flags")}>
+                  Review flags
+                  {reviewFlags ? ` (${reviewFlags.disagreements.filter((d) => !d.decision).length + reviewFlags.evidenceWithoutGoal.filter((e) => !e.decision).length})` : ""}
                 </button>
               </div>
 
@@ -699,6 +849,8 @@ export function PocReviewPage() {
                 </div>
               ) : tab === "growth" ? (
                 <GrowthPreviewView childLabel={detail.label} goalTags={filteredDetail.goalTags} logEvidence={filteredDetail.logEvidence} />
+              ) : tab === "flags" ? (
+                reviewFlags ? <ReviewFlagsView flags={reviewFlags} onResolve={handleResolveFlag} /> : <p className="empty-state">Loading...</p>
               ) : (
                 <div className="table-wrap">
                   <table className="data-table">

@@ -294,18 +294,57 @@ enum PocMeasurementType {
   FREE_OBSERVATION
 }
 
+enum PocReviewFlagKind {
+  /// The two providers tagged the same real goal (by sourceGoalId) to two different skills.
+  GOAL_DISAGREEMENT
+  /// A skill has log evidence but no goal (from either provider) was ever tagged to it for this
+  /// child -- may mean a goal exists but was missed, or the evidence is genuinely incidental.
+  EVIDENCE_WITHOUT_GOAL
+}
+
+/// A human's resolution of a review flag -- the flags themselves (disagreements, evidence without a
+/// goal) are computed live from PocGoalTag/PocLogEvidence on every request, never stored; this table
+/// persists only what a person decided once they looked at one. This is the judgment layer the
+/// future "promotion" path (turning a reviewed POC mapping into a real Goal/GoalItem) depends on --
+/// plain UUID columns throughout, not Prisma relations, matching PocReviewChild.sourceChildId's own
+/// precedent for referencing something outside this table's own small graph.
+model PocReviewDecision {
+  id               String             @id @default(uuid()) @db.Uuid
+  childId          String             @db.Uuid
+  child            PocReviewChild     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  kind             PocReviewFlagKind
+  /// Set for GOAL_DISAGREEMENT -- the real IEPGoal.id both providers tagged (PocGoalTag.sourceGoalId).
+  sourceGoalId     String?            @db.Uuid
+  /// Set for EVIDENCE_WITHOUT_GOAL -- the skill that has evidence but no goal tag.
+  canonicalSkillId String?            @db.Uuid
+  /// The skill a reviewer decided is actually correct. Null for an EVIDENCE_WITHOUT_GOAL
+  /// acknowledgement (there's no competing prediction to pick between, just "seen, this is fine").
+  resolvedSkillId  String?            @db.Uuid
+  /// 'gemini' | 'claude' | 'manual' (disagreement resolutions) or 'acknowledged' (evidence-without-
+  /// goal). Free string, not an enum -- mirrors modelProvider elsewhere in this module.
+  resolvedSource   String?
+  note             String?
+  decidedById      String?            @db.Uuid
+  decidedAt        DateTime           @default(now())
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([childId, kind])
+}
+
 /// Not tenant-scoped -- this is a superadmin-only review surface for the AI goal/log tagging POC
 /// (see PranTrackingSystem's docs/l12-growth-intelligence-*.md), covering two real children who
 /// aren't PravnyaAdmin Kids yet. Exists to let a human judge tagging quality against the real
 /// Canonical Skill taxonomy before any real child-data import happens. A label (first name), not a
 /// Kid record -- sourceChildId is PranTrackingSystem's own child id, kept only for traceability.
 model PocReviewChild {
-  id            String          @id @default(uuid()) @db.Uuid
-  label         String
-  sourceChildId String          @unique @db.Uuid
-  goalTags      PocGoalTag[]
-  logEvidence   PocLogEvidence[]
-  createdAt     DateTime        @default(now())
+  id              String              @id @default(uuid()) @db.Uuid
+  label           String
+  sourceChildId   String              @unique @db.Uuid
+  goalTags        PocGoalTag[]
+  logEvidence     PocLogEvidence[]
+  reviewDecisions PocReviewDecision[]
+  createdAt       DateTime            @default(now())
 }
 
 /// One row per source goal (IEPGoal.title, deliberately -- never the encrypted description field).
@@ -315,6 +354,12 @@ model PocGoalTag {
   id                 String             @id @default(uuid()) @db.Uuid
   childId            String             @db.Uuid
   child              PocReviewChild     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  /// The real IEPGoal.id this tag was produced from. Nullable only because rows pushed before
+  /// 2026-10-04 don't carry it -- durable (unlike this row's own id) across re-imports, since a
+  /// provider re-push deletes and recreates all of that provider's PocGoalTag rows wholesale. This
+  /// is what lets PocReviewDecision survive a re-run: it's keyed to the real goal, not to a row that
+  /// gets thrown away on every pipeline iteration.
+  sourceGoalId       String?            @db.Uuid
   goalTitle          String
   /// The goal's own domain/category exactly as entered by the therapist (IEPGoal.domainName /
   /// .category) -- never encrypted, kept for comparison against the AI-predicted skill's domain.
@@ -333,6 +378,7 @@ model PocGoalTag {
   createdAt        DateTime           @default(now())
 
   @@index([childId])
+  @@index([sourceGoalId])
 }
 
 /// One row per extracted piece of evidence from a daily log -- a single log can yield several.

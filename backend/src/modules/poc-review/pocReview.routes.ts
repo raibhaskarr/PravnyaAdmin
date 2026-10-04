@@ -27,6 +27,7 @@ const importSchema = z.object({
   modelName: z.string().min(1).max(100),
   goalTags: z.array(
     z.object({
+      sourceGoalId: z.string().uuid().nullable(),
       goalTitle: z.string().min(1).max(300),
       originalDomainName: z.string().max(200).nullable(),
       originalCategory: z.string().max(200).nullable(),
@@ -65,4 +66,34 @@ pocReviewRoutes.post(
   "/import",
   validateRequest({ body: importSchema }),
   asyncHandler(async (req, res) => res.status(201).json(await pocReviewService.importData(req.body)))
+);
+
+pocReviewRoutes.get(
+  "/children/:childId/review-flags",
+  validateRequest({ params: childParamsSchema }),
+  asyncHandler(async (req, res) => res.json(await pocReviewService.getReviewFlags(req.params.childId)))
+);
+
+const resolveFlagSchema = z
+  .object({
+    kind: z.enum(["GOAL_DISAGREEMENT", "EVIDENCE_WITHOUT_GOAL"]),
+    sourceGoalId: z.string().uuid().nullable().default(null),
+    canonicalSkillId: z.string().uuid().nullable().default(null),
+    resolvedSkillId: z.string().uuid().nullable().default(null),
+    resolvedSource: z.string().min(1).max(30),
+    note: z.string().max(500).nullable().default(null)
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === "GOAL_DISAGREEMENT" && !value.sourceGoalId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "sourceGoalId is required for GOAL_DISAGREEMENT" });
+    }
+    if (value.kind === "EVIDENCE_WITHOUT_GOAL" && !value.canonicalSkillId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "canonicalSkillId is required for EVIDENCE_WITHOUT_GOAL" });
+    }
+  });
+
+pocReviewRoutes.post(
+  "/children/:childId/review-flags/resolve",
+  validateRequest({ params: childParamsSchema, body: resolveFlagSchema }),
+  asyncHandler(async (req, res) => res.json(await pocReviewService.resolveReviewFlag(req.params.childId, req.user!.id, req.body)))
 );

@@ -12,6 +12,7 @@ import type {
   Modality,
   PocReviewChild,
   PocReviewChildDetail,
+  PocReviewFlags,
   Tenant,
   TenantDiscipline,
   Therapist,
@@ -146,6 +147,23 @@ export const api = {
   },
   getPocReviewChild(token: string, childId: string) {
     return request<PocReviewChildDetail>(`/poc-review/children/${childId}`, { token });
+  },
+  getPocReviewFlags(token: string, childId: string) {
+    return request<PocReviewFlags>(`/poc-review/children/${childId}/review-flags`, { token });
+  },
+  resolvePocReviewFlag(
+    token: string,
+    childId: string,
+    body: {
+      kind: "GOAL_DISAGREEMENT" | "EVIDENCE_WITHOUT_GOAL";
+      sourceGoalId: string | null;
+      canonicalSkillId: string | null;
+      resolvedSkillId: string | null;
+      resolvedSource: string;
+      note?: string | null;
+    }
+  ) {
+    return request<void>(`/poc-review/children/${childId}/review-flags/resolve`, { token, method: "POST", body });
   }
 };
 

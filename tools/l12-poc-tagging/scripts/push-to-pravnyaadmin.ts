@@ -49,6 +49,10 @@ function mapModality(s: string | null): string {
   return s ? s.toUpperCase() : "UNKNOWN";
 }
 
+function mapMeasurementType(s: string | null): string | null {
+  return s ? s.toUpperCase() : null;
+}
+
 async function main() {
   const db = openDb();
   const token = await login();
@@ -100,6 +104,7 @@ async function main() {
         modelProvider: provider,
         modelName,
         goalTags: goalRows.map((r) => ({
+          sourceGoalId: r.source_goal_id,
           goalTitle: r.goal_title,
           originalDomainName: r.source_domain_name,
           originalCategory: r.source_category,
@@ -120,6 +125,13 @@ async function main() {
           outcome: mapOutcome(r.outcome),
           supportLevel: mapSupport(r.support_level),
           modality: mapModality(r.modality),
+          measurementType: mapMeasurementType(r.measurement_type),
+          measurementNumerator: null,
+          measurementDenominator: null,
+          measurementValue: r.measurement_value,
+          measurementUnit: r.measurement_unit,
+          measurementBoolean: r.measurement_boolean === null ? null : Boolean(r.measurement_boolean),
+          measurementText: r.measurement_text,
           confidence: r.confidence
         }))
       };
