@@ -22,9 +22,13 @@ function formatDuration(seconds: number) {
   return `${mins} min ${secs} sec`;
 }
 
+type MeasurementFields = Pick<GoalItemEvidenceRow, "measurementType" | "measurementValue" | "measurementUnit" | "measurementBoolean" | "measurementText">;
+
 /** Same rule as the POC growth preview's measurementLabel: a trial-shaped skill's outcome already
- * is the measurement, so only skills with a real extra value (frequency/duration/...) show one. */
-export function measurementLabel(e: GoalItemEvidenceRow): string | null {
+ * is the measurement, so only skills with a real extra value (frequency/duration/...) show one.
+ * Takes just the measurement fields (not a full GoalItemEvidenceRow) so it also works on an
+ * unsaved EvidenceCandidate from the AI review flow, before it's a real row with an id/logDate. */
+export function measurementLabel(e: MeasurementFields): string | null {
   switch (e.measurementType) {
     case "FREQUENCY":
       return e.measurementValue != null ? `${e.measurementValue} ${e.measurementUnit ?? "times"}` : null;

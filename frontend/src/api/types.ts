@@ -125,6 +125,23 @@ export type GoalItem = {
 
 export type GoalItemInput = { canonicalSkillItemId?: string; customText?: string };
 
+export type EvidenceCandidate = {
+  goalId: string;
+  goalTitle: string;
+  skillName: string;
+  measurementType: PocMeasurementType | null;
+  itemHint: string | null;
+  outcome: PocEvidenceOutcome;
+  supportLevel: PocSupportLevel;
+  modality: PocModality;
+  measurementValue: number | null;
+  measurementUnit: string | null;
+  measurementBoolean: boolean | null;
+  measurementText: string | null;
+  confidence: number;
+  excerpt: string;
+};
+
 export type GoalSkillSuggestion = {
   domainId: string;
   canonicalSkillId: string;

@@ -5,6 +5,7 @@ import type {
   CanonicalSkillDetail,
   DbModel,
   DocSection,
+  EvidenceCandidate,
   Goal,
   GoalItemEvidenceRow,
   GoalItemInput,
@@ -138,6 +139,9 @@ export const api = {
   },
   suggestGoalSkill(token: string, title: string) {
     return request<GoalSkillSuggestionResponse>("/ai/suggest-goal-skill", { token, method: "POST", body: { title } });
+  },
+  extractEvidence(token: string, kidId: string, freeText: string) {
+    return request<{ candidates: EvidenceCandidate[] } | { error: string }>("/ai/extract-evidence", { token, method: "POST", body: { kidId, freeText } });
   },
   logEvidence(
     token: string,

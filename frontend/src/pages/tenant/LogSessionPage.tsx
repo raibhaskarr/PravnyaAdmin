@@ -3,6 +3,9 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import type { Goal, Kid } from "../../api/types";
 import { LogEvidenceForm } from "./LogEvidenceForm";
+import { FreeTextLogForm } from "./FreeTextLogForm";
+
+type Mode = "pick" | "note";
 
 /** Standalone entry point for therapists logging practice -- deliberately separate from a kid's
  * own detail page, so a therapist can jump straight to "who, then what" without navigating into a
@@ -16,6 +19,7 @@ export function LogSessionPage() {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [goalSearch, setGoalSearch] = useState("");
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const [mode, setMode] = useState<Mode>("pick");
 
   useEffect(() => {
     api.listKids(token!).then(setKids);
@@ -39,6 +43,7 @@ export function LogSessionPage() {
     setSelectedGoal(null);
     setKidSearch("");
     setGoalSearch("");
+    setMode("pick");
   }
 
   function handleLogged(updatedGoal: Goal) {
@@ -93,7 +98,25 @@ export function LogSessionPage() {
             </button>
           </div>
 
-          {!selectedGoal ? (
+          <div className="page-toolbar" style={{ marginBottom: "1.25rem" }}>
+            <button
+              type="button"
+              className={`btn ${mode === "pick" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => {
+                setMode("pick");
+                setSelectedGoal(null);
+              }}
+            >
+              Pick a goal
+            </button>
+            <button type="button" className={`btn ${mode === "note" ? "btn-primary" : "btn-secondary"}`} onClick={() => setMode("note")}>
+              Write a note (AI-assisted)
+            </button>
+          </div>
+
+          {mode === "note" ? (
+            <FreeTextLogForm kidId={selectedKid.id} onLogged={() => loadGoals(selectedKid.id)} />
+          ) : !selectedGoal ? (
             <>
               <input
                 className="input"
