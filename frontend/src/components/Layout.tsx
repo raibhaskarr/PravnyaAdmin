@@ -13,6 +13,7 @@ export function Layout() {
           { to: "/admin/poc-review", label: "AI Tagging POC" }
         ]
       : [
+          ...(user.role !== "VIEWER" ? [{ to: "/tenant/log", label: "Log a session" }] : []),
           { to: "/tenant/disciplines", label: "Disciplines" },
           { to: "/tenant/therapists", label: "Therapists" },
           { to: "/tenant/kids", label: "Kids" }

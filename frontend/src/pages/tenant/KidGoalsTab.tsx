@@ -3,7 +3,6 @@ import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Modality, TenantDiscipline } from "../../api/types";
 import { GoalEvidenceDetail } from "./goalEvidence";
-import { LogEvidenceForm } from "./LogEvidenceForm";
 
 const MODALITIES: Modality[] = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"];
 
@@ -22,7 +21,6 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
   const [pendingItems, setPendingItems] = useState<(GoalItemInput & { label: string })[]>([]);
   const [customText, setCustomText] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [showLogForm, setShowLogForm] = useState(false);
   const [error, setError] = useState("");
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
 
@@ -153,29 +151,15 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
           <div className="page-toolbar">
             <button
               type="button"
-              className={`btn ${showLogForm ? "btn-secondary" : "btn-primary"}`}
-              onClick={() => {
-                setShowLogForm((v) => !v);
-                setShowForm(false);
-              }}
-              disabled={goals.length === 0}
-              title={goals.length === 0 ? "Create a goal first" : undefined}
-            >
-              {showLogForm ? "Cancel" : "+ Log a session"}
-            </button>
-            <button
-              type="button"
               className="btn btn-secondary"
               onClick={() => {
                 setShowForm((v) => !v);
-                setShowLogForm(false);
                 resetFormState();
               }}
             >
               {showForm ? "Cancel" : "New goal"}
             </button>
           </div>
-          {showLogForm ? <LogEvidenceForm goals={goals} onLogged={load} /> : null}
           {showForm ? (
             <form onSubmit={handleCreate} className="form-panel" style={{ maxWidth: 480 }}>
               <label className="field">
