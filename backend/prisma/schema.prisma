@@ -212,6 +212,11 @@ model Goal {
   status           GoalStatus          @default(ACTIVE)
   notes            String?
   items            GoalItem[]
+  /// The real IEPGoal.id this Goal was migrated from, when it came from the reviewed POC tagging
+  /// pipeline rather than being created by hand in the product -- unique so re-running the migration
+  /// is idempotent (skips a goal that's already here) instead of duplicating it. Null for any Goal
+  /// created the normal way, through the product's own goal-creation flow.
+  sourceGoalId     String?             @unique @db.Uuid
   createdById      String?             @db.Uuid
   updatedById      String?             @db.Uuid
   createdAt        DateTime            @default(now())
@@ -233,9 +238,38 @@ model GoalItem {
   canonicalSkillItemId String?             @db.Uuid
   canonicalSkillItem   CanonicalSkillItem? @relation(fields: [canonicalSkillItemId], references: [id], onDelete: SetNull)
   customText           String?
+  evidence             GoalItemEvidence[]
   createdAt            DateTime            @default(now())
 
   @@index([goalId])
+}
+
+/// Real practice-history evidence for a GoalItem -- migrated from the reviewed POC tagging pipeline
+/// (PocLogEvidence) once a human confirmed the goal/skill match, never written automatically.
+/// Reuses the Poc* outcome/supportLevel/modality/measurementType enums -- the same real clinical
+/// concepts validated during the POC, not POC-specific despite the name. sourceChildId/sourceLogId
+/// are loose references back to PranTrackingSystem's real Child/DailyLog (a different database, no
+/// FK possible) -- kept only for traceability, same pattern as PocReviewChild.sourceChildId.
+model GoalItemEvidence {
+  id                 String              @id @default(uuid()) @db.Uuid
+  goalItemId         String              @db.Uuid
+  goalItem           GoalItem            @relation(fields: [goalItemId], references: [id], onDelete: Cascade)
+  logDate            DateTime?
+  centreName         String?
+  outcome            PocEvidenceOutcome
+  supportLevel       PocSupportLevel
+  modality           PocModality         @default(UNKNOWN)
+  measurementType    PocMeasurementType?
+  measurementValue   Float?
+  measurementUnit    String?
+  measurementBoolean Boolean?
+  measurementText    String?
+  confidence         Float?
+  sourceChildId      String?             @db.Uuid
+  sourceLogId        String?             @db.Uuid
+  createdAt          DateTime            @default(now())
+
+  @@index([goalItemId, logDate])
 }
 
 enum PocEvidenceOutcome {

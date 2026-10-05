@@ -119,3 +119,11 @@ pocReviewRoutes.post(
   validateRequest({ params: childParamsSchema, body: resolveFlagSchema }),
   asyncHandler(async (req, res) => res.json(await pocReviewService.resolveReviewFlag(req.params.childId, req.user!.id, req.body)))
 );
+
+const migrateSchema = z.object({ kidId: z.string().uuid() });
+
+pocReviewRoutes.post(
+  "/children/:childId/migrate",
+  validateRequest({ params: childParamsSchema, body: migrateSchema }),
+  asyncHandler(async (req, res) => res.json(await pocReviewService.migrateToKid(req.params.childId, req.body.kidId)))
+);

@@ -1,9 +1,10 @@
-import { PocEvidenceOutcome, PocGoalTagStatus, PocMeasurementType, PocModality, PocSupportLevel } from "@prisma/client";
+import { Modality, PocEvidenceOutcome, PocGoalTagStatus, PocMeasurementType, PocModality, PocSupportLevel } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { notFound } from "../../common/errors/AppError";
 
 const skillSelect = { select: { id: true, name: true, domain: { select: { name: true } } } };
 const itemSelect = { select: { id: true, displayName: true } };
+const REAL_MODALITIES = new Set(["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"]);
 
 export interface GoalTagImport {
   sourceGoalId: string | null;
@@ -262,5 +263,182 @@ export const pocReviewService = {
     return prisma.pocReviewDecision.create({
       data: { childId, kind: input.kind, sourceGoalId: input.sourceGoalId, canonicalSkillId: input.canonicalSkillId, ...data }
     });
+  },
+
+  // One-time (but safely re-runnable) migration: turns reviewed POC mappings into real Goal/
+  // GoalItem/GoalItemEvidence rows under a real Kid. Only migrates what's actually resolved --
+  // clean goal-skill tags, disagreements with a recorded decision, and evidence-without-goal
+  // skills a human explicitly linked to a goal -- everything else is skipped and reported, never
+  // silently guessed. Idempotent via Goal.sourceGoalId: re-running skips goals already migrated.
+  async migrateToKid(childId: string, kidId: string) {
+    const child = await prisma.pocReviewChild.findUnique({
+      where: { id: childId },
+      include: {
+        goalTags: { include: { predictedSkill: skillSelect } },
+        logEvidence: true,
+        reviewDecisions: true
+      }
+    });
+    if (!child) throw notFound("Review child not found");
+
+    const kid = await prisma.kid.findUnique({ where: { id: kidId } });
+    if (!kid) throw notFound("Kid not found");
+
+    const bySourceGoal = new Map<string, typeof child.goalTags>();
+    for (const g of child.goalTags) {
+      if (!g.sourceGoalId) continue;
+      const list = bySourceGoal.get(g.sourceGoalId) ?? [];
+      list.push(g);
+      bySourceGoal.set(g.sourceGoalId, list);
+    }
+
+    const disagreementDecisions = new Map(
+      child.reviewDecisions.filter((d) => d.kind === "GOAL_DISAGREEMENT" && d.sourceGoalId).map((d) => [d.sourceGoalId as string, d])
+    );
+
+    type Resolved = { sourceGoalId: string; goalTitle: string; skillId: string };
+    const resolved: Resolved[] = [];
+    const skipped: { sourceGoalId: string; goalTitle: string; reason: string }[] = [];
+
+    for (const [sourceGoalId, tags] of bySourceGoal) {
+      const taggedSkillIds = new Set(tags.filter((t) => t.predictedSkillId).map((t) => t.predictedSkillId as string));
+      const goalTitle = tags[0].goalTitle;
+      if (taggedSkillIds.size === 0) {
+        skipped.push({ sourceGoalId, goalTitle, reason: "no taxonomy match from either provider" });
+      } else if (taggedSkillIds.size === 1) {
+        resolved.push({ sourceGoalId, goalTitle, skillId: [...taggedSkillIds][0] });
+      } else {
+        const decision = disagreementDecisions.get(sourceGoalId);
+        if (decision?.resolvedSkillId) {
+          resolved.push({ sourceGoalId, goalTitle, skillId: decision.resolvedSkillId });
+        } else {
+          skipped.push({ sourceGoalId, goalTitle, reason: "providers disagree and it's not resolved yet -- review on the Review flags tab" });
+        }
+      }
+    }
+
+    // Evidence-without-goal skills a reviewer explicitly linked to a real goal ride along as extra
+    // GoalItems under that goal, even though their own skill differs from the goal's own skill --
+    // this is the whole point of that flow: one real goal legitimately covering several skills.
+    const linkedSkillsByGoal = new Map<string, string[]>();
+    let evidenceLinkedCount = 0;
+    let evidenceStillOpenCount = 0;
+    for (const d of child.reviewDecisions) {
+      if (d.kind !== "EVIDENCE_WITHOUT_GOAL" || !d.canonicalSkillId) continue;
+      if (d.resolvedSourceGoalId) {
+        const list = linkedSkillsByGoal.get(d.resolvedSourceGoalId) ?? [];
+        list.push(d.canonicalSkillId);
+        linkedSkillsByGoal.set(d.resolvedSourceGoalId, list);
+        evidenceLinkedCount += 1;
+      }
+    }
+    const decidedEvidenceSkillIds = new Set(
+      child.reviewDecisions.filter((d) => d.kind === "EVIDENCE_WITHOUT_GOAL" && d.canonicalSkillId).map((d) => d.canonicalSkillId as string)
+    );
+    const skillIdsWithGoals = new Set(child.goalTags.filter((g) => g.predictedSkillId).map((g) => g.predictedSkillId as string));
+    const evidenceSkillIds = new Set(
+      child.logEvidence.filter((e) => e.predictedSkillId && !skillIdsWithGoals.has(e.predictedSkillId)).map((e) => e.predictedSkillId as string)
+    );
+    for (const skillId of evidenceSkillIds) {
+      if (!decidedEvidenceSkillIds.has(skillId)) evidenceStillOpenCount += 1;
+    }
+
+    const created: { sourceGoalId: string; goalId: string; goalTitle: string; skillName: string; itemCount: number; evidenceCount: number }[] = [];
+
+    for (const r of resolved) {
+      const existingGoal = await prisma.goal.findUnique({ where: { sourceGoalId: r.sourceGoalId } });
+      if (existingGoal) {
+        skipped.push({ sourceGoalId: r.sourceGoalId, goalTitle: r.goalTitle, reason: "already migrated" });
+        continue;
+      }
+
+      const skill = await prisma.canonicalSkill.findUnique({
+        where: { id: r.skillId },
+        select: { name: true, defaultDisciplineId: true, supportedModalities: true }
+      });
+      if (!skill || !skill.defaultDisciplineId) {
+        skipped.push({ sourceGoalId: r.sourceGoalId, goalTitle: r.goalTitle, reason: "matched skill has no default discipline set in the taxonomy" });
+        continue;
+      }
+
+      const relevantSkillIds = new Set([r.skillId, ...(linkedSkillsByGoal.get(r.sourceGoalId) ?? [])]);
+      const evidenceRows = child.logEvidence.filter((e) => e.predictedSkillId && relevantSkillIds.has(e.predictedSkillId));
+
+      const modalityCounts = new Map<string, number>();
+      for (const e of evidenceRows) {
+        if (REAL_MODALITIES.has(e.modality)) modalityCounts.set(e.modality, (modalityCounts.get(e.modality) ?? 0) + 1);
+      }
+      const bestModality = [...modalityCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      const modality = (bestModality ?? skill.supportedModalities[0] ?? "VERBAL") as Modality;
+
+      const result = await prisma.$transaction(async (tx) => {
+        const goal = await tx.goal.create({
+          data: {
+            tenantId: kid.tenantId,
+            kidId,
+            canonicalSkillId: r.skillId,
+            disciplineId: skill.defaultDisciplineId!,
+            modality,
+            title: r.goalTitle,
+            status: "ACTIVE",
+            sourceGoalId: r.sourceGoalId
+          }
+        });
+
+        // Same item-bucketing the review page itself uses, so a promoted Goal's items match what a
+        // reviewer already saw: one real item bucket per matched CanonicalSkillItem, one per distinct
+        // unmatched hint, and a single "general practice" bucket for everything else.
+        const buckets = new Map<string, { canonicalSkillItemId: string | null; customText: string | null; rows: typeof evidenceRows }>();
+        for (const e of evidenceRows) {
+          let key: string;
+          let canonicalSkillItemId: string | null = null;
+          let customText: string | null = null;
+          if (e.itemMatchMethod === "ai" && e.predictedItemId) {
+            key = `item:${e.predictedItemId}`;
+            canonicalSkillItemId = e.predictedItemId;
+          } else if (e.itemMatchMethod === "ai_no_match" && e.itemHint) {
+            const normalized = e.itemHint.trim().toLowerCase();
+            key = `text:${normalized}`;
+            customText = normalized;
+          } else {
+            key = "general";
+          }
+          const bucket = buckets.get(key) ?? { canonicalSkillItemId, customText, rows: [] as typeof evidenceRows };
+          bucket.rows.push(e);
+          buckets.set(key, bucket);
+        }
+
+        let evidenceCount = 0;
+        for (const bucket of buckets.values()) {
+          const item = await tx.goalItem.create({
+            data: { goalId: goal.id, canonicalSkillItemId: bucket.canonicalSkillItemId, customText: bucket.customText }
+          });
+          await tx.goalItemEvidence.createMany({
+            data: bucket.rows.map((e) => ({
+              goalItemId: item.id,
+              logDate: e.logDate,
+              centreName: e.centreName,
+              outcome: e.outcome,
+              supportLevel: e.supportLevel,
+              modality: e.modality,
+              measurementType: e.measurementType,
+              measurementValue: e.measurementValue,
+              measurementUnit: e.measurementUnit,
+              measurementBoolean: e.measurementBoolean,
+              measurementText: e.measurementText,
+              confidence: e.confidence,
+              sourceChildId: child.sourceChildId
+            }))
+          });
+          evidenceCount += bucket.rows.length;
+        }
+
+        return { goalId: goal.id, itemCount: buckets.size, evidenceCount };
+      });
+
+      created.push({ sourceGoalId: r.sourceGoalId, goalId: result.goalId, goalTitle: r.goalTitle, skillName: skill.name, itemCount: result.itemCount, evidenceCount: result.evidenceCount });
+    }
+
+    return { created, skipped, evidenceLinkedAndMigrated: evidenceLinkedCount, evidenceStillNeedsReview: evidenceStillOpenCount };
   }
 };
