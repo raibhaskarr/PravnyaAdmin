@@ -3,7 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import type { Goal, Kid } from "../../api/types";
 import { LogEvidenceForm } from "./LogEvidenceForm";
-import { FreeTextLogForm } from "./FreeTextLogForm";
+import { AiAssistedLogForm } from "./AiAssistedLogForm";
 
 type Mode = "pick" | "note";
 
@@ -110,12 +110,12 @@ export function LogSessionPage() {
               Pick a goal
             </button>
             <button type="button" className={`btn ${mode === "note" ? "btn-primary" : "btn-secondary"}`} onClick={() => setMode("note")}>
-              Write a note (AI-assisted)
+              AI-assisted (note, photo, or voice)
             </button>
           </div>
 
           {mode === "note" ? (
-            <FreeTextLogForm kidId={selectedKid.id} onLogged={() => loadGoals(selectedKid.id)} />
+            <AiAssistedLogForm kidId={selectedKid.id} onLogged={() => loadGoals(selectedKid.id)} />
           ) : !selectedGoal ? (
             <>
               <input

@@ -1,9 +1,16 @@
 import { z } from "zod";
-import { createExecutionContext, textMessage } from "@pravnix/ai-core";
+import { createExecutionContext } from "@pravnix/ai-core";
+import type { AiContentPart } from "@pravnix/ai-core";
 import { prisma } from "../../config/prisma";
 import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { orchestrator } from "./ai.platform";
+
+export interface EvidenceMedia {
+  kind: "image" | "audio";
+  mimeType: string;
+  base64: string;
+}
 
 const OUTCOMES = ["CORRECT", "INCORRECT", "PARTIAL", "ATTEMPTED", "NOT_OBSERVED", "UNKNOWN"] as const;
 const SUPPORT_LEVELS = ["INDEPENDENT", "VISUAL_PROMPT", "VERBAL_PROMPT", "GESTURAL_PROMPT", "PHYSICAL_PROMPT", "PARTIAL_ASSISTANCE", "FULL_ASSISTANCE", "UNKNOWN"] as const;
@@ -98,7 +105,11 @@ export interface EvidenceCandidate {
 }
 
 export const extractEvidenceService = {
-  async extract(user: AuthUser, kidId: string, freeText: string): Promise<{ candidates: EvidenceCandidate[] } | { error: string }> {
+  async extract(
+    user: AuthUser,
+    kidId: string,
+    input: { freeText: string } | { media: EvidenceMedia }
+  ): Promise<{ candidates: EvidenceCandidate[] } | { error: string }> {
     await assertCanAccessKid(user, kidId);
 
     const goals = await prisma.goal.findMany({
@@ -112,11 +123,33 @@ export const extractEvidenceService = {
       .map((g) => `${g.id}\t${g.title} (skill: ${g.canonicalSkill.name})${g.canonicalSkill.measurementType ? ` [measures: ${g.canonicalSkill.measurementType.toLowerCase()}]` : ""}`)
       .join("\n");
 
+    const candidateBlock = `This kid's active goals (id, title (skill)):\n${candidateLines}`;
+    const content: AiContentPart[] =
+      "freeText" in input
+        ? [{ type: "text", text: `Session note:\n${input.freeText}\n\n${candidateBlock}` }]
+        : [
+            {
+              type: "text",
+              text:
+                (input.media.kind === "image"
+                  ? "The attached image is a therapist's session note (handwritten or typed) -- read it and extract evidence from it exactly as you would a typed note."
+                  : "The attached audio is a therapist describing a session out loud -- listen to it and extract evidence from it exactly as you would a typed note.") +
+                `\n\n${candidateBlock}`
+            },
+            { type: input.media.kind, data: { base64: input.media.base64 }, mimeType: input.media.mimeType }
+          ];
+
+    // Claude's Messages API rejects audio input outright -- force Gemini for that case. Images
+    // work on both, but Gemini is already the configured default when both keys are present isn't
+    // guaranteed (Claude wins by default in ai.platform.ts), so leave image on the normal default.
+    const forcedProvider = "media" in input && input.media.kind === "audio" ? "gemini" : undefined;
+
     const result = await orchestrator.executeStructured({
       name: "pravnyaadmin.extract-evidence-from-note",
+      provider: forcedProvider,
       request: {
         systemPrompt: SYSTEM_PROMPT,
-        messages: [textMessage("user", `Session note:\n${freeText}\n\nThis kid's active goals (id, title (skill)):\n${candidateLines}`)],
+        messages: [{ role: "user", content }],
         executionContext: createExecutionContext({ productId: "pravnyaadmin", tenantId: user.tenantId ?? undefined, featureId: "extract-evidence-from-note" })
       },
       schema: buildSchema(validIds),

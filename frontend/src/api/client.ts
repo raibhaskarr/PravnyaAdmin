@@ -140,8 +140,8 @@ export const api = {
   suggestGoalSkill(token: string, title: string) {
     return request<GoalSkillSuggestionResponse>("/ai/suggest-goal-skill", { token, method: "POST", body: { title } });
   },
-  extractEvidence(token: string, kidId: string, freeText: string) {
-    return request<{ candidates: EvidenceCandidate[] } | { error: string }>("/ai/extract-evidence", { token, method: "POST", body: { kidId, freeText } });
+  extractEvidence(token: string, kidId: string, input: { freeText: string } | { media: { kind: "image" | "audio"; mimeType: string; base64: string } }) {
+    return request<{ candidates: EvidenceCandidate[] } | { error: string }>("/ai/extract-evidence", { token, method: "POST", body: { kidId, ...input } });
   },
   logEvidence(
     token: string,

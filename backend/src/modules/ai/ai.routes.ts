@@ -23,15 +23,32 @@ aiRoutes.post(
   })
 );
 
-const extractEvidenceSchema = z.object({ kidId: z.string().uuid(), freeText: z.string().min(1).max(8000) });
+const extractEvidenceSchema = z
+  .object({
+    kidId: z.string().uuid(),
+    freeText: z.string().min(1).max(8000).optional(),
+    media: z
+      .object({
+        kind: z.enum(["image", "audio"]),
+        mimeType: z.string().min(1).max(100),
+        base64: z.string().min(1)
+      })
+      .optional()
+  })
+  .refine((v) => (v.freeText !== undefined) !== (v.media !== undefined), {
+    message: "Provide exactly one of freeText or media"
+  });
 
 // Never persists anything -- just returns candidates for the therapist to review. Saving happens
-// through the normal POST /goals/:goalId/evidence endpoint, once per approved candidate.
+// through the normal POST /goals/:goalId/evidence endpoint, once per approved candidate. media is
+// a base64-encoded photo or voice recording; it's only ever forwarded to the AI provider for this
+// one request and never written to disk or the DB.
 aiRoutes.post(
   "/extract-evidence",
   blockViewer,
   validateRequest({ body: extractEvidenceSchema }),
   asyncHandler(async (req, res) => {
-    res.json(await extractEvidenceService.extract(req.user!, req.body.kidId, req.body.freeText));
+    const input = req.body.freeText !== undefined ? { freeText: req.body.freeText } : { media: req.body.media };
+    res.json(await extractEvidenceService.extract(req.user!, req.body.kidId, input));
   })
 );

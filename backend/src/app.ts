@@ -20,6 +20,10 @@ export function createApp() {
 
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN.split(",") }));
+  // A base64-encoded phone photo or voice recording can run several MB -- scoped to just this one
+  // route (registered before the general parser below) rather than raising the global limit for
+  // every other route's small CRUD bodies.
+  app.use("/api/ai/extract-evidence", express.json({ limit: "25mb" }));
   // Default 100kb is too small for the poc-review bulk-import endpoint (hundreds of rows per
   // child); every other route's payloads are small CRUD bodies well under this.
   app.use(express.json({ limit: "2mb" }));
