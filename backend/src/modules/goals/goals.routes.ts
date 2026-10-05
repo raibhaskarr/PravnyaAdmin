@@ -3,7 +3,7 @@ import { asyncHandler } from "../../common/middleware/asyncHandler";
 import { blockViewer, requireAuth, requireTenantScope } from "../../common/middleware/auth";
 import { validateRequest } from "../../common/middleware/validateRequest";
 import { goalsService } from "./goals.service";
-import { createGoalSchema, goalParamsSchema, goalQuerySchema, updateGoalSchema } from "./goals.schemas";
+import { createEvidenceSchema, createGoalSchema, goalParamsSchema, goalQuerySchema, updateGoalSchema } from "./goals.schemas";
 
 export const goalsRoutes = Router();
 
@@ -42,5 +42,14 @@ goalsRoutes.patch(
   validateRequest({ params: goalParamsSchema, body: updateGoalSchema }),
   asyncHandler(async (req, res) => {
     res.json(await goalsService.update(req.user!, req.params.goalId, req.body));
+  })
+);
+
+goalsRoutes.post(
+  "/:goalId/evidence",
+  blockViewer,
+  validateRequest({ params: goalParamsSchema, body: createEvidenceSchema }),
+  asyncHandler(async (req, res) => {
+    res.status(201).json(await goalsService.createEvidence(req.user!, req.params.goalId, req.body));
   })
 );

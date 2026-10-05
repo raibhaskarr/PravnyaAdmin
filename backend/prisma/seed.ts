@@ -2,7 +2,8 @@
 // (PranTrackingSystem repo) into real rows. Idempotent (upsert on unique keys) so it can be
 // re-run safely as the source docs evolve.
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, PocMeasurementType } from "@prisma/client";
+import measurementTypeByName from "./skillMeasurementTypesByName.json";
 
 const prisma = new PrismaClient();
 
@@ -439,6 +440,7 @@ async function main() {
   for (const s of SKILLS) {
     const key = `${s.domain}.${slug(s.name)}`;
     const supportedModalities = modalitiesFor(s.domain, s.name);
+    const measurementType = (measurementTypeByName as Record<string, PocMeasurementType>)[s.name] ?? null;
     const row = await prisma.canonicalSkill.upsert({
       where: { key },
       update: {
@@ -447,7 +449,8 @@ async function main() {
         defaultDisciplineId: disciplineByKey.get(s.discipline)!,
         supportsItems: s.supportsItems,
         sourceTag: s.source,
-        supportedModalities
+        supportedModalities,
+        measurementType
       },
       create: {
         key,
@@ -456,7 +459,8 @@ async function main() {
         defaultDisciplineId: disciplineByKey.get(s.discipline)!,
         supportsItems: s.supportsItems,
         sourceTag: s.source,
-        supportedModalities
+        supportedModalities,
+        measurementType
       }
     });
     skillByName.set(s.name, row.id);

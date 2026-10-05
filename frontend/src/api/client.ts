@@ -6,13 +6,17 @@ import type {
   DbModel,
   DocSection,
   Goal,
+  GoalItemEvidenceRow,
   GoalItemInput,
   GoalSkillSuggestionResponse,
   Kid,
   Modality,
+  PocEvidenceOutcome,
+  PocModality,
   PocReviewChild,
   PocReviewChildDetail,
   PocReviewFlags,
+  PocSupportLevel,
   Tenant,
   TenantDiscipline,
   Therapist,
@@ -134,6 +138,28 @@ export const api = {
   },
   suggestGoalSkill(token: string, title: string) {
     return request<GoalSkillSuggestionResponse>("/ai/suggest-goal-skill", { token, method: "POST", body: { title } });
+  },
+  logEvidence(
+    token: string,
+    goalId: string,
+    input: {
+      goalItemId?: string;
+      newItemCustomText?: string;
+      logDate: string;
+      centreName?: string | null;
+      outcome: PocEvidenceOutcome;
+      supportLevel: PocSupportLevel;
+      modality: PocModality;
+      measurementValue?: number | null;
+      measurementUnit?: string | null;
+      measurementBoolean?: boolean | null;
+      measurementText?: string | null;
+    }
+  ) {
+    return request<GoalItemEvidenceRow & { goalItem: { id: string; customText: string | null; canonicalSkillItem: { id: string; displayName: string } | null } }>(
+      `/goals/${goalId}/evidence`,
+      { token, method: "POST", body: input }
+    );
   },
 
   // Manual

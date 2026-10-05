@@ -2,11 +2,11 @@ import { prisma } from "../../config/prisma";
 import { notFound } from "../../common/errors/AppError";
 import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid, kidVisibilityFilter } from "../../common/access/kidAccess";
-import { CreateGoalInput, UpdateGoalInput } from "./goals.schemas";
+import { CreateEvidenceInput, CreateGoalInput, UpdateGoalInput } from "./goals.schemas";
 
 const includeRelations = {
   kid: { select: { id: true, firstName: true, lastName: true } },
-  canonicalSkill: { select: { id: true, name: true, domain: { select: { id: true, name: true } } } },
+  canonicalSkill: { select: { id: true, name: true, measurementType: true, domain: { select: { id: true, name: true } } } },
   discipline: { select: { id: true, name: true } },
   items: {
     include: {
@@ -80,6 +80,46 @@ export const goalsService = {
       where: { id: goalId },
       data: { ...fields, updatedById: user.id },
       include: includeRelations
+    });
+  },
+
+  // A therapist logging a session rarely wants to pre-create items first -- resolve (or create)
+  // the right GoalItem inline: an explicit goalItemId, a new custom-text item typed on the spot, or
+  // the shared "general practice" bucket (customText null, canonicalSkillItemId null) when neither
+  // is given. Never creates a second "general practice" row for the same goal.
+  async createEvidence(user: AuthUser, goalId: string, input: CreateEvidenceInput) {
+    const goal = await prisma.goal.findUnique({ where: { id: goalId }, include: { canonicalSkill: { select: { measurementType: true } } } });
+    if (!goal) throw notFound("Goal not found");
+    await assertCanAccessKid(user, goal.kidId);
+
+    let goalItemId = input.goalItemId;
+    if (!goalItemId) {
+      const customText = input.newItemCustomText?.trim() || null;
+      const existing = await prisma.goalItem.findFirst({
+        where: customText ? { goalId, customText: { equals: customText, mode: "insensitive" } } : { goalId, customText: null, canonicalSkillItemId: null }
+      });
+      const item = existing ?? (await prisma.goalItem.create({ data: { goalId, customText } }));
+      goalItemId = item.id;
+    } else {
+      const item = await prisma.goalItem.findUnique({ where: { id: goalItemId } });
+      if (!item || item.goalId !== goalId) throw notFound("Goal item not found on this goal");
+    }
+
+    return prisma.goalItemEvidence.create({
+      data: {
+        goalItemId,
+        logDate: new Date(input.logDate),
+        centreName: input.centreName ?? null,
+        outcome: input.outcome,
+        supportLevel: input.supportLevel,
+        modality: input.modality,
+        measurementType: goal.canonicalSkill.measurementType,
+        measurementValue: input.measurementValue ?? null,
+        measurementUnit: input.measurementUnit ?? null,
+        measurementBoolean: input.measurementBoolean ?? null,
+        measurementText: input.measurementText ?? null
+      },
+      include: { goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } } }
     });
   }
 };

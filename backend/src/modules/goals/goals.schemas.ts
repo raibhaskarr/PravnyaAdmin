@@ -32,5 +32,23 @@ export const updateGoalSchema = z.object({
 export const goalParamsSchema = z.object({ goalId: z.string().uuid() });
 export const goalQuerySchema = z.object({ kidId: z.string().uuid().optional() });
 
+// A therapist logging a session picks an existing item, types a new one on the fly, or leaves both
+// blank for "general practice, no specific item" -- the service finds-or-creates the right GoalItem
+// either way, so the frontend never has to pre-create items before it can log against them.
+export const createEvidenceSchema = z.object({
+  goalItemId: z.string().uuid().optional(),
+  newItemCustomText: z.string().min(1).max(300).optional(),
+  logDate: z.string().min(1),
+  centreName: z.string().max(200).nullable().optional(),
+  outcome: z.enum(["CORRECT", "INCORRECT", "PARTIAL", "ATTEMPTED", "NOT_OBSERVED", "UNKNOWN"]),
+  supportLevel: z.enum(["INDEPENDENT", "VISUAL_PROMPT", "VERBAL_PROMPT", "GESTURAL_PROMPT", "PHYSICAL_PROMPT", "PARTIAL_ASSISTANCE", "FULL_ASSISTANCE", "UNKNOWN"]),
+  modality: z.enum(["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL", "UNKNOWN", "NOT_APPLICABLE"]).default("UNKNOWN"),
+  measurementValue: z.number().nullable().optional(),
+  measurementUnit: z.string().max(50).nullable().optional(),
+  measurementBoolean: z.boolean().nullable().optional(),
+  measurementText: z.string().max(500).nullable().optional()
+});
+
 export type CreateGoalInput = z.infer<typeof createGoalSchema>;
 export type UpdateGoalInput = z.infer<typeof updateGoalSchema>;
+export type CreateEvidenceInput = z.infer<typeof createEvidenceSchema>;

@@ -256,7 +256,7 @@ export type Goal = {
   kidId: string;
   kid: { id: string; firstName: string; lastName: string };
   canonicalSkillId: string;
-  canonicalSkill: { id: string; name: string; domain: { id: string; name: string } };
+  canonicalSkill: { id: string; name: string; measurementType: PocMeasurementType | null; domain: { id: string; name: string } };
   disciplineId: string;
   discipline: { id: string; name: string };
   modality: Modality;

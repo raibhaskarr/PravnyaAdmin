@@ -114,6 +114,12 @@ model CanonicalSkill {
   /// pointing/selecting, not speaking) -- a default like defaultDisciplineId, not a hard lock.
   /// Empty for skills where "modality" doesn't apply at all (motor, sensory, behavior, adaptive).
   supportedModalities  Modality[]          @default([])
+  /// What this skill is actually measured by, clinically -- a discrete right/wrong trial is only
+  /// one shape among several (frequency, duration, a 1-5 rating, ...). Promoted from the L12 AI-
+  /// tagging POC's own classification (tools/l12-poc-tagging/scripts/skill-measurement-types.ts,
+  /// validated against real evidence all session) once a real log-entry UX needed to know which
+  /// input to show a therapist. Null means "not yet classified, falls back to outcome/supportLevel".
+  measurementType      PocMeasurementType?
   sourceTag            SkillSource         @default(FRAMEWORK)
   items                CanonicalSkillItem[]
   goals                Goal[]
