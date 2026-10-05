@@ -1,7 +1,8 @@
-import { FormEvent, useEffect, useState } from "react";
+import { Fragment, FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Kid, Modality, TenantDiscipline } from "../../api/types";
+import { GoalEvidenceDetail } from "./goalEvidence";
 
 const MODALITIES: Modality[] = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"];
 
@@ -18,6 +19,7 @@ export function GoalsPage() {
   const [customText, setCustomText] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [canonicalSkillId, setCanonicalSkillId] = useState("");
@@ -355,6 +357,7 @@ export function GoalsPage() {
         <table className="data-table">
           <thead>
             <tr>
+              <th></th>
               <th>Kid</th>
               <th>Title</th>
               <th>Canonical skill</th>
@@ -365,19 +368,42 @@ export function GoalsPage() {
             </tr>
           </thead>
           <tbody>
-            {goals.map((g) => (
-              <tr key={g.id}>
-                <td>
-                  {g.kid.firstName} {g.kid.lastName}
-                </td>
-                <td>{g.title}</td>
-                <td>{g.canonicalSkill.name}</td>
-                <td>{g.discipline.name}</td>
-                <td>{g.modality}</td>
-                <td>{g.items.length ? g.items.map(goalItemLabel).join(", ") : "—"}</td>
-                <td>{g.status}</td>
-              </tr>
-            ))}
+            {goals.map((g) => {
+              const evidenceCount = g.items.reduce((sum, i) => sum + i.evidence.length, 0);
+              const isExpanded = expandedGoalId === g.id;
+              return (
+                <Fragment key={g.id}>
+                  <tr>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: "0.1rem 0.5rem", fontSize: "0.75rem" }}
+                        onClick={() => setExpandedGoalId(isExpanded ? null : g.id)}
+                      >
+                        {isExpanded ? "Hide" : "History"} {evidenceCount ? `(${evidenceCount})` : ""}
+                      </button>
+                    </td>
+                    <td>
+                      {g.kid.firstName} {g.kid.lastName}
+                    </td>
+                    <td>{g.title}</td>
+                    <td>{g.canonicalSkill.name}</td>
+                    <td>{g.discipline.name}</td>
+                    <td>{g.modality}</td>
+                    <td>{g.items.length ? g.items.map(goalItemLabel).join(", ") : "—"}</td>
+                    <td>{g.status}</td>
+                  </tr>
+                  {isExpanded ? (
+                    <tr>
+                      <td colSpan={8} style={{ padding: 0 }}>
+                        <GoalEvidenceDetail goal={g} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
         {goals.length === 0 ? <p className="empty-state">No goals visible to your account yet.</p> : null}

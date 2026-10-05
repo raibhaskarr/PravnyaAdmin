@@ -6,9 +6,14 @@ import { CreateGoalInput, UpdateGoalInput } from "./goals.schemas";
 
 const includeRelations = {
   kid: { select: { id: true, firstName: true, lastName: true } },
-  canonicalSkill: { select: { id: true, name: true } },
+  canonicalSkill: { select: { id: true, name: true, domain: { select: { id: true, name: true } } } },
   discipline: { select: { id: true, name: true } },
-  items: { include: { canonicalSkillItem: { select: { id: true, displayName: true } } } }
+  items: {
+    include: {
+      canonicalSkillItem: { select: { id: true, displayName: true } },
+      evidence: { orderBy: { logDate: "desc" as const } }
+    }
+  }
 };
 
 export const goalsService = {

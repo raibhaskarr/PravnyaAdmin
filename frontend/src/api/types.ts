@@ -100,11 +100,27 @@ export type Kid = {
 
 export type Modality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL";
 
+export type GoalItemEvidenceRow = {
+  id: string;
+  logDate: string | null;
+  centreName: string | null;
+  outcome: PocEvidenceOutcome;
+  supportLevel: PocSupportLevel;
+  modality: PocModality;
+  measurementType: PocMeasurementType | null;
+  measurementValue: number | null;
+  measurementUnit: string | null;
+  measurementBoolean: boolean | null;
+  measurementText: string | null;
+  confidence: number | null;
+};
+
 export type GoalItem = {
   id: string;
   canonicalSkillItemId: string | null;
   canonicalSkillItem: { id: string; displayName: string } | null;
   customText: string | null;
+  evidence: GoalItemEvidenceRow[];
 };
 
 export type GoalItemInput = { canonicalSkillItemId?: string; customText?: string };
@@ -240,7 +256,7 @@ export type Goal = {
   kidId: string;
   kid: { id: string; firstName: string; lastName: string };
   canonicalSkillId: string;
-  canonicalSkill: { id: string; name: string };
+  canonicalSkill: { id: string; name: string; domain: { id: string; name: string } };
   disciplineId: string;
   discipline: { id: string; name: string };
   modality: Modality;
