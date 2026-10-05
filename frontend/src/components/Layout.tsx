@@ -15,9 +15,7 @@ export function Layout() {
       : [
           { to: "/tenant/disciplines", label: "Disciplines" },
           { to: "/tenant/therapists", label: "Therapists" },
-          { to: "/tenant/kids", label: "Kids" },
-          { to: "/tenant/goals", label: "Goals" },
-          { to: "/tenant/growth", label: "Growth" }
+          { to: "/tenant/kids", label: "Kids" }
         ];
   links.push({ to: "/manual", label: "Manual" });
 

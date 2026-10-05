@@ -111,6 +111,9 @@ export const api = {
   createKid(token: string, input: { firstName: string; lastName: string; therapistIds: string[] }) {
     return request<Kid>("/kids", { token, method: "POST", body: input });
   },
+  updateKid(token: string, kidId: string, input: { therapistIds?: string[]; status?: "ACTIVE" | "ARCHIVED" }) {
+    return request<Kid>(`/kids/${kidId}`, { token, method: "PATCH", body: input });
+  },
 
   // Goals
   listGoals(token: string, kidId?: string) {

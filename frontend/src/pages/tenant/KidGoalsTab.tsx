@@ -1,15 +1,18 @@
 import { Fragment, FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Kid, Modality, TenantDiscipline } from "../../api/types";
+import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Modality, TenantDiscipline } from "../../api/types";
 import { GoalEvidenceDetail } from "./goalEvidence";
 
 const MODALITIES: Modality[] = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"];
 
-export function GoalsPage() {
-  const { token, user } = useAuth();
+function goalItemLabel(item: Goal["items"][number]) {
+  return item.customText ?? item.canonicalSkillItem?.displayName ?? "—";
+}
+
+export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolean }) {
+  const { token } = useAuth();
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [kids, setKids] = useState<Kid[]>([]);
   const [domains, setDomains] = useState<CanonicalDomain[]>([]);
   const [disciplines, setDisciplines] = useState<TenantDiscipline[]>([]);
   const [skills, setSkills] = useState<{ id: string; name: string }[]>([]);
@@ -29,17 +32,15 @@ export function GoalsPage() {
   const [suggesting, setSuggesting] = useState(false);
   const [suggestNote, setSuggestNote] = useState("");
 
-  const canEdit = user?.role !== "VIEWER";
   const suggestedModalities = selectedSkill?.supportedModalities ?? [];
 
   function load() {
-    api.listGoals(token!).then(setGoals);
-    api.listKids(token!).then(setKids);
+    api.listGoals(token!, kidId).then(setGoals);
     api.listDomains(token!).then(setDomains);
     api.listTenantDisciplines(token!).then(setDisciplines);
   }
 
-  useEffect(load, [token]);
+  useEffect(load, [token, kidId]);
 
   useEffect(() => {
     if (!selectedDomainId) {
@@ -49,8 +50,6 @@ export function GoalsPage() {
     api.listSkills(token!, selectedDomainId).then(setSkills);
   }, [token, selectedDomainId]);
 
-  // Once an AI-suggested domain's skill list has loaded, finish selecting the suggested skill --
-  // the skills dropdown is domain-scoped, so this can't happen in the same tick as the domain pick.
   useEffect(() => {
     if (!pendingSkillId) return;
     if (skills.some((s) => s.id === pendingSkillId)) {
@@ -127,10 +126,9 @@ export function GoalsPage() {
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    const form = new FormData(event.currentTarget);
     try {
       await api.createGoal(token!, {
-        kidId: String(form.get("kidId")),
+        kidId,
         canonicalSkillId,
         disciplineId,
         modality: modality as Modality,
@@ -138,7 +136,6 @@ export function GoalsPage() {
         items: pendingItems.map(({ canonicalSkillItemId, customText: text }) => ({ canonicalSkillItemId, customText: text }))
       });
       setShowForm(false);
-      event.currentTarget.reset();
       setSelectedDomainId("");
       resetFormState();
       load();
@@ -147,14 +144,8 @@ export function GoalsPage() {
     }
   }
 
-  function goalItemLabel(item: Goal["items"][number]) {
-    return item.customText ?? item.canonicalSkillItem?.displayName ?? "—";
-  }
-
   return (
     <div>
-      <h1>Goals</h1>
-
       {canEdit ? (
         <>
           <div className="page-toolbar">
@@ -171,18 +162,6 @@ export function GoalsPage() {
           </div>
           {showForm ? (
             <form onSubmit={handleCreate} className="form-panel" style={{ maxWidth: 480 }}>
-              <label className="field">
-                <span className="field-label">Kid</span>
-                <select name="kidId" required className="input">
-                  <option value="">Select a kid</option>
-                  {kids.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.firstName} {k.lastName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
               <label className="field">
                 <span className="field-label">Goal title (as written)</span>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} required className="input" />
@@ -358,7 +337,6 @@ export function GoalsPage() {
           <thead>
             <tr>
               <th></th>
-              <th>Kid</th>
               <th>Title</th>
               <th>Canonical skill</th>
               <th>Discipline</th>
@@ -384,9 +362,6 @@ export function GoalsPage() {
                         {isExpanded ? "Hide" : "History"} {evidenceCount ? `(${evidenceCount})` : ""}
                       </button>
                     </td>
-                    <td>
-                      {g.kid.firstName} {g.kid.lastName}
-                    </td>
                     <td>{g.title}</td>
                     <td>{g.canonicalSkill.name}</td>
                     <td>{g.discipline.name}</td>
@@ -396,7 +371,7 @@ export function GoalsPage() {
                   </tr>
                   {isExpanded ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: 0 }}>
+                      <td colSpan={7} style={{ padding: 0 }}>
                         <GoalEvidenceDetail goal={g} />
                       </td>
                     </tr>
@@ -406,7 +381,7 @@ export function GoalsPage() {
             })}
           </tbody>
         </table>
-        {goals.length === 0 ? <p className="empty-state">No goals visible to your account yet.</p> : null}
+        {goals.length === 0 ? <p className="empty-state">No goals for this kid yet.</p> : null}
       </div>
     </div>
   );

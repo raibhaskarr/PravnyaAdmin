@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, Therapist } from "../../api/types";
 
 export function KidsPage() {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [kids, setKids] = useState<Kid[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -87,7 +89,7 @@ export function KidsPage() {
           </thead>
           <tbody>
             {kids.map((k) => (
-              <tr key={k.id}>
+              <tr key={k.id} onClick={() => navigate(`/tenant/kids/${k.id}`)} style={{ cursor: "pointer" }}>
                 <td>
                   {k.firstName} {k.lastName}
                 </td>
