@@ -35,12 +35,69 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Search-filter field for picking (or creating) a GoalItem, same pattern as the kid/goal search on
+ * the Log a session page -- type, matches filter live below, click one. Clicking an existing item
+ * adopts its exact label (so the submit matches it by id, never creating a near-duplicate); typing
+ * something that matches nothing and submitting as-is creates a new item with that text. */
+function ItemSearchField({ goal, value, onChange }: { goal: Goal; value: string; onChange: (v: string) => void }) {
+  const [focused, setFocused] = useState(false);
+  const query = value.trim().toLowerCase();
+  const matches = query ? goal.items.filter((i) => itemLabel(i).toLowerCase().includes(query)) : goal.items;
+  const exactMatch = goal.items.some((i) => itemLabel(i).toLowerCase() === query);
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        className="input"
+        value={value}
+        placeholder="General practice (no specific item) -- or type to search/add one"
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
+      />
+      {focused ? (
+        <div className="card" style={{ position: "absolute", zIndex: 10, top: "100%", left: 0, right: 0, marginTop: "0.25rem", maxHeight: "220px", overflowY: "auto", padding: "0.3rem" }}>
+          <button
+            type="button"
+            className="taxonomy-item-btn"
+            style={{ width: "100%", textAlign: "left" }}
+            onMouseDown={() => {
+              onChange("");
+              setFocused(false);
+            }}
+          >
+            General practice (no specific item)
+          </button>
+          {matches.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="taxonomy-item-btn"
+              style={{ width: "100%", textAlign: "left" }}
+              onMouseDown={() => {
+                onChange(itemLabel(item));
+                setFocused(false);
+              }}
+            >
+              {itemLabel(item)}
+            </button>
+          ))}
+          {value.trim() && !exactMatch ? (
+            <div className="hint-text" style={{ padding: "0.4rem 0.6rem" }}>
+              + Will add "{value.trim()}" as a new item
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Goal has already been picked (via search, upstream) by the time this renders -- this form is
  * just the quick-entry fields for that one goal, driven by its skill's measurement type. */
 export function LogEvidenceForm({ goal, onLogged }: { goal: Goal; onLogged: (updatedGoal: Goal) => void }) {
   const { token } = useAuth();
-  const [itemChoice, setItemChoice] = useState(""); // "" = general practice, "new" = typed below, else a GoalItem id
-  const [newItemText, setNewItemText] = useState("");
+  const [itemQuery, setItemQuery] = useState("");
   const [logDate, setLogDate] = useState(todayISO());
   const [centreName, setCentreName] = useState("");
   const [outcome, setOutcome] = useState<PocEvidenceOutcome>("CORRECT");
@@ -59,8 +116,7 @@ export function LogEvidenceForm({ goal, onLogged }: { goal: Goal; onLogged: (upd
   const measurementType = goal.canonicalSkill.measurementType;
 
   function resetMeasurementFields() {
-    setItemChoice("");
-    setNewItemText("");
+    setItemQuery("");
     setMeasurementValue("");
     setMeasurementUnit("times");
     setDurationMin("");
@@ -77,10 +133,12 @@ export function LogEvidenceForm({ goal, onLogged }: { goal: Goal; onLogged: (upd
     event.preventDefault();
     setError("");
     setSaving(true);
+    const trimmedItem = itemQuery.trim();
+    const matchedExisting = trimmedItem ? goal.items.find((i) => itemLabel(i).toLowerCase() === trimmedItem.toLowerCase()) : undefined;
     try {
       await api.logEvidence(token!, goal.id, {
-        goalItemId: itemChoice && itemChoice !== "new" ? itemChoice : undefined,
-        newItemCustomText: itemChoice === "new" ? newItemText.trim() || undefined : undefined,
+        goalItemId: matchedExisting?.id,
+        newItemCustomText: !matchedExisting && trimmedItem ? trimmedItem : undefined,
         logDate: new Date(logDate).toISOString(),
         centreName: centreName.trim() || null,
         outcome,
@@ -112,22 +170,8 @@ export function LogEvidenceForm({ goal, onLogged }: { goal: Goal; onLogged: (upd
     <form onSubmit={handleSubmit} className="form-panel" style={{ maxWidth: 560 }}>
       <label className="field">
         <span className="field-label">What was practiced</span>
-        <select className="input" value={itemChoice} onChange={(e) => setItemChoice(e.target.value)}>
-          <option value="">General practice (no specific item)</option>
-          {goal.items.map((item) => (
-            <option key={item.id} value={item.id}>
-              {itemLabel(item)}
-            </option>
-          ))}
-          <option value="new">+ Type a new item...</option>
-        </select>
+        <ItemSearchField goal={goal} value={itemQuery} onChange={setItemQuery} />
       </label>
-      {itemChoice === "new" ? (
-        <label className="field">
-          <span className="field-label">New item name</span>
-          <input className="input" value={newItemText} onChange={(e) => setNewItemText(e.target.value)} placeholder="e.g. Apple" autoFocus />
-        </label>
-      ) : null}
 
       <div style={{ display: "flex", gap: "0.75rem" }}>
         <label className="field" style={{ flex: 1 }}>
