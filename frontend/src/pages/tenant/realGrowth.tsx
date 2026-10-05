@@ -63,11 +63,14 @@ function modalityLabel(modality: string): string | null {
 
 interface EvidenceWithItem extends GoalItemEvidenceRow {
   itemLabel: string;
+  /** Null when this evidence has no specific matched item -- it's the "General practice" bucket,
+   * which reads fine as a group header but not inside a "Got X right" sentence. */
+  itemName: string | null;
 }
 
 function allEvidenceWithItem(goal: Goal): EvidenceWithItem[] {
   return goal.items
-    .flatMap((i) => i.evidence.map((e) => ({ ...e, itemLabel: itemLabel(i) })))
+    .flatMap((i) => i.evidence.map((e) => ({ ...e, itemLabel: itemLabel(i), itemName: i.customText ?? i.canonicalSkillItem?.displayName ?? null })))
     .sort((a, b) => (a.logDate ?? "").localeCompare(b.logDate ?? ""));
 }
 
@@ -168,7 +171,8 @@ function buildGrowthMoments(goals: Goal[], limit = 10): GrowthMoment[] {
       seenEnv.add(env);
       if (e.outcome === "CORRECT" && !firstCorrectFound) {
         firstCorrectFound = true;
-        moments.push({ date: e.logDate!, goalTitle: g.title, title: `Got "${e.itemLabel}" right for the first time`, environment: env, tag: "First independent" });
+        const title = e.itemName ? `Got "${e.itemName}" right for the first time` : "First independent success";
+        moments.push({ date: e.logDate!, goalTitle: g.title, title, environment: env, tag: "First independent" });
       } else if (isNewEnv && hadSeenAnyEnv) {
         moments.push({ date: e.logDate!, goalTitle: g.title, title: `First time this showed up at ${env}`, environment: env, tag: "New setting" });
       }
