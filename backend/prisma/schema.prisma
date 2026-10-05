@@ -320,8 +320,11 @@ model PocReviewDecision {
   /// The skill a reviewer decided is actually correct. Null for an EVIDENCE_WITHOUT_GOAL
   /// acknowledgement (there's no competing prediction to pick between, just "seen, this is fine").
   resolvedSkillId  String?            @db.Uuid
-  /// 'gemini' | 'claude' | 'manual' (disagreement resolutions) or 'acknowledged' (evidence-without-
-  /// goal). Free string, not an enum -- mirrors modelProvider elsewhere in this module.
+  /// Set when a reviewer links an EVIDENCE_WITHOUT_GOAL skill to a real goal (PocGoalTag.sourceGoalId)
+  /// -- usually confirming a PocEvidenceGoalSuggestion, but not required to match one.
+  resolvedSourceGoalId String?        @db.Uuid
+  /// 'gemini' | 'claude' | 'manual' (disagreement resolutions) or 'acknowledged' / 'linked_goal'
+  /// (evidence-without-goal). Free string, not an enum -- mirrors modelProvider elsewhere here.
   resolvedSource   String?
   note             String?
   decidedById      String?            @db.Uuid
@@ -332,19 +335,45 @@ model PocReviewDecision {
   @@index([childId, kind])
 }
 
+/// A reverse-direction AI suggestion: for a skill that has evidence but no tagged goal, which of
+/// this child's real goals (if any) does it most plausibly belong under -- a looser, best-effort
+/// search across the whole goal list, unlike the original per-goal tagging pass which requires one
+/// specific goal to pick one specific skill. Always a suggestion for a human to confirm or dismiss
+/// via PocReviewDecision, never auto-applied. One row per (childId, canonicalSkillId) -- replaced
+/// wholesale each time this pass re-runs, same replace-on-import pattern as PocGoalTag/PocLogEvidence.
+model PocEvidenceGoalSuggestion {
+  id                String         @id @default(uuid()) @db.Uuid
+  childId           String         @db.Uuid
+  child             PocReviewChild @relation(fields: [childId], references: [id], onDelete: Cascade)
+  canonicalSkillId  String         @db.Uuid
+  /// Null means the AI found no plausible goal either -- a real, useful finding (the evidence is
+  /// most likely genuinely incidental), not a missing row.
+  suggestedGoalId   String?        @db.Uuid
+  /// Snapshot of the goal's title at suggestion time -- no live Goal table to join against here.
+  suggestedGoalTitle String?
+  confidence        Float?
+  rationale         String?
+  modelProvider     String
+  modelName         String
+  createdAt         DateTime       @default(now())
+
+  @@unique([childId, canonicalSkillId])
+}
+
 /// Not tenant-scoped -- this is a superadmin-only review surface for the AI goal/log tagging POC
 /// (see PranTrackingSystem's docs/l12-growth-intelligence-*.md), covering two real children who
 /// aren't PravnyaAdmin Kids yet. Exists to let a human judge tagging quality against the real
 /// Canonical Skill taxonomy before any real child-data import happens. A label (first name), not a
 /// Kid record -- sourceChildId is PranTrackingSystem's own child id, kept only for traceability.
 model PocReviewChild {
-  id              String              @id @default(uuid()) @db.Uuid
-  label           String
-  sourceChildId   String              @unique @db.Uuid
-  goalTags        PocGoalTag[]
-  logEvidence     PocLogEvidence[]
-  reviewDecisions PocReviewDecision[]
-  createdAt       DateTime            @default(now())
+  id                String                       @id @default(uuid()) @db.Uuid
+  label             String
+  sourceChildId     String                       @unique @db.Uuid
+  goalTags          PocGoalTag[]
+  logEvidence       PocLogEvidence[]
+  reviewDecisions   PocReviewDecision[]
+  goalSuggestions   PocEvidenceGoalSuggestion[]
+  createdAt         DateTime                     @default(now())
 }
 
 /// One row per source goal (IEPGoal.title, deliberately -- never the encrypted description field).

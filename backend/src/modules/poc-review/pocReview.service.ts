@@ -47,6 +47,21 @@ export interface ImportPayload {
   logEvidence: LogEvidenceImport[];
 }
 
+export interface GoalSuggestionImport {
+  canonicalSkillId: string;
+  suggestedGoalId: string | null;
+  suggestedGoalTitle: string | null;
+  confidence: number | null;
+  rationale: string | null;
+}
+
+export interface SuggestionImportPayload {
+  sourceChildId: string;
+  modelProvider: string;
+  modelName: string;
+  suggestions: GoalSuggestionImport[];
+}
+
 export const pocReviewService = {
   async listChildren() {
     const children = await prisma.pocReviewChild.findMany({
@@ -127,6 +142,32 @@ export const pocReviewService = {
     return { childId: child.id, goalTagsImported: payload.goalTags.length, logEvidenceImported: payload.logEvidence.length };
   },
 
+  // Replace-on-import per child -- a suggestion is a point-in-time best-effort search, not
+  // provider-scoped like goalTags/logEvidence (only one provider runs this reverse pass at a time;
+  // see the local pipeline's match-evidence-to-goals.ts for why).
+  async importGoalSuggestions(payload: SuggestionImportPayload) {
+    const child = await prisma.pocReviewChild.findUnique({ where: { sourceChildId: payload.sourceChildId } });
+    if (!child) throw notFound("Review child not found -- import goals/evidence for this child first");
+
+    await prisma.$transaction([
+      prisma.pocEvidenceGoalSuggestion.deleteMany({ where: { childId: child.id } }),
+      prisma.pocEvidenceGoalSuggestion.createMany({
+        data: payload.suggestions.map((s) => ({
+          childId: child.id,
+          canonicalSkillId: s.canonicalSkillId,
+          suggestedGoalId: s.suggestedGoalId,
+          suggestedGoalTitle: s.suggestedGoalTitle,
+          confidence: s.confidence,
+          rationale: s.rationale,
+          modelProvider: payload.modelProvider,
+          modelName: payload.modelName
+        }))
+      })
+    ]);
+
+    return { childId: child.id, suggestionsImported: payload.suggestions.length };
+  },
+
   // Flags are never stored -- computed fresh from current PocGoalTag/PocLogEvidence on every call,
   // then correlated against whatever PocReviewDecision rows already exist so a resolved flag still
   // shows as resolved even after the next re-import regenerates the tags/evidence underneath it.
@@ -141,10 +182,12 @@ export const pocReviewService = {
     if (!child) throw notFound("Review child not found");
 
     const decisions = await prisma.pocReviewDecision.findMany({ where: { childId } });
+    const suggestions = await prisma.pocEvidenceGoalSuggestion.findMany({ where: { childId } });
     const disagreementDecision = (sourceGoalId: string) =>
       decisions.find((d) => d.kind === "GOAL_DISAGREEMENT" && d.sourceGoalId === sourceGoalId) ?? null;
     const evidenceDecision = (canonicalSkillId: string) =>
       decisions.find((d) => d.kind === "EVIDENCE_WITHOUT_GOAL" && d.canonicalSkillId === canonicalSkillId) ?? null;
+    const evidenceSuggestion = (canonicalSkillId: string) => suggestions.find((s) => s.canonicalSkillId === canonicalSkillId) ?? null;
 
     const bySourceGoal = new Map<string, typeof child.goalTags>();
     for (const g of child.goalTags) {
@@ -184,7 +227,8 @@ export const pocReviewService = {
       skill: s.skill,
       evidenceCount: s.count,
       providers: [...s.providers],
-      decision: evidenceDecision(s.skillId)
+      decision: evidenceDecision(s.skillId),
+      suggestion: evidenceSuggestion(s.skillId)
     }));
 
     return { disagreements, evidenceWithoutGoal };
@@ -198,6 +242,7 @@ export const pocReviewService = {
       sourceGoalId: string | null;
       canonicalSkillId: string | null;
       resolvedSkillId: string | null;
+      resolvedSourceGoalId: string | null;
       resolvedSource: string;
       note: string | null;
     }
@@ -207,6 +252,7 @@ export const pocReviewService = {
     });
     const data = {
       resolvedSkillId: input.resolvedSkillId,
+      resolvedSourceGoalId: input.resolvedSourceGoalId,
       resolvedSource: input.resolvedSource,
       note: input.note,
       decidedById,

@@ -196,10 +196,21 @@ export type PocReviewDecision = {
   sourceGoalId: string | null;
   canonicalSkillId: string | null;
   resolvedSkillId: string | null;
+  resolvedSourceGoalId: string | null;
   resolvedSource: string | null;
   note: string | null;
   decidedById: string | null;
   decidedAt: string;
+};
+
+export type PocEvidenceGoalSuggestion = {
+  id: string;
+  canonicalSkillId: string;
+  suggestedGoalId: string | null;
+  suggestedGoalTitle: string | null;
+  confidence: number | null;
+  rationale: string | null;
+  modelProvider: string;
 };
 
 export type PocGoalDisagreement = {
@@ -215,6 +226,7 @@ export type PocEvidenceWithoutGoal = {
   evidenceCount: number;
   providers: string[];
   decision: PocReviewDecision | null;
+  suggestion: PocEvidenceGoalSuggestion | null;
 };
 
 export type PocReviewFlags = {

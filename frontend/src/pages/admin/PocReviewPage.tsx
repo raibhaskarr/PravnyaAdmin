@@ -440,6 +440,7 @@ function ReviewFlagsView({ flags, onResolve }: { flags: PocReviewFlags; onResolv
                           sourceGoalId: d.sourceGoalId,
                           canonicalSkillId: null,
                           resolvedSkillId: t.predictedSkill!.id,
+                          resolvedSourceGoalId: null,
                           resolvedSource: t.modelProvider,
                           note: noteDrafts[d.sourceGoalId] ?? null
                         })
@@ -492,30 +493,110 @@ function ReviewFlagsView({ flags, onResolve }: { flags: PocReviewFlags; onResolv
             Logs reference this skill, but no goal (from either provider) was tagged to it -- may be a missed goal tag, or genuinely incidental evidence.
           </p>
           {flags.evidenceWithoutGoal.map((e) => (
-            <div
-              key={e.canonicalSkillId}
-              className="card"
-              style={{ marginBottom: "0.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", opacity: e.decision ? 0.7 : 1 }}
-            >
-              <div>
-                <strong>{e.skill?.name ?? "—"}</strong>
-                <div className="hint-text">
-                  {e.skill?.domain.name} &middot; {e.evidenceCount} evidence &middot; {e.providers.join(", ")}
+            <div key={e.canonicalSkillId} className="card" style={{ marginBottom: "0.5rem", opacity: e.decision ? 0.7 : 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div>
+                  <strong>{e.skill?.name ?? "—"}</strong>
+                  <div className="hint-text">
+                    {e.skill?.domain.name} &middot; {e.evidenceCount} evidence &middot; {e.providers.join(", ")}
+                  </div>
                 </div>
+                {e.decision ? (
+                  <span className="hint-text">
+                    {e.decision.resolvedSource === "linked_goal" ? "Linked to a goal" : "Acknowledged"} on {new Date(e.decision.decidedAt).toLocaleDateString()}
+                  </span>
+                ) : !e.suggestion ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() =>
+                      onResolve({
+                        kind: "EVIDENCE_WITHOUT_GOAL",
+                        sourceGoalId: null,
+                        canonicalSkillId: e.canonicalSkillId,
+                        resolvedSkillId: null,
+                        resolvedSourceGoalId: null,
+                        resolvedSource: "acknowledged",
+                        note: null
+                      })
+                    }
+                  >
+                    Acknowledge
+                  </button>
+                ) : null}
               </div>
-              {e.decision ? (
-                <span className="hint-text">Acknowledged on {new Date(e.decision.decidedAt).toLocaleDateString()}</span>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() =>
-                    onResolve({ kind: "EVIDENCE_WITHOUT_GOAL", sourceGoalId: null, canonicalSkillId: e.canonicalSkillId, resolvedSkillId: null, resolvedSource: "acknowledged", note: null })
-                  }
-                >
-                  Acknowledge
-                </button>
-              )}
+              {!e.decision && e.suggestion ? (
+                <div style={{ marginTop: "0.6rem", paddingTop: "0.6rem", borderTop: "1px solid var(--color-border)" }}>
+                  {e.suggestion.suggestedGoalTitle ? (
+                    <>
+                      <div className="hint-text">
+                        AI suggests: <span style={{ color: "var(--color-text)" }}>{e.suggestion.suggestedGoalTitle}</span> ({confidencePct(e.suggestion.confidence)} confidence)
+                      </div>
+                      {e.suggestion.rationale ? <div className="hint-text" style={{ marginTop: "0.2rem" }}>{e.suggestion.rationale}</div> : null}
+                      <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ padding: "0.15rem 0.6rem", fontSize: "0.8rem" }}
+                          onClick={() =>
+                            onResolve({
+                              kind: "EVIDENCE_WITHOUT_GOAL",
+                              sourceGoalId: null,
+                              canonicalSkillId: e.canonicalSkillId,
+                              resolvedSkillId: null,
+                              resolvedSourceGoalId: e.suggestion!.suggestedGoalId,
+                              resolvedSource: "linked_goal",
+                              note: null
+                            })
+                          }
+                        >
+                          Link this goal
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: "0.15rem 0.6rem", fontSize: "0.8rem" }}
+                          onClick={() =>
+                            onResolve({
+                              kind: "EVIDENCE_WITHOUT_GOAL",
+                              sourceGoalId: null,
+                              canonicalSkillId: e.canonicalSkillId,
+                              resolvedSkillId: null,
+                              resolvedSourceGoalId: null,
+                              resolvedSource: "acknowledged",
+                              note: null
+                            })
+                          }
+                        >
+                          No, this stands alone
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="hint-text">AI found no plausible goal for this skill either -- this is likely genuinely incidental evidence.</div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ marginTop: "0.5rem", padding: "0.15rem 0.6rem", fontSize: "0.8rem" }}
+                        onClick={() =>
+                          onResolve({
+                            kind: "EVIDENCE_WITHOUT_GOAL",
+                            sourceGoalId: null,
+                            canonicalSkillId: e.canonicalSkillId,
+                            resolvedSkillId: null,
+                            resolvedSourceGoalId: null,
+                            resolvedSource: "acknowledged",
+                            note: null
+                          })
+                        }
+                      >
+                        Acknowledge
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

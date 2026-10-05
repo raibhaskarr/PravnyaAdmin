@@ -75,6 +75,17 @@ with `SQLITE_BUSY` (hit once; not a mystery if it recurs — just don't overlap 
 `scripts/match-items.ts` is the original deterministic string-matcher for item hints, superseded by
 the AI-based `tag-items.ts` (59% match rate vs. 79%+) but kept for reference/comparison.
 
+### Evidence-without-goal suggestions (review-flags support)
+
+`scripts/match-evidence-to-goals.ts` is a standalone reverse-direction pass -- for each skill the
+POC Review page flags as "evidence without a tagged goal," it searches that child's full real goal
+list for a plausible fit and pushes the suggestion to `/api/poc-review/evidence-goal-suggestions/
+import`, where a human reviews and confirms or dismisses it on the Review flags tab. Unlike the
+other scripts here, it never touches `poc.sqlite` or `data/` -- it reads everything it needs (the
+real goal list, item hints) live from PravnyaAdmin's own API, since that data is already pushed and
+non-clinical-text. Run with `POC_PROVIDER=gemini|claude npx tsx scripts/match-evidence-to-goals.ts`
+after goals/evidence are already imported for both children.
+
 ### Reviewing and filling real taxonomy gaps
 
 `scripts/add-taxonomy-items.ts` and `scripts/add-taxonomy-items-2.ts` are one-off scripts (two

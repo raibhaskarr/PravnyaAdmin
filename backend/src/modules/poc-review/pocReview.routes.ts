@@ -68,6 +68,27 @@ pocReviewRoutes.post(
   asyncHandler(async (req, res) => res.status(201).json(await pocReviewService.importData(req.body)))
 );
 
+const suggestionImportSchema = z.object({
+  sourceChildId: z.string().uuid(),
+  modelProvider: z.string().min(1).max(50),
+  modelName: z.string().min(1).max(100),
+  suggestions: z.array(
+    z.object({
+      canonicalSkillId: z.string().uuid(),
+      suggestedGoalId: z.string().uuid().nullable(),
+      suggestedGoalTitle: z.string().max(300).nullable(),
+      confidence: z.number().min(0).max(1).nullable(),
+      rationale: z.string().max(1000).nullable()
+    })
+  )
+});
+
+pocReviewRoutes.post(
+  "/evidence-goal-suggestions/import",
+  validateRequest({ body: suggestionImportSchema }),
+  asyncHandler(async (req, res) => res.status(201).json(await pocReviewService.importGoalSuggestions(req.body)))
+);
+
 pocReviewRoutes.get(
   "/children/:childId/review-flags",
   validateRequest({ params: childParamsSchema }),
@@ -80,6 +101,7 @@ const resolveFlagSchema = z
     sourceGoalId: z.string().uuid().nullable().default(null),
     canonicalSkillId: z.string().uuid().nullable().default(null),
     resolvedSkillId: z.string().uuid().nullable().default(null),
+    resolvedSourceGoalId: z.string().uuid().nullable().default(null),
     resolvedSource: z.string().min(1).max(30),
     note: z.string().max(500).nullable().default(null)
   })

@@ -159,6 +159,7 @@ export const api = {
       sourceGoalId: string | null;
       canonicalSkillId: string | null;
       resolvedSkillId: string | null;
+      resolvedSourceGoalId: string | null;
       resolvedSource: string;
       note?: string | null;
     }
