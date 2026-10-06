@@ -3,6 +3,17 @@ import { z } from "zod";
 
 dotenv.config();
 
+// z.coerce.boolean() coerces "false" -> true (truthy string). This preprocessor
+// treats "false"/"0"/"no"/"off"/"" as false and any other string as true.
+const boolFromEnv = z.preprocess(
+  (val) => {
+    if (typeof val !== "string") return val;
+    const lower = val.trim().toLowerCase();
+    return lower !== "false" && lower !== "0" && lower !== "no" && lower !== "off" && lower !== "";
+  },
+  z.boolean()
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(4011),
@@ -21,7 +32,7 @@ const envSchema = z.object({
   EMAIL_PROVIDER: z.enum(["log", "smtp"]).default("log"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_SECURE: boolFromEnv.default(false),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM_NAME: z.string().default("PravnyaAdmin"),
