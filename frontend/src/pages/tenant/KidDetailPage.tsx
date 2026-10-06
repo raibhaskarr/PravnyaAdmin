@@ -15,6 +15,9 @@ export function KidDetailPage() {
   const [kid, setKid] = useState<Kid | null>(null);
   const [tab, setTab] = useState<Tab>("goals");
   const canEdit = user?.role !== "VIEWER";
+  // Inviting or reassigning a kid's support team is a Tenant Admin call, not a therapist's --
+  // even a therapist already assigned to this kid can't bring on another therapist for it.
+  const canManageTeam = user?.role === "TENANT_ADMIN";
 
   function load() {
     if (!kidId) return;
@@ -51,7 +54,7 @@ export function KidDetailPage() {
 
       {tab === "goals" ? <KidGoalsTab kidId={kid.id} canEdit={canEdit} /> : null}
       {tab === "growth" ? <KidGrowthTab kidId={kid.id} kidLabel={kidLabel} /> : null}
-      {tab === "team" ? <KidSupportTeamTab kid={kid} canEdit={canEdit} onUpdated={load} /> : null}
+      {tab === "team" ? <KidSupportTeamTab kid={kid} canEdit={canManageTeam} onUpdated={load} /> : null}
     </div>
   );
 }
