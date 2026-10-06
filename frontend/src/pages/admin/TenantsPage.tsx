@@ -24,7 +24,8 @@ export function TenantsPage() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     setError("");
     try {
       const result = await api.createTenant(token!, {
@@ -35,7 +36,7 @@ export function TenantsPage() {
       });
       setCreatedCreds({ email: result.adminEmail, tempPassword: result.tempPassword });
       setShowForm(false);
-      event.currentTarget.reset();
+      formEl.reset();
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create tenant");

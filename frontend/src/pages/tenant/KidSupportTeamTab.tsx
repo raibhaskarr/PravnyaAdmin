@@ -18,9 +18,10 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
 
   async function handleInviteByEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setError("");
     setInviteNotice(null);
-    const email = String(new FormData(event.currentTarget).get("email"));
+    const email = String(new FormData(form).get("email"));
     setInviting(true);
     try {
       const result = await api.inviteTherapistForKid(token!, kid.id, email);
@@ -29,7 +30,7 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
       } else {
         setInviteNotice(`Invited ${email} -- they'll show up here once they accept and set their password.${result.inviteUrl ? ` Dev link: ${result.inviteUrl}` : ""}`);
       }
-      event.currentTarget.reset();
+      form.reset();
       onUpdated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to invite this email");

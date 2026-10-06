@@ -33,8 +33,9 @@ export function TherapistsPage() {
 
   async function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formEl = event.currentTarget;
     setError("");
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formEl);
     const disciplineIds = disciplines.filter((d) => form.get(`discipline_${d.id}`) === "on").map((d) => d.id);
     try {
       const result = await api.inviteTherapist(token!, {
@@ -45,7 +46,7 @@ export function TherapistsPage() {
       setSentTo(result.invitation.email);
       setDevInviteUrl(result.inviteUrl ?? null);
       setShowForm(false);
-      event.currentTarget.reset();
+      formEl.reset();
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to send invitation");

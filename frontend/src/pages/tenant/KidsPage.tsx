@@ -22,8 +22,9 @@ export function KidsPage() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formEl = event.currentTarget;
     setError("");
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formEl);
     const therapistIds = therapists.filter((t) => form.get(`therapist_${t.id}`) === "on").map((t) => t.id);
     try {
       await api.createKid(token!, {
@@ -32,7 +33,7 @@ export function KidsPage() {
         therapistIds
       });
       setShowForm(false);
-      event.currentTarget.reset();
+      formEl.reset();
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create kid");
