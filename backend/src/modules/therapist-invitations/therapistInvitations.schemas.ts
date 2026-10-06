@@ -7,7 +7,8 @@ export const inviteGeneralSchema = z.object({
 });
 
 export const inviteForKidSchema = z.object({
-  email: z.string().email()
+  email: z.string().email(),
+  disciplineIds: z.array(z.string().uuid()).default([])
 });
 
 export const invitationParamsSchema = z.object({ invitationId: z.string().uuid() });

@@ -115,10 +115,10 @@ export const api = {
   inviteTherapist(token: string, input: { email: string; name: string; disciplineIds: string[] }) {
     return request<{ invitation: TherapistInvitation; inviteUrl?: string }>("/therapist-invitations", { token, method: "POST", body: input });
   },
-  inviteTherapistForKid(token: string, kidId: string, email: string) {
+  inviteTherapistForKid(token: string, kidId: string, email: string, disciplineIds: string[]) {
     return request<{ linked: true; therapist: Therapist } | { linked: false; invitation: TherapistInvitation; inviteUrl?: string }>(
       "/therapist-invitations/for-kid",
-      { token, method: "POST", body: { kidId, email } }
+      { token, method: "POST", body: { kidId, email, disciplineIds } }
     );
   },
   revokeTherapistInvitation(token: string, invitationId: string) {

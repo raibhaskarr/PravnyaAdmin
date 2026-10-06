@@ -113,6 +113,7 @@ export const therapistInvitationsService = {
       data: {
         tenantId: user.tenantId!,
         email: input.email,
+        disciplineIds: input.disciplineIds,
         kidId,
         invitedById: user.id,
         tokenHash: hashToken(raw),

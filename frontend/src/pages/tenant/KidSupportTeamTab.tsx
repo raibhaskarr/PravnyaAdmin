@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { Kid, Therapist } from "../../api/types";
+import type { Kid, TenantDiscipline, Therapist } from "../../api/types";
 
 export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEdit: boolean; onUpdated: () => void }) {
   const { token } = useAuth();
   const [therapists, setTherapists] = useState<Therapist[]>([]);
+  const [disciplines, setDisciplines] = useState<TenantDiscipline[]>([]);
   const [editing, setEditing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
@@ -14,6 +15,7 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
 
   useEffect(() => {
     api.listTherapists(token!).then(setTherapists);
+    api.listTenantDisciplines(token!).then(setDisciplines);
   }, [token]);
 
   async function handleInviteByEmail(event: FormEvent<HTMLFormElement>) {
@@ -21,10 +23,12 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
     const form = event.currentTarget;
     setError("");
     setInviteNotice(null);
-    const email = String(new FormData(form).get("email"));
+    const formData = new FormData(form);
+    const email = String(formData.get("email"));
+    const disciplineIds = disciplines.filter((d) => formData.get(`discipline_${d.id}`) === "on").map((d) => d.id);
     setInviting(true);
     try {
-      const result = await api.inviteTherapistForKid(token!, kid.id, email);
+      const result = await api.inviteTherapistForKid(token!, kid.id, email, disciplineIds);
       if (result.linked) {
         setInviteNotice(`${result.therapist.name} is already a therapist here -- added to the support team.`);
       } else {
@@ -81,11 +85,21 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
               <span className="field-label">Add by email</span>
               <input className="input" name="email" type="email" required placeholder="therapist@example.com" />
             </label>
+            <fieldset className="form-group">
+              <legend>Disciplines (if inviting someone new)</legend>
+              {disciplines
+                .filter((d) => d.enabled)
+                .map((d) => (
+                  <label key={d.id} className="checkbox-row">
+                    <input type="checkbox" name={`discipline_${d.id}`} /> {d.name}
+                  </label>
+                ))}
+            </fieldset>
             <button type="submit" className="btn btn-primary" disabled={inviting}>
               {inviting ? "Adding..." : "Add"}
             </button>
             <p className="hint-text" style={{ marginTop: "0.4rem" }}>
-              If this email already belongs to a therapist here, they're added right away. Otherwise they'll get an invite to set up their account.
+              If this email already belongs to a therapist here, they're added right away (disciplines above are ignored). Otherwise they'll get an invite to set up their account with these disciplines.
             </p>
           </form>
         ) : null}
