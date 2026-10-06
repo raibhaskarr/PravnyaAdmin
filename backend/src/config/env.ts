@@ -15,7 +15,18 @@ const envSchema = z.object({
   // "no suggestion") when neither is set, rather than failing to boot. See
   // backend/src/modules/ai/ai.platform.ts.
   ANTHROPIC_API_KEY: z.string().optional(),
-  GEMINI_API_KEY: z.string().optional()
+  GEMINI_API_KEY: z.string().optional(),
+  // Optional: therapist invitation emails degrade to logging the message server-side (dev-visible,
+  // content-free in production) when unconfigured -- see modules/therapist-invitations/invitationEmail.service.ts.
+  EMAIL_PROVIDER: z.enum(["log", "smtp"]).default("log"),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  EMAIL_FROM_NAME: z.string().default("PravnyaAdmin"),
+  EMAIL_FROM_ADDRESS: z.string().default("no-reply@pravnya.com"),
+  APP_BASE_URL: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);

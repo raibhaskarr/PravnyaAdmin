@@ -10,6 +10,7 @@ import type {
   GoalItemEvidenceRow,
   GoalItemInput,
   GoalSkillSuggestionResponse,
+  InvitationPreview,
   Kid,
   Modality,
   PocEvidenceOutcome,
@@ -21,6 +22,7 @@ import type {
   Tenant,
   TenantDiscipline,
   Therapist,
+  TherapistInvitation,
   UserRole
 } from "./types";
 
@@ -105,8 +107,28 @@ export const api = {
   listTherapists(token: string) {
     return request<Therapist[]>("/therapists", { token });
   },
-  createTherapist(token: string, input: { email: string; name: string; disciplineIds: string[] }) {
-    return request<{ therapist: Therapist; tempPassword: string }>("/therapists", { token, method: "POST", body: input });
+
+  // Therapist invitations
+  listTherapistInvitations(token: string) {
+    return request<TherapistInvitation[]>("/therapist-invitations", { token });
+  },
+  inviteTherapist(token: string, input: { email: string; name: string; disciplineIds: string[] }) {
+    return request<{ invitation: TherapistInvitation; inviteUrl?: string }>("/therapist-invitations", { token, method: "POST", body: input });
+  },
+  inviteTherapistForKid(token: string, kidId: string, email: string) {
+    return request<{ linked: true; therapist: Therapist } | { linked: false; invitation: TherapistInvitation; inviteUrl?: string }>(
+      "/therapist-invitations/for-kid",
+      { token, method: "POST", body: { kidId, email } }
+    );
+  },
+  revokeTherapistInvitation(token: string, invitationId: string) {
+    return request(`/therapist-invitations/${invitationId}`, { token, method: "DELETE" });
+  },
+  previewInvitation(inviteToken: string) {
+    return request<InvitationPreview>(`/invitations/${inviteToken}`);
+  },
+  acceptInvitation(inviteToken: string, input: { name: string; password: string }) {
+    return request<{ token: string; user: AuthUser }>(`/invitations/${inviteToken}/accept`, { method: "POST", body: input });
   },
 
   // Kids

@@ -7,6 +7,7 @@ type AuthState = {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  setSession: (token: string, user: AuthUser) => void;
   logout: () => void;
 };
 
@@ -40,13 +41,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(result));
   }
 
+  function setSession(nextToken: string, nextUser: AuthUser) {
+    setToken(nextToken);
+    setUser(nextUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: nextToken, user: nextUser }));
+  }
+
   function logout() {
     setToken(null);
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  return <AuthContext.Provider value={{ token, user, loading, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ token, user, loading, login, setSession, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
+import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { TenantsPage } from "./pages/admin/TenantsPage";
 import { TaxonomyPage } from "./pages/admin/TaxonomyPage";
 import { PocReviewPage } from "./pages/admin/PocReviewPage";
@@ -22,6 +23,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/invite/:token" element={<AcceptInvitePage />} />
 
           <Route element={<ProtectedRoute allow={["SUPERADMIN"]} />}>
             <Route element={<Layout />}>

@@ -14,6 +14,8 @@ import { goalsRoutes } from "./modules/goals/goals.routes";
 import { manualRoutes } from "./modules/manual/manual.routes";
 import { aiRoutes } from "./modules/ai/ai.routes";
 import { pocReviewRoutes } from "./modules/poc-review/pocReview.routes";
+import { therapistInvitationsRoutes } from "./modules/therapist-invitations/therapistInvitations.routes";
+import { invitationAcceptRoutes } from "./modules/therapist-invitations/invitationAccept.routes";
 
 export function createApp() {
   const app = express();
@@ -50,6 +52,8 @@ export function createApp() {
   app.use("/api/manual", manualRoutes);
   app.use("/api/ai", aiRoutes);
   app.use("/api/poc-review", pocReviewRoutes);
+  app.use("/api/therapist-invitations", therapistInvitationsRoutes);
+  app.use("/api/invitations", invitationAcceptRoutes);
 
   app.use(errorMiddleware);
 

@@ -88,6 +88,25 @@ export type Therapist = {
   user: { email: string; name: string };
 };
 
+export type TherapistInvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+
+export type TherapistInvitation = {
+  id: string;
+  email: string;
+  name: string | null;
+  status: TherapistInvitationStatus;
+  kid: { id: string; firstName: string; lastName: string } | null;
+  expiresAt: string;
+  createdAt: string;
+};
+
+export type InvitationPreview = {
+  email: string;
+  name: string | null;
+  tenantName: string;
+  kidName: string | null;
+};
+
 export type Kid = {
   id: string;
   tenantId: string;

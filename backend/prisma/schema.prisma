@@ -47,6 +47,13 @@ enum KidStatus {
   ARCHIVED
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
 /// Single login table for every user in the system. SUPERADMIN rows have tenantId = null; every
 /// other role is scoped to exactly one tenant. A therapist working across multiple tenants is a
 /// known future case, not modeled here.
@@ -59,6 +66,7 @@ model User {
   tenantId     String?   @db.Uuid
   tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   therapist    Therapist?
+  sentTherapistInvitations TherapistInvitation[] @relation("InvitationSentBy")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -75,6 +83,7 @@ model Tenant {
   therapists Therapist[]
   kids       Kid[]
   goals      Goal[]
+  therapistInvitations TherapistInvitation[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -185,10 +194,41 @@ model Kid {
   status     KidStatus   @default(ACTIVE)
   therapists KidTherapist[]
   goals      Goal[]
+  therapistInvitations TherapistInvitation[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
   @@index([tenantId])
+}
+
+/// A pending/resolved offer for someone to join as a THERAPIST, created either from the general
+/// "invite a therapist" form (kidId null) or from a specific kid's support-team editor (kidId
+/// set -- the new therapist is auto-assigned to that one kid on acceptance). The invited person
+/// sets their own password when accepting; nothing here ever stores a plaintext password.
+/// Deliberately tenant-scoped like everything else -- see the note on User above, cross-tenant
+/// therapist access is a known future case, not modeled here. If the invited email already
+/// belongs to a therapist in this same tenant, the inviting flow links them directly instead of
+/// creating a row here at all.
+model TherapistInvitation {
+  id            String           @id @default(uuid()) @db.Uuid
+  tenantId      String           @db.Uuid
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email         String
+  name          String?
+  disciplineIds String[]         @default([])
+  kidId         String?          @db.Uuid
+  kid           Kid?             @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  invitedById   String           @db.Uuid
+  invitedBy     User             @relation("InvitationSentBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  tokenHash     String           @unique
+  status        InvitationStatus @default(PENDING)
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([email])
 }
 
 model KidTherapist {

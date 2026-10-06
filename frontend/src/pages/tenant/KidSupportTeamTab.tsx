@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, Therapist } from "../../api/types";
@@ -9,10 +9,34 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
   const [editing, setEditing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
 
   useEffect(() => {
     api.listTherapists(token!).then(setTherapists);
   }, [token]);
+
+  async function handleInviteByEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setInviteNotice(null);
+    const email = String(new FormData(event.currentTarget).get("email"));
+    setInviting(true);
+    try {
+      const result = await api.inviteTherapistForKid(token!, kid.id, email);
+      if (result.linked) {
+        setInviteNotice(`${result.therapist.name} is already a therapist here -- added to the support team.`);
+      } else {
+        setInviteNotice(`Invited ${email} -- they'll show up here once they accept and set their password.${result.inviteUrl ? ` Dev link: ${result.inviteUrl}` : ""}`);
+      }
+      event.currentTarget.reset();
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to invite this email");
+    } finally {
+      setInviting(false);
+    }
+  }
 
   function startEditing() {
     setSelectedIds(new Set(kid.therapists.map((t) => t.therapist.id)));
@@ -49,6 +73,22 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
             </button>
           </div>
         ) : null}
+
+        {canEdit ? (
+          <form onSubmit={handleInviteByEmail} className="form-panel" style={{ maxWidth: 420, marginBottom: "1rem" }}>
+            <label className="field">
+              <span className="field-label">Add by email</span>
+              <input className="input" name="email" type="email" required placeholder="therapist@example.com" />
+            </label>
+            <button type="submit" className="btn btn-primary" disabled={inviting}>
+              {inviting ? "Adding..." : "Add"}
+            </button>
+            <p className="hint-text" style={{ marginTop: "0.4rem" }}>
+              If this email already belongs to a therapist here, they're added right away. Otherwise they'll get an invite to set up their account.
+            </p>
+          </form>
+        ) : null}
+        {inviteNotice ? <p className="hint-text">{inviteNotice}</p> : null}
         {error ? <p className="error-text">{error}</p> : null}
         <div className="table-wrap">
           <table className="data-table">
