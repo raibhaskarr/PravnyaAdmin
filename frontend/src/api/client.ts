@@ -71,6 +71,35 @@ export const api = {
   updateTenant(token: string, tenantId: string, input: { name?: string; status?: "ACTIVE" | "SUSPENDED" }) {
     return request<Tenant>(`/tenants/${tenantId}`, { token, method: "PATCH", body: input });
   },
+  getTenant(token: string, tenantId: string) {
+    return request<Tenant>(`/tenants/${tenantId}`, { token });
+  },
+  updateTenantProfile(
+    token: string,
+    tenantId: string,
+    input: Partial<
+      Pick<
+        Tenant,
+        | "leadOwnerName"
+        | "leadOwnerEmail"
+        | "leadOwnerPhone"
+        | "phone"
+        | "website"
+        | "socialLinks"
+        | "addressLine1"
+        | "addressLine2"
+        | "city"
+        | "state"
+        | "country"
+        | "pincode"
+        | "logoUrl"
+        | "kycStatus"
+        | "kycNotes"
+      >
+    >
+  ) {
+    return request<Tenant>(`/tenants/${tenantId}/profile`, { token, method: "PATCH", body: input });
+  },
 
   // Taxonomy (read: any role; write: superadmin)
   listDomains(token: string) {

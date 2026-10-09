@@ -73,11 +73,43 @@ model User {
   @@index([tenantId])
 }
 
+enum TenantKycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+/// Business/KYC profile fields are deliberately separate from the TENANT_ADMIN login created at
+/// signup (adminName/adminEmail on CreateTenantInput) -- leadOwner* is the registered business
+/// contact for compliance purposes, independent of who happens to hold the login credential.
+/// Defaults to the admin contact at creation time when left blank (see tenants.service.ts), but
+/// stays independently editable afterward so changing who logs in never corrupts the KYC record.
 model Tenant {
   id         String        @id @default(uuid()) @db.Uuid
   name       String
   slug       String        @unique
   status     TenantStatus  @default(ACTIVE)
+
+  leadOwnerName  String?
+  leadOwnerEmail String?
+  leadOwnerPhone String?
+  phone          String?
+  website        String?
+  /// Freeform platform -> profile URL map (e.g. {"instagram": "...", "facebook": "..."}) --
+  /// display-only metadata, not queried/filtered on, so a few named columns would be unnecessary
+  /// rigidity for an open-ended set of social platforms.
+  socialLinks    Json?
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  state          String?
+  country        String?
+  pincode        String?
+  logoUrl        String?
+  kycStatus      TenantKycStatus @default(PENDING)
+  kycNotes       String?
+  kycReviewedAt  DateTime?
+
   users      User[]
   disciplines TenantDiscipline[]
   therapists Therapist[]

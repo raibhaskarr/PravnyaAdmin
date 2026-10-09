@@ -7,6 +7,7 @@ import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { TenantsPage } from "./pages/admin/TenantsPage";
+import { TenantDetailPage } from "./pages/admin/TenantDetailPage";
 import { TaxonomyPage } from "./pages/admin/TaxonomyPage";
 import { PocReviewPage } from "./pages/admin/PocReviewPage";
 import { DisciplinesPage } from "./pages/tenant/DisciplinesPage";
@@ -28,6 +29,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route element={<ProtectedRoute allow={["SUPERADMIN"]} />}>
             <Route element={<Layout />}>
               <Route path="/admin/tenants" element={<TenantsPage />} />
+              <Route path="/admin/tenants/:tenantId" element={<TenantDetailPage />} />
               <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
               <Route path="/admin/poc-review" element={<PocReviewPage />} />
             </Route>

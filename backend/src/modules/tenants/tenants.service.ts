@@ -2,7 +2,25 @@ import crypto from "node:crypto";
 import { prisma } from "../../config/prisma";
 import { AppError, notFound } from "../../common/errors/AppError";
 import { authService } from "../auth/auth.service";
-import { CreateTenantInput, UpdateTenantInput } from "./tenants.schemas";
+import { CreateTenantInput, UpdateTenantInput, UpdateTenantProfileInput } from "./tenants.schemas";
+
+const PROFILE_FIELD_KEYS = [
+  "leadOwnerName",
+  "leadOwnerEmail",
+  "leadOwnerPhone",
+  "phone",
+  "website",
+  "socialLinks",
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "state",
+  "country",
+  "pincode",
+  "logoUrl",
+  "kycStatus",
+  "kycNotes"
+] as const;
 
 function generateTempPassword() {
   return crypto.randomBytes(9).toString("base64url");
@@ -33,6 +51,23 @@ export const tenantsService = {
       data: {
         name: input.name,
         slug: input.slug,
+        // Lead owner defaults to the admin contact when left blank, but stays independently
+        // editable afterward -- see the doc comment on the Tenant model.
+        leadOwnerName: input.leadOwnerName ?? input.adminName,
+        leadOwnerEmail: input.leadOwnerEmail ?? input.adminEmail,
+        ...(input.leadOwnerPhone !== undefined ? { leadOwnerPhone: input.leadOwnerPhone } : {}),
+        ...(input.phone !== undefined ? { phone: input.phone } : {}),
+        ...(input.website !== undefined ? { website: input.website } : {}),
+        ...(input.socialLinks !== undefined ? { socialLinks: input.socialLinks } : {}),
+        ...(input.addressLine1 !== undefined ? { addressLine1: input.addressLine1 } : {}),
+        ...(input.addressLine2 !== undefined ? { addressLine2: input.addressLine2 } : {}),
+        ...(input.city !== undefined ? { city: input.city } : {}),
+        ...(input.state !== undefined ? { state: input.state } : {}),
+        ...(input.country !== undefined ? { country: input.country } : {}),
+        ...(input.pincode !== undefined ? { pincode: input.pincode } : {}),
+        ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
+        ...(input.kycStatus !== undefined ? { kycStatus: input.kycStatus, kycReviewedAt: new Date() } : {}),
+        ...(input.kycNotes !== undefined ? { kycNotes: input.kycNotes } : {}),
         users: {
           create: {
             email: input.adminEmail,
@@ -57,5 +92,16 @@ export const tenantsService = {
         ...(input.status !== undefined ? { status: input.status } : {})
       }
     });
+  },
+
+  async updateProfile(tenantId: string, input: UpdateTenantProfileInput) {
+    await this.get(tenantId);
+    const data: Record<string, unknown> = {};
+    for (const key of PROFILE_FIELD_KEYS) {
+      if (input[key] !== undefined) data[key] = input[key];
+    }
+    // Derived, never client-set directly -- a KYC status change is always "reviewed now".
+    if (input.kycStatus !== undefined) data.kycReviewedAt = new Date();
+    return prisma.tenant.update({ where: { id: tenantId }, data });
   }
 };

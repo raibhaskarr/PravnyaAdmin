@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Tenant } from "../../api/types";
@@ -114,7 +115,9 @@ export function TenantsPage() {
             <tbody>
               {tenants.map((t) => (
                 <tr key={t.id}>
-                  <td>{t.name}</td>
+                  <td>
+                    <Link to={`/admin/tenants/${t.id}`}>{t.name}</Link>
+                  </td>
                   <td>{t.slug}</td>
                   <td>{t.status}</td>
                   <td>

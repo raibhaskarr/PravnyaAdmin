@@ -32,11 +32,29 @@ export type DbModel = {
   fields: DbField[];
 };
 
+export type TenantKycStatus = "PENDING" | "VERIFIED" | "REJECTED";
+
 export type Tenant = {
   id: string;
   name: string;
   slug: string;
   status: "ACTIVE" | "SUSPENDED";
+  leadOwnerName: string | null;
+  leadOwnerEmail: string | null;
+  leadOwnerPhone: string | null;
+  phone: string | null;
+  website: string | null;
+  socialLinks: Record<string, string> | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  pincode: string | null;
+  logoUrl: string | null;
+  kycStatus: TenantKycStatus;
+  kycNotes: string | null;
+  kycReviewedAt: string | null;
   createdAt: string;
 };
 
