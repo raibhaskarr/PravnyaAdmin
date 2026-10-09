@@ -67,6 +67,7 @@ model User {
   tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   therapist    Therapist?
   sentTherapistInvitations TherapistInvitation[] @relation("InvitationSentBy")
+  sentTenantInvitations TenantInvitation[] @relation("TenantInvitationSentBy")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -118,6 +119,28 @@ model Tenant {
   therapistInvitations TherapistInvitation[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+}
+
+/// A pending/resolved offer for someone to set up a tenant, created by a superadmin with just
+/// name/slug/email. No real Tenant row exists until this is accepted -- mirrors how
+/// TherapistInvitation defers creating the real Therapist+User until accept. The invitee sets
+/// their own password; the richer business/KYC profile fields (see Tenant) are filled in by the
+/// tenant admin themselves afterward, not captured in this invitation at all.
+model TenantInvitation {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String
+  email       String
+  tokenHash   String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String           @db.Uuid
+  invitedBy   User             @relation("TenantInvitationSentBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([email])
 }
 
 model CanonicalDomain {

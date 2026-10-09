@@ -21,6 +21,10 @@ import type {
   PocSupportLevel,
   Tenant,
   TenantDiscipline,
+  TenantInvitation,
+  TenantInvitationPreview,
+  TenantKycFields,
+  TenantProfileFields,
   Therapist,
   TherapistInvitation,
   UserRole
@@ -65,40 +69,40 @@ export const api = {
   listTenants(token: string) {
     return request<Tenant[]>("/tenants", { token });
   },
-  createTenant(token: string, input: { name: string; slug: string; adminEmail: string; adminName: string }) {
-    return request<{ tenant: Tenant; adminEmail: string; tempPassword: string }>("/tenants", { token, method: "POST", body: input });
-  },
   updateTenant(token: string, tenantId: string, input: { name?: string; status?: "ACTIVE" | "SUSPENDED" }) {
     return request<Tenant>(`/tenants/${tenantId}`, { token, method: "PATCH", body: input });
   },
   getTenant(token: string, tenantId: string) {
     return request<Tenant>(`/tenants/${tenantId}`, { token });
   },
-  updateTenantProfile(
-    token: string,
-    tenantId: string,
-    input: Partial<
-      Pick<
-        Tenant,
-        | "leadOwnerName"
-        | "leadOwnerEmail"
-        | "leadOwnerPhone"
-        | "phone"
-        | "website"
-        | "socialLinks"
-        | "addressLine1"
-        | "addressLine2"
-        | "city"
-        | "state"
-        | "country"
-        | "pincode"
-        | "logoUrl"
-        | "kycStatus"
-        | "kycNotes"
-      >
-    >
-  ) {
+  updateTenantProfile(token: string, tenantId: string, input: Partial<TenantProfileFields & TenantKycFields>) {
     return request<Tenant>(`/tenants/${tenantId}/profile`, { token, method: "PATCH", body: input });
+  },
+
+  // Tenant admin's own tenant profile (self-service -- no KYC fields, see backend schema split)
+  getOwnTenantProfile(token: string) {
+    return request<Tenant>("/tenants/me/profile", { token });
+  },
+  updateOwnTenantProfile(token: string, input: Partial<TenantProfileFields>) {
+    return request<Tenant>("/tenants/me/profile", { token, method: "PATCH", body: input });
+  },
+
+  // Tenant invitations (superadmin invites, invitee sets their own password and later fills in
+  // the business/KYC profile themselves via updateOwnTenantProfile)
+  listTenantInvitations(token: string) {
+    return request<TenantInvitation[]>("/tenant-invitations", { token });
+  },
+  inviteTenant(token: string, input: { name: string; slug: string; email: string }) {
+    return request<{ invitation: TenantInvitation; signupUrl?: string }>("/tenant-invitations", { token, method: "POST", body: input });
+  },
+  revokeTenantInvitation(token: string, invitationId: string) {
+    return request(`/tenant-invitations/${invitationId}`, { token, method: "DELETE" });
+  },
+  previewTenantSignup(inviteToken: string) {
+    return request<TenantInvitationPreview>(`/tenant-signup/${inviteToken}`);
+  },
+  acceptTenantSignup(inviteToken: string, input: { adminName: string; password: string }) {
+    return request<{ token: string; user: AuthUser }>(`/tenant-signup/${inviteToken}/accept`, { method: "POST", body: input });
   },
 
   // Taxonomy (read: any role; write: superadmin)

@@ -16,7 +16,8 @@ export function Layout() {
           ...(user.role !== "VIEWER" ? [{ to: "/tenant/log", label: "Log a session" }] : []),
           { to: "/tenant/disciplines", label: "Disciplines" },
           { to: "/tenant/therapists", label: "Therapists" },
-          { to: "/tenant/kids", label: "Kids" }
+          { to: "/tenant/kids", label: "Kids" },
+          ...(user.role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile" }] : [])
         ];
   links.push({ to: "/manual", label: "Manual" });
 

@@ -5,8 +5,10 @@ import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { env } from "../../config/env";
 
 // Mirrors PranTrackingSystem's proven trusted-circle invitation email pattern (same
-// log/smtp provider split, same token-in-URL convention) scaled down to this product's one
-// use case: inviting someone to become a THERAPIST, either tenant-wide or for one specific kid.
+// log/smtp provider split, same token-in-URL convention). Started out therapist-invite-only
+// (hence the module it lives in); now also sends tenant-setup invites -- the EmailProvider/
+// transport plumbing below is genuinely generic, only the message-composing functions at the
+// bottom are per-invite-type.
 
 export type EmailSendInput = { to: string; subject: string; text: string; html?: string };
 export type EmailSendResult = { sent: boolean; provider: "log" | "smtp" };
@@ -23,15 +25,19 @@ export function buildInviteUrl(token: string) {
   return `${appBaseUrl().replace(/\/$/, "")}/invite/${encodeURIComponent(token)}`;
 }
 
+export function buildTenantSignupUrl(token: string) {
+  return `${appBaseUrl().replace(/\/$/, "")}/tenant-signup/${encodeURIComponent(token)}`;
+}
+
 class LoggingEmailProvider implements EmailProvider {
   async send(input: EmailSendInput): Promise<EmailSendResult> {
     // In production this means the invite email is NOT actually delivered -- logged as a warning,
     // without the recipient/body, so a real invite failing to send is visible without putting
     // someone's email address and invite link into plain server logs.
     if (env.NODE_ENV === "production") {
-      console.warn(`[therapist invitation email] no EMAIL_PROVIDER configured -- "${input.subject}" was not delivered`);
+      console.warn(`[invitation email] no EMAIL_PROVIDER configured -- "${input.subject}" was not delivered`);
     } else {
-      console.log(`[therapist invitation email] to=${input.to} subject="${input.subject}"\n${input.text}`);
+      console.log(`[invitation email] to=${input.to} subject="${input.subject}"\n${input.text}`);
     }
     return { sent: true, provider: "log" };
   }
@@ -90,6 +96,12 @@ export const invitationEmailService = {
     const body = input.kidName
       ? `${input.invitedByName} invited you to join ${input.kidName}'s care team at ${input.tenantName} as a therapist.\n\nSet up your account: ${input.inviteUrl}\n\nThis link expires in 14 days.`
       : `${input.invitedByName} invited you to join ${input.tenantName} on Pravnya as a therapist.\n\nSet up your account: ${input.inviteUrl}\n\nThis link expires in 14 days.`;
+    return emailProvider.send({ to: input.to, subject, text: body });
+  },
+
+  async sendTenantInvitation(input: { to: string; tenantName: string; invitedByName: string; signupUrl: string }) {
+    const subject = `You've been invited to set up ${input.tenantName} on Pravnya`;
+    const body = `${input.invitedByName} invited you to set up ${input.tenantName} on Pravnya.\n\nSet up your account: ${input.signupUrl}\n\nThis link expires in 14 days.`;
     return emailProvider.send({ to: input.to, subject, text: body });
   }
 };

@@ -58,6 +58,41 @@ export type Tenant = {
   createdAt: string;
 };
 
+export type TenantProfileFields = Pick<
+  Tenant,
+  | "leadOwnerName"
+  | "leadOwnerEmail"
+  | "leadOwnerPhone"
+  | "phone"
+  | "website"
+  | "socialLinks"
+  | "addressLine1"
+  | "addressLine2"
+  | "city"
+  | "state"
+  | "country"
+  | "pincode"
+  | "logoUrl"
+>;
+
+export type TenantKycFields = Pick<Tenant, "kycStatus" | "kycNotes">;
+
+export type TenantInvitation = {
+  id: string;
+  name: string;
+  slug: string;
+  email: string;
+  status: TherapistInvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+};
+
+export type TenantInvitationPreview = {
+  name: string;
+  slug: string;
+  email: string;
+};
+
 export type CanonicalDiscipline = {
   id: string;
   key: string;

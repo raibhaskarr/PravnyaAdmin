@@ -1,40 +1,12 @@
-import { createHash, randomBytes } from "crypto";
 import { UserRole } from "@prisma/client";
 import { prisma } from "../../config/prisma";
-import { env } from "../../config/env";
 import { conflict, gone, notFound } from "../../common/errors/AppError";
 import { AuthUser, signToken } from "../../common/middleware/auth";
 import { assertCanAccessKid } from "../../common/access/kidAccess";
+import { assertEmailNotTaken, devInviteUrl, expiryDate, hashToken, tokenValue } from "../../common/invitations/invitationToken";
 import { authService } from "../auth/auth.service";
 import { invitationEmailService, buildInviteUrl } from "./invitationEmail.service";
 import type { AcceptInvitationInput, InviteForKidInput, InviteGeneralInput } from "./therapistInvitations.schemas";
-
-const INVITATION_EXPIRY_DAYS = 14;
-
-function tokenValue() {
-  return randomBytes(32).toString("base64url");
-}
-
-function hashToken(raw: string): string {
-  return createHash("sha256").update(raw).digest("hex");
-}
-
-function expiryDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + INVITATION_EXPIRY_DAYS);
-  return date;
-}
-
-// Dev convenience only -- in production the invite link only ever reaches the invitee via the
-// actual email, never through an API response.
-function devInviteUrl(url: string) {
-  return env.NODE_ENV === "production" ? undefined : url;
-}
-
-async function assertEmailNotTaken(email: string) {
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) throw conflict("That email already has an account.", "EMAIL_TAKEN");
-}
 
 async function markExpiredIfNeeded<T extends { id: string; status: string; expiresAt: Date }>(invitation: T): Promise<T> {
   if (invitation.status === "PENDING" && invitation.expiresAt <= new Date()) {
