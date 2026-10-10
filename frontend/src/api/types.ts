@@ -137,6 +137,7 @@ export type Therapist = {
   id: string;
   tenantId: string;
   name: string;
+  phone: string | null;
   disciplineIds: string[];
   user: { email: string; name: string };
 };
@@ -156,6 +157,7 @@ export type TherapistInvitation = {
 export type InvitationPreview = {
   email: string;
   name: string | null;
+  phone: string | null;
   tenantName: string;
   kidName: string | null;
 };

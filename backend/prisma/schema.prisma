@@ -231,6 +231,7 @@ model Therapist {
   userId        String   @unique @db.Uuid
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
+  phone         String?
   disciplineIds String[] @default([])
   kids          KidTherapist[]
   createdAt     DateTime @default(now())
@@ -270,6 +271,7 @@ model TherapistInvitation {
   tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   email         String
   name          String?
+  phone         String?
   disciplineIds String[]         @default([])
   kidId         String?          @db.Uuid
   kid           Kid?             @relation(fields: [kidId], references: [id], onDelete: Cascade)

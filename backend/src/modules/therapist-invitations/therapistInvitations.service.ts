@@ -46,6 +46,7 @@ export const therapistInvitationsService = {
         tenantId: user.tenantId!,
         email: input.email,
         name: input.name,
+        phone: input.phone,
         disciplineIds: input.disciplineIds,
         invitedById: user.id,
         tokenHash: hashToken(raw),
@@ -117,6 +118,7 @@ export const therapistInvitationsService = {
     return {
       email: invitation.email,
       name: invitation.name,
+      phone: invitation.phone,
       tenantName: invitation.tenant.name,
       kidName: invitation.kid ? `${invitation.kid.firstName} ${invitation.kid.lastName}` : null
     };
@@ -137,6 +139,7 @@ export const therapistInvitationsService = {
         data: {
           tenant: { connect: { id: invitation.tenantId } },
           name: input.name,
+          phone: input.phone ?? invitation.phone,
           disciplineIds: invitation.disciplineIds,
           user: {
             create: {

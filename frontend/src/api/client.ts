@@ -145,7 +145,7 @@ export const api = {
   listTherapistInvitations(token: string) {
     return request<TherapistInvitation[]>("/therapist-invitations", { token });
   },
-  inviteTherapist(token: string, input: { email: string; name: string; disciplineIds: string[] }) {
+  inviteTherapist(token: string, input: { email: string; name: string; phone?: string; disciplineIds: string[] }) {
     return request<{ invitation: TherapistInvitation; inviteUrl?: string }>("/therapist-invitations", { token, method: "POST", body: input });
   },
   inviteTherapistForKid(token: string, kidId: string, email: string, disciplineIds: string[]) {
@@ -160,7 +160,7 @@ export const api = {
   previewInvitation(inviteToken: string) {
     return request<InvitationPreview>(`/invitations/${inviteToken}`);
   },
-  acceptInvitation(inviteToken: string, input: { name: string; password: string }) {
+  acceptInvitation(inviteToken: string, input: { name: string; phone?: string; password: string }) {
     return request<{ token: string; user: AuthUser }>(`/invitations/${inviteToken}/accept`, { method: "POST", body: input });
   },
 

@@ -12,6 +12,7 @@ export function AcceptInvitePage() {
   const [preview, setPreview] = useState<InvitationPreview | null>(null);
   const [loadError, setLoadError] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitError, setSubmitError] = useState("");
@@ -24,6 +25,7 @@ export function AcceptInvitePage() {
       .then((p) => {
         setPreview(p);
         if (p.name) setName(p.name);
+        if (p.phone) setPhone(p.phone);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "This invite link isn't valid."));
   }, [inviteToken]);
@@ -39,7 +41,7 @@ export function AcceptInvitePage() {
     }
     setSubmitting(true);
     try {
-      const result = await api.acceptInvitation(inviteToken!, { name, password });
+      const result = await api.acceptInvitation(inviteToken!, { name, phone: phone || undefined, password });
       setSession(result.token, result.user);
       navigate("/tenant/kids", { replace: true });
     } catch (err) {
@@ -73,6 +75,10 @@ export function AcceptInvitePage() {
               <label className="field">
                 <span className="field-label">Email</span>
                 <input className="input" value={preview.email} disabled />
+              </label>
+              <label className="field">
+                <span className="field-label">Phone</span>
+                <input className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
               </label>
               <label className="field">
                 <span className="field-label">Set a password</span>

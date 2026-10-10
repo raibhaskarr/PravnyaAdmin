@@ -38,9 +38,11 @@ export function TherapistsPage() {
     const form = new FormData(formEl);
     const disciplineIds = disciplines.filter((d) => form.get(`discipline_${d.id}`) === "on").map((d) => d.id);
     try {
+      const phone = String(form.get("phone") || "");
       const result = await api.inviteTherapist(token!, {
         email: String(form.get("email")),
         name: String(form.get("name")),
+        phone: phone || undefined,
         disciplineIds
       });
       setSentTo(result.invitation.email);
@@ -101,6 +103,10 @@ export function TherapistsPage() {
                 <span className="field-label">Email</span>
                 <input className="input" name="email" type="email" required />
               </label>
+              <label className="field">
+                <span className="field-label">Phone</span>
+                <input className="input" name="phone" type="tel" />
+              </label>
               <fieldset className="form-group">
                 <legend>Disciplines practiced</legend>
                 {disciplines
@@ -127,6 +133,7 @@ export function TherapistsPage() {
             <tr>
               <th>Name</th>
               <th>Email</th>
+              <th>Phone</th>
               <th>Disciplines</th>
             </tr>
           </thead>
@@ -135,6 +142,7 @@ export function TherapistsPage() {
               <tr key={t.id}>
                 <td>{t.name}</td>
                 <td>{t.user.email}</td>
+                <td>{t.phone ?? "—"}</td>
                 <td>{t.disciplineIds.map(disciplineName).join(", ") || "—"}</td>
               </tr>
             ))}

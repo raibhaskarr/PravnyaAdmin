@@ -26,6 +26,7 @@ export const therapistsService = {
       where: { id: therapistId },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.phone !== undefined ? { phone: input.phone } : {}),
         ...(input.disciplineIds !== undefined ? { disciplineIds: input.disciplineIds } : {})
       }
     });

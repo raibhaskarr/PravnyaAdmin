@@ -3,6 +3,7 @@ import { z } from "zod";
 export const inviteGeneralSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(200),
+  phone: z.string().min(1).max(30).optional(),
   disciplineIds: z.array(z.string().uuid()).default([])
 });
 
@@ -17,6 +18,7 @@ export const tokenParamsSchema = z.object({ token: z.string().min(1) });
 
 export const acceptInvitationSchema = z.object({
   name: z.string().min(1).max(200),
+  phone: z.string().min(1).max(30).optional(),
   password: z.string().min(8).max(200)
 });
 
