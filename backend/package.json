@@ -36,11 +36,13 @@
     "@pravnix/ai-provider-openai": "file:vendor/pravnix/pravnix-ai-provider-openai-0.1.0-preview.1.tgz",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "csv-parse": "^7.0.3",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^10.0.15",
+    "pdf-parse": "^2.4.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

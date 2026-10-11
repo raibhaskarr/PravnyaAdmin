@@ -18,6 +18,7 @@ import { therapistInvitationsRoutes } from "./modules/therapist-invitations/ther
 import { invitationAcceptRoutes } from "./modules/therapist-invitations/invitationAccept.routes";
 import { tenantInvitationsRoutes } from "./modules/tenant-invitations/tenantInvitations.routes";
 import { tenantInvitationAcceptRoutes } from "./modules/tenant-invitations/tenantInvitationAccept.routes";
+import { iepRoutes } from "./modules/iep/iep.routes";
 
 export function createApp() {
   const app = express();
@@ -28,6 +29,9 @@ export function createApp() {
   // route (registered before the general parser below) rather than raising the global limit for
   // every other route's small CRUD bodies.
   app.use("/api/ai/extract-evidence", express.json({ limit: "25mb" }));
+  // A multi-page IEP PDF or a full-resolution photo of one can run several MB -- same scoped-limit
+  // approach as extract-evidence above, not a global bump.
+  app.use("/api/iep/extract", express.json({ limit: "20mb" }));
   // Default 100kb is too small for the poc-review bulk-import endpoint (hundreds of rows per
   // child); every other route's payloads are small CRUD bodies well under this.
   app.use(express.json({ limit: "2mb" }));
@@ -58,6 +62,7 @@ export function createApp() {
   app.use("/api/invitations", invitationAcceptRoutes);
   app.use("/api/tenant-invitations", tenantInvitationsRoutes);
   app.use("/api/tenant-signup", tenantInvitationAcceptRoutes);
+  app.use("/api/iep", iepRoutes);
 
   app.use(errorMiddleware);
 

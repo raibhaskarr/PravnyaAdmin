@@ -3,6 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Modality, TenantDiscipline } from "../../api/types";
 import { GoalEvidenceDetail } from "./goalEvidence";
+import { IepUploadForm } from "./IepUploadForm";
 
 const MODALITIES: Modality[] = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"];
 
@@ -21,6 +22,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
   const [pendingItems, setPendingItems] = useState<(GoalItemInput & { label: string })[]>([]);
   const [customText, setCustomText] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showIepUpload, setShowIepUpload] = useState(false);
   const [error, setError] = useState("");
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
 
@@ -154,12 +156,24 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
               className="btn btn-secondary"
               onClick={() => {
                 setShowForm((v) => !v);
+                setShowIepUpload(false);
                 resetFormState();
               }}
             >
               {showForm ? "Cancel" : "New goal"}
             </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowIepUpload((v) => !v);
+                setShowForm(false);
+              }}
+            >
+              {showIepUpload ? "Cancel" : "Upload IEP"}
+            </button>
           </div>
+          {showIepUpload ? <IepUploadForm kidId={kidId} onAdded={load} /> : null}
           {showForm ? (
             <form onSubmit={handleCreate} className="form-panel" style={{ maxWidth: 480 }}>
               <label className="field">

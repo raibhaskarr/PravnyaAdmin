@@ -217,6 +217,18 @@ export type EvidenceCandidate = {
   excerpt: string;
 };
 
+export type IepGoalCandidate = {
+  canonicalSkillId: string;
+  skillName: string;
+  domainName: string;
+  measurementType: PocMeasurementType | null;
+  disciplineId: string | null;
+  modality: Modality | null;
+  title: string;
+  confidence: number;
+  sourceExcerpt: string;
+};
+
 export type GoalSkillSuggestion = {
   domainId: string;
   canonicalSkillId: string;

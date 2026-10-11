@@ -10,6 +10,7 @@ import type {
   GoalItemEvidenceRow,
   GoalItemInput,
   GoalSkillSuggestionResponse,
+  IepGoalCandidate,
   InvitationPreview,
   Kid,
   Modality,
@@ -189,6 +190,7 @@ export const api = {
       disciplineId: string;
       modality: Modality;
       title: string;
+      notes?: string;
       items?: GoalItemInput[];
     }
   ) {
@@ -196,6 +198,13 @@ export const api = {
   },
   suggestGoalSkill(token: string, kidId: string, title: string) {
     return request<GoalSkillSuggestionResponse>("/ai/suggest-goal-skill", { token, method: "POST", body: { kidId, title } });
+  },
+  extractIepGoals(
+    token: string,
+    kidId: string,
+    source: { kind: "pdf"; base64: string } | { kind: "image"; base64: string; mimeType: string } | { kind: "csv"; csvText: string }
+  ) {
+    return request<{ candidates: IepGoalCandidate[] } | { error: string }>("/iep/extract", { token, method: "POST", body: { kidId, source } });
   },
   extractEvidence(token: string, kidId: string, input: { freeText: string } | { media: { kind: "image" | "audio"; mimeType: string; base64: string } }) {
     return request<{ candidates: EvidenceCandidate[] } | { error: string }>("/ai/extract-evidence", { token, method: "POST", body: { kidId, ...input } });
