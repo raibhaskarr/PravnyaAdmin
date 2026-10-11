@@ -37,7 +37,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
   function load() {
     api.listGoals(token!, kidId).then(setGoals);
     api.listDomains(token!).then(setDomains);
-    api.listTenantDisciplines(token!).then(setDisciplines);
+    api.listTenantDisciplines(token!, kidId).then(setDisciplines);
   }
 
   useEffect(load, [token, kidId]);
@@ -89,7 +89,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
     setSuggesting(true);
     setSuggestNote("");
     try {
-      const result = await api.suggestGoalSkill(token!, trimmed);
+      const result = await api.suggestGoalSkill(token!, kidId, trimmed);
       if (!result.suggestion) {
         setSuggestNote(result.reason ?? "No suggestion available -- pick manually below.");
         return;

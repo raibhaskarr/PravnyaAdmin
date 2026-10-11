@@ -61,14 +61,16 @@ export const therapistInvitationsService = {
   },
 
   // Flow 2: inviting someone onto one specific kid's support team by email only. If that email
-  // already belongs to a therapist in this tenant, just link them straight to the kid -- no
-  // invite needed. Otherwise send a real invite, scoped to just this one kid on acceptance.
+  // already belongs to a therapist ANYWHERE (any tenant), just link them straight to the kid as a
+  // guest -- no invite needed, and the kid stays owned/billed by its own tenant regardless of
+  // which tenant that therapist belongs to. Otherwise send a real invite, scoped to just this one
+  // kid on acceptance (and the new therapist joins the INVITING admin's own tenant, same as before).
   async inviteForKid(user: AuthUser, kidId: string, input: InviteForKidInput) {
     const kid = await assertCanAccessKid(user, kidId);
 
     const existingTherapist = await prisma.therapist.findFirst({
-      where: { tenantId: user.tenantId!, user: { email: input.email } },
-      include: { user: { select: { email: true, name: true } } }
+      where: { user: { email: input.email } },
+      include: { user: { select: { email: true, name: true } }, tenant: { select: { id: true, name: true } } }
     });
 
     if (existingTherapist) {

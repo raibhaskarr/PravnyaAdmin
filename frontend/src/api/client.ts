@@ -125,9 +125,11 @@ export const api = {
     return request(`/taxonomy/items/${itemId}`, { token, method: "DELETE" });
   },
 
-  // Tenant disciplines
-  listTenantDisciplines(token: string) {
-    return request<TenantDiscipline[]>("/tenant-disciplines", { token });
+  // Tenant disciplines. Pass kidId when populating a discipline picker for a specific kid (e.g.
+  // creating a goal) -- a guest therapist from another tenant needs the KID's enabled disciplines,
+  // not their own. Omit it for the tenant's own settings page.
+  listTenantDisciplines(token: string, kidId?: string) {
+    return request<TenantDiscipline[]>(`/tenant-disciplines${kidId ? `?kidId=${kidId}` : ""}`, { token });
   },
   enableDiscipline(token: string, disciplineId: string) {
     return request(`/tenant-disciplines/${disciplineId}/enable`, { token, method: "POST" });
@@ -192,8 +194,8 @@ export const api = {
   ) {
     return request<Goal>("/goals", { token, method: "POST", body: input });
   },
-  suggestGoalSkill(token: string, title: string) {
-    return request<GoalSkillSuggestionResponse>("/ai/suggest-goal-skill", { token, method: "POST", body: { title } });
+  suggestGoalSkill(token: string, kidId: string, title: string) {
+    return request<GoalSkillSuggestionResponse>("/ai/suggest-goal-skill", { token, method: "POST", body: { kidId, title } });
   },
   extractEvidence(token: string, kidId: string, input: { freeText: string } | { media: { kind: "image" | "audio"; mimeType: string; base64: string } }) {
     return request<{ candidates: EvidenceCandidate[] } | { error: string }>("/ai/extract-evidence", { token, method: "POST", body: { kidId, ...input } });

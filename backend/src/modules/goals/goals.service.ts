@@ -39,10 +39,13 @@ export const goalsService = {
   },
 
   async create(user: AuthUser, input: CreateGoalInput) {
-    await assertCanAccessKid(user, input.kidId);
+    // Tag the goal to the KID's own tenant, not the creating user's -- a guest therapist from
+    // another tenant can create a goal here (see kidAccess.ts), and it must still belong to the
+    // kid's own tenant, never the guest's.
+    const kid = await assertCanAccessKid(user, input.kidId);
     return prisma.goal.create({
       data: {
-        tenantId: user.tenantId!,
+        tenantId: kid.tenantId,
         kidId: input.kidId,
         canonicalSkillId: input.canonicalSkillId,
         disciplineId: input.disciplineId,

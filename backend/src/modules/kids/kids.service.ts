@@ -4,12 +4,19 @@ import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid, kidVisibilityFilter } from "../../common/access/kidAccess";
 import { CreateKidInput, UpdateKidInput } from "./kids.schemas";
 
+// Shared across list/get -- includes each assigned therapist's own tenant so the frontend can
+// label a cross-tenant ("guest") therapist, since a kid's support team is no longer guaranteed to
+// all share the kid's own tenant. See kidAccess.ts.
+const therapistsInclude = {
+  therapists: { include: { therapist: { select: { id: true, name: true, tenant: { select: { id: true, name: true } } } } } }
+};
+
 export const kidsService = {
   async list(user: AuthUser) {
     const filter = await kidVisibilityFilter(user);
     return prisma.kid.findMany({
       where: filter,
-      include: { therapists: { include: { therapist: { select: { id: true, name: true } } } } },
+      include: therapistsInclude,
       orderBy: { firstName: "asc" }
     });
   },
@@ -18,7 +25,7 @@ export const kidsService = {
     await assertCanAccessKid(user, kidId);
     const kid = await prisma.kid.findUnique({
       where: { id: kidId },
-      include: { therapists: { include: { therapist: { select: { id: true, name: true } } } }, goals: true }
+      include: { ...therapistsInclude, goals: true }
     });
     if (!kid) throw notFound("Kid not found");
     return kid;
@@ -41,6 +48,12 @@ export const kidsService = {
     await assertCanAccessKid(user, kidId);
 
     if (input.therapistIds !== undefined) {
+      // Therapist ids are intentionally not tenant-scoped here -- a kid's support team can
+      // include a guest therapist from another tenant (see kidAccess.ts). Still worth a clean
+      // existence check up front rather than letting a bad id fail as a raw FK error.
+      const existingCount = await prisma.therapist.count({ where: { id: { in: input.therapistIds } } });
+      if (existingCount !== input.therapistIds.length) throw notFound("One or more selected therapists do not exist");
+
       await prisma.kidTherapist.deleteMany({ where: { kidId } });
       await prisma.kidTherapist.createMany({
         data: input.therapistIds.map((therapistId) => ({ kidId, therapistId }))

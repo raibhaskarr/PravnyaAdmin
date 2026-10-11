@@ -51,3 +51,24 @@ test("kid visibility never crosses tenants", async () => {
 
   assert.ok(!visible.some((k) => k.id === b.assignedKid.id || k.id === b.unassignedKid.id));
 });
+
+test("THERAPIST role sees a kid in ANOTHER tenant when explicitly linked (guest support-team link)", async () => {
+  const home = await createTenantWithKidsAndTherapist();
+  const other = await createTenantWithKidsAndTherapist();
+
+  // The home-tenant therapist also gets linked, as a guest, to a kid in a different tenant.
+  await prisma.kidTherapist.create({ data: { kidId: other.assignedKid.id, therapistId: (await prisma.therapist.findUniqueOrThrow({ where: { userId: home.therapistUser.id } })).id } });
+
+  const user = { id: home.therapistUser.id, role: "THERAPIST" as const, tenantId: home.tenant.id };
+  const filter = await kidVisibilityFilter(user);
+  const visible = await prisma.kid.findMany({ where: filter });
+  const ids = visible.map((k) => k.id).sort();
+
+  assert.deepEqual(ids, [home.assignedKid.id, other.assignedKid.id].sort());
+  // Not linked to the other tenant's second kid -- the join itself is still the only signal, not
+  // blanket access to that tenant.
+  assert.ok(!ids.includes(other.unassignedKid.id));
+
+  await assertCanAccessKid(user, other.assignedKid.id);
+  await assert.rejects(() => assertCanAccessKid(user, other.unassignedKid.id));
+});

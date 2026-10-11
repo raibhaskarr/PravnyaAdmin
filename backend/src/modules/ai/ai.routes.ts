@@ -10,7 +10,7 @@ export const aiRoutes = Router();
 
 aiRoutes.use(requireAuth, requireTenantScope);
 
-const suggestGoalSkillSchema = z.object({ title: z.string().min(1).max(300) });
+const suggestGoalSkillSchema = z.object({ kidId: z.string().uuid(), title: z.string().min(1).max(300) });
 
 // Same access rule as creating a goal itself (POST /api/goals) -- Tenant Admin and Therapist can
 // ask for a suggestion, Viewer cannot (it never leads anywhere they're allowed to save).
@@ -19,7 +19,7 @@ aiRoutes.post(
   blockViewer,
   validateRequest({ body: suggestGoalSkillSchema }),
   asyncHandler(async (req, res) => {
-    res.json(await goalSkillSuggestionService.suggest(req.user!, req.body.title));
+    res.json(await goalSkillSuggestionService.suggest(req.user!, req.body.kidId, req.body.title));
   })
 );
 

@@ -140,6 +140,7 @@ export type Therapist = {
   phone: string | null;
   disciplineIds: string[];
   user: { email: string; name: string };
+  tenant?: { id: string; name: string };
 };
 
 export type TherapistInvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
@@ -169,7 +170,7 @@ export type Kid = {
   lastName: string;
   dob: string | null;
   status: "ACTIVE" | "ARCHIVED";
-  therapists: { therapist: { id: string; name: string } }[];
+  therapists: { therapist: { id: string; name: string; tenant: { id: string; name: string } } }[];
 };
 
 export type Modality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL";

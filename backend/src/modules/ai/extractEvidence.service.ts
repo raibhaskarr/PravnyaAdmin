@@ -110,7 +110,7 @@ export const extractEvidenceService = {
     kidId: string,
     input: { freeText: string } | { media: EvidenceMedia }
   ): Promise<{ candidates: EvidenceCandidate[] } | { error: string }> {
-    await assertCanAccessKid(user, kidId);
+    const kid = await assertCanAccessKid(user, kidId);
 
     const goals = await prisma.goal.findMany({
       where: { kidId, status: "ACTIVE" },
@@ -150,7 +150,9 @@ export const extractEvidenceService = {
       request: {
         systemPrompt: SYSTEM_PROMPT,
         messages: [{ role: "user", content }],
-        executionContext: createExecutionContext({ productId: "pravnyaadmin", tenantId: user.tenantId ?? undefined, featureId: "extract-evidence-from-note" })
+        // Attributed to the kid's own tenant, not the (possibly guest) therapist's -- see
+        // kidAccess.ts on cross-tenant support-team links.
+        executionContext: createExecutionContext({ productId: "pravnyaadmin", tenantId: kid.tenantId, featureId: "extract-evidence-from-note" })
       },
       schema: buildSchema(validIds),
       maxRepairAttempts: 1

@@ -3,6 +3,7 @@ import { createExecutionContext, textMessage } from "@pravnix/ai-core";
 import { Modality } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AuthUser } from "../../common/middleware/auth";
+import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { orchestrator } from "./ai.platform";
 
 const SYSTEM_PROMPT =
@@ -98,7 +99,12 @@ export interface SuggestionOutcome {
 const NO_SUGGESTION_REASON = "Couldn't generate a suggestion right now -- pick manually below.";
 
 export const goalSkillSuggestionService = {
-  async suggest(user: AuthUser, title: string): Promise<SuggestionOutcome> {
+  // kidId is required so the suggested discipline comes from the KID's own tenant's enabled set,
+  // not the requesting therapist's -- same reasoning as tenantDisciplines' ?kidId= support (a
+  // guest therapist from another tenant must still get the kid's own tenant's disciplines).
+  async suggest(user: AuthUser, kidId: string, title: string): Promise<SuggestionOutcome> {
+    const kid = await assertCanAccessKid(user, kidId);
+
     const skills = await prisma.canonicalSkill.findMany({
       select: {
         id: true,
@@ -129,7 +135,7 @@ export const goalSkillSuggestionService = {
     }
 
     const tenantDisciplines = await prisma.tenantDiscipline.findMany({
-      where: { tenantId: user.tenantId! },
+      where: { tenantId: kid.tenantId },
       select: { disciplineId: true },
       orderBy: { createdAt: "asc" }
     });

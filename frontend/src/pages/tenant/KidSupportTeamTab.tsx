@@ -48,6 +48,10 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
     setEditing(true);
   }
 
+  function guestLabel(therapistTenantId: string, therapistTenantName: string) {
+    return therapistTenantId === kid.tenantId ? null : ` — guest, ${therapistTenantName}`;
+  }
+
   function toggle(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -115,7 +119,10 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
             <tbody>
               {kid.therapists.map((t) => (
                 <tr key={t.therapist.id}>
-                  <td>{t.therapist.name}</td>
+                  <td>
+                    {t.therapist.name}
+                    {guestLabel(t.therapist.tenant.id, t.therapist.tenant.name)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -126,16 +133,27 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
     );
   }
 
+  // Union of the home-tenant roster (for adding someone new) and the kid's currently-linked
+  // therapists (which may include guests from another tenant, via the "Add by email" flow) --
+  // otherwise an already-linked guest has no checkbox at all and becomes unmanageable here.
+  const pickerOptions = [
+    ...therapists.map((t) => ({ id: t.id, name: t.name, tenantId: t.tenantId, tenantName: t.tenant?.name ?? "" })),
+    ...kid.therapists
+      .filter((t) => !therapists.some((home) => home.id === t.therapist.id))
+      .map((t) => ({ id: t.therapist.id, name: t.therapist.name, tenantId: t.therapist.tenant.id, tenantName: t.therapist.tenant.name }))
+  ];
+
   return (
     <div className="form-panel" style={{ maxWidth: 480 }}>
       <fieldset className="form-group">
         <legend>Assigned therapists</legend>
-        {therapists.map((t) => (
+        {pickerOptions.map((t) => (
           <label key={t.id} className="checkbox-row">
             <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggle(t.id)} /> {t.name}
+            {guestLabel(t.tenantId, t.tenantName)}
           </label>
         ))}
-        {therapists.length === 0 ? <p className="empty-state">No therapists in this tenant yet.</p> : null}
+        {pickerOptions.length === 0 ? <p className="empty-state">No therapists to assign yet.</p> : null}
       </fieldset>
       {error ? <p className="error-text">{error}</p> : null}
       <div style={{ display: "flex", gap: "0.5rem" }}>
