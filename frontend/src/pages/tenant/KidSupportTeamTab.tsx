@@ -32,7 +32,7 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
       if (result.linked) {
         setInviteNotice(`${result.therapist.name} is already a therapist here -- added to the support team.`);
       } else {
-        setInviteNotice(`Invited ${email} -- they'll show up here once they accept and set their password.${result.inviteUrl ? ` Dev link: ${result.inviteUrl}` : ""}`);
+        setInviteNotice(`Invited ${email} -- they'll show up here once they accept and set their password.${result.inviteUrl ? ` Invite link (also emailed): ${result.inviteUrl}` : ""}`);
       }
       form.reset();
       onUpdated();

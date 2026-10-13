@@ -1,6 +1,5 @@
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "../../config/prisma";
-import { env } from "../../config/env";
 import { conflict } from "../errors/AppError";
 
 // Shared by every email-invite flow (therapist invitations, tenant invitations, ...) -- same
@@ -26,8 +25,11 @@ export async function assertEmailNotTaken(email: string) {
   if (existing) throw conflict("That email already has an account.", "EMAIL_TAKEN");
 }
 
-// Dev convenience only -- in production an invite link only ever reaches the invitee via the
-// actual email, never through an API response.
+// Surfaced in the API response (and shown in the UI) everywhere, including production, for now --
+// deliberate for this active testing phase so whoever's inviting someone doesn't have to go check
+// an inbox each time. Email still sends in parallel (see invitationEmail.service.ts), this is
+// purely an additional convenience. Revert to gating this behind `env.NODE_ENV !== "production"`
+// once real, non-test invitees are the norm and the link should only ever reach them by email.
 export function devInviteUrl(url: string): string | undefined {
-  return env.NODE_ENV === "production" ? undefined : url;
+  return url;
 }

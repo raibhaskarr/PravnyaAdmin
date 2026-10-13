@@ -83,7 +83,7 @@ export function TenantsPage() {
           </p>
           {devSignupUrl ? (
             <p className="hint-text">
-              Dev only -- signup link: <code>{devSignupUrl}</code>
+              Signup link (also emailed): <code>{devSignupUrl}</code>
             </p>
           ) : null}
           <button type="button" className="btn btn-secondary" onClick={() => setSentTo(null)}>

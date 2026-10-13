@@ -77,7 +77,7 @@ export function TherapistsPage() {
           </p>
           {devInviteUrl ? (
             <p className="hint-text">
-              Dev only -- invite link: <code>{devInviteUrl}</code>
+              Invite link (also emailed): <code>{devInviteUrl}</code>
             </p>
           ) : null}
           <button type="button" className="btn btn-secondary" onClick={() => setSentTo(null)}>
