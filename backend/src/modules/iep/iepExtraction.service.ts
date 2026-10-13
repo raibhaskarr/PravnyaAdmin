@@ -187,6 +187,10 @@ export const iepExtractionService = {
       request: {
         systemPrompt: SYSTEM_PROMPT,
         messages: [{ role: "user", content }],
+        // Default provider cap (4000) truncates mid-JSON on a real multi-goal document -- up to
+        // 30 goals (schema max), each with a verbatim quoted sourceExcerpt up to 500 chars, can
+        // need well more than that. 8000 comfortably covers the worst case with headroom.
+        options: { maxOutputTokens: 8000 },
         // Attributed to the kid's own tenant, not the (possibly guest) therapist's -- see
         // kidAccess.ts on cross-tenant support-team links.
         executionContext: createExecutionContext({ productId: "pravnyaadmin", tenantId: kid.tenantId, featureId: "extract-iep-goals" })
