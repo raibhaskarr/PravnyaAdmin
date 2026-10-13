@@ -63,8 +63,40 @@ async function extractPdfText(base64: string): Promise<string | null> {
   const buffer = Buffer.from(base64, "base64");
   const parser = new PDFParse({ data: buffer });
   try {
-    const result = await parser.getText();
+    // pdf-parse's default pageJoiner inserts "-- N of total --" boilerplate between pages, which
+    // inflates the text length for every multi-page PDF regardless of real content -- disabled so
+    // the usable-text check below (isUsablePdfText) measures only actual extracted text.
+    const result = await parser.getText({ pageJoiner: "" });
     return (result.text ?? "").trim();
+  } catch {
+    return null;
+  } finally {
+    await parser.destroy();
+  }
+}
+
+// A scanned/photographed document (e.g. CamScanner) wrapped in a PDF has no real embedded text --
+// pdf-parse has no OCR, so getText() comes back empty, or (common with scanner apps) non-empty
+// but useless: just the app's own watermark string. Either way there's nothing for the AI to
+// extract goals from, so this is the trigger for falling back to rendering pages as images and
+// routing through the same multimodal path as "photo" uploads.
+const MIN_USABLE_PDF_TEXT_LENGTH = 60;
+function isUsablePdfText(text: string | null): text is string {
+  return !!text && text.replace(/\s+/g, "").length >= MIN_USABLE_PDF_TEXT_LENGTH;
+}
+
+// Renders each page to a PNG raster image via pdf-parse's own getScreenshot() (backed by
+// @napi-rs/canvas, a prebuilt-binary transitive dependency of pdf-parse -- no extra install/build
+// toolchain needed). Capped at maxPages to bound multimodal message size/cost for long documents.
+// Returns null (never throws) on a file that isn't actually a readable PDF.
+async function renderPdfPagesAsImages(base64: string, maxPages = 5): Promise<string[] | null> {
+  const buffer = Buffer.from(base64, "base64");
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const result = await parser.getScreenshot({ first: maxPages, imageBuffer: true, imageDataUrl: false });
+    const pages = result.pages.filter((p) => p.data && p.data.length > 0);
+    if (pages.length === 0) return null;
+    return pages.map((p) => Buffer.from(p.data).toString("base64"));
   } catch {
     return null;
   } finally {
@@ -120,23 +152,34 @@ export const iepExtractionService = {
       .join("\n");
     const candidateBlock = `Candidate skills (id, domain > name):\n${candidateLines}`;
 
+    const imageContentFor = (pageBase64s: string[], mimeType: string): AiContentPart[] => [
+      {
+        type: "text",
+        text: `The attached image${pageBase64s.length > 1 ? "s are pages" : " is a page"} from an IEP document -- read the text in ${
+          pageBase64s.length > 1 ? "them" : "it"
+        } and extract goals exactly as you would from typed text.\n\n${candidateBlock}`
+      },
+      ...pageBase64s.map((base64): AiContentPart => ({ type: "image", data: { base64 }, mimeType }))
+    ];
+
     let content: AiContentPart[];
     if (source.kind === "pdf") {
       const text = await extractPdfText(source.base64);
-      if (!text) return { error: "Couldn't read any text from this PDF -- it may be a scanned image. Try uploading it as a photo instead." };
-      content = [{ type: "text", text: `IEP document text:\n${text}\n\n${candidateBlock}` }];
+      if (isUsablePdfText(text)) {
+        content = [{ type: "text", text: `IEP document text:\n${text}\n\n${candidateBlock}` }];
+      } else {
+        // No usable embedded text (empty, or scanner-app watermark only) -- fall back to
+        // rendering pages as images and reusing the proven multimodal "photo" path.
+        const pageImages = await renderPdfPagesAsImages(source.base64);
+        if (!pageImages) return { error: "Couldn't read any text from this PDF -- it may be a scanned image. Try uploading it as a photo instead." };
+        content = imageContentFor(pageImages, "image/png");
+      }
     } else if (source.kind === "csv") {
       const goalListText = csvToGoalListText(source.csvText);
       if (!goalListText) return { error: "No rows found -- make sure the CSV has a \"title\" column with at least one goal." };
       content = [{ type: "text", text: `Goal list (one per line):\n${goalListText}\n\n${candidateBlock}` }];
     } else {
-      content = [
-        {
-          type: "text",
-          text: `The attached image is a page from an IEP document -- read the text in it and extract goals exactly as you would from typed text.\n\n${candidateBlock}`
-        },
-        { type: "image", data: { base64: source.base64 }, mimeType: source.mimeType }
-      ];
+      content = imageContentFor([source.base64], source.mimeType);
     }
 
     const result = await orchestrator.executeStructured({
