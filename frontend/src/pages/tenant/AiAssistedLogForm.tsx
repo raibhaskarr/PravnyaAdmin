@@ -286,7 +286,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
                   <input type="checkbox" checked={approved.has(i)} onChange={() => toggleApproved(i)} style={{ marginTop: "0.2rem" }} />
                   <div style={{ flex: 1 }}>
                     <div>
-                      <strong>{c.goalTitle}</strong> <span className="hint-text">({c.skillName})</span>
+                      <strong>{c.goalTitle}</strong> <span className="hint-text">({c.domainName} &gt; {c.skillName})</span>
                     </div>
                     <div style={{ marginTop: "0.2rem" }}>
                       {c.itemHint ? <span>{c.itemHint} — </span> : null}

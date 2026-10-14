@@ -261,7 +261,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
                     <input type="checkbox" checked={approvedUpdates.has(i)} onChange={() => toggleUpdate(i)} style={{ marginTop: "0.2rem" }} />
                     <div style={{ flex: 1 }}>
                       <div>
-                        <strong>{c.goalTitle}</strong> <span className="hint-text">({c.skillName})</span>
+                        <strong>{c.goalTitle}</strong> <span className="hint-text">({c.domainName} &gt; {c.skillName})</span>
                       </div>
                       <div className="hint-text" style={{ marginTop: "0.2rem" }}>
                         {c.outcome.toLowerCase()}

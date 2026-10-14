@@ -51,6 +51,7 @@ export interface EvidenceCandidate {
   goalId: string;
   goalTitle: string;
   skillName: string;
+  domainName: string;
   measurementType: "TRIALS" | "FREQUENCY" | "DURATION" | "PERCENTAGE" | "PROMPT_LEVEL" | "YES_NO" | "RATING" | "FREE_OBSERVATION" | null;
   itemHint: string | null;
   outcome: (typeof OUTCOMES)[number];

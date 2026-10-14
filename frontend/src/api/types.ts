@@ -204,6 +204,7 @@ export type EvidenceCandidate = {
   goalId: string;
   goalTitle: string;
   skillName: string;
+  domainName: string;
   measurementType: PocMeasurementType | null;
   itemHint: string | null;
   outcome: PocEvidenceOutcome;
@@ -368,5 +369,6 @@ export type Goal = {
   status: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
   notes: string | null;
   centreName: string | null;
+  createdAt: string;
   items: GoalItem[];
 };

@@ -2,7 +2,7 @@ import { Fragment, FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Modality, TenantDiscipline } from "../../api/types";
-import { EditableCentre, GoalEvidenceDetail } from "./goalEvidence";
+import { EditableCentre, GoalEvidenceDetail, formatDate } from "./goalEvidence";
 import { IepUploadForm } from "./IepUploadForm";
 
 const MODALITIES: Modality[] = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"];
@@ -370,6 +370,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
               <th>Items</th>
               <th>Status</th>
               <th>Centre</th>
+              <th>Added</th>
             </tr>
           </thead>
           <tbody>
@@ -390,7 +391,9 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
                       </button>
                     </td>
                     <td>{g.title}</td>
-                    <td>{g.canonicalSkill.name}</td>
+                    <td>
+                      {g.canonicalSkill.domain.name} <span className="hint-text">&gt; {g.canonicalSkill.name}</span>
+                    </td>
                     <td>{g.discipline.name}</td>
                     <td>{g.modality}</td>
                     <td>{g.items.length ? g.items.map(goalItemLabel).join(", ") : "—"}</td>
@@ -405,10 +408,11 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
                         }}
                       />
                     </td>
+                    <td>{formatDate(g.createdAt)}</td>
                   </tr>
                   {isExpanded ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: 0 }}>
+                      <td colSpan={9} style={{ padding: 0 }}>
                         <GoalEvidenceDetail goal={g} canEdit={canEdit} onUpdated={load} />
                       </td>
                     </tr>

@@ -83,7 +83,7 @@ export const extractEvidenceService = {
 
     const goals = await prisma.goal.findMany({
       where: { kidId, status: "ACTIVE" },
-      select: { id: true, title: true, canonicalSkill: { select: { name: true, measurementType: true } } }
+      select: { id: true, title: true, canonicalSkill: { select: { name: true, measurementType: true, domain: { select: { name: true } } } } }
     });
     if (goals.length === 0) return { error: "This kid has no active goals to match against yet." };
 
@@ -132,7 +132,7 @@ export const extractEvidenceService = {
     const goalById = new Map(goals.map((g) => [g.id, g]));
     const candidates: EvidenceCandidate[] = result.value.evidence.map((e) => {
       const goal = goalById.get(e.goalId)!;
-      return { ...e, goalTitle: goal.title, skillName: goal.canonicalSkill.name, measurementType: goal.canonicalSkill.measurementType };
+      return { ...e, goalTitle: goal.title, skillName: goal.canonicalSkill.name, domainName: goal.canonicalSkill.domain.name, measurementType: goal.canonicalSkill.measurementType };
     });
     return { candidates };
   }

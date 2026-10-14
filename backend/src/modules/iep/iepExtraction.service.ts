@@ -200,7 +200,7 @@ export const iepExtractionService = {
 
     const activeGoals = await prisma.goal.findMany({
       where: { kidId, status: "ACTIVE" },
-      select: { id: true, title: true, canonicalSkill: { select: { name: true, measurementType: true } } }
+      select: { id: true, title: true, canonicalSkill: { select: { name: true, measurementType: true, domain: { select: { name: true } } } } }
     });
 
     const validSkillIds = new Set(skills.map((s) => s.id));
@@ -322,7 +322,7 @@ export const iepExtractionService = {
       statusUpdatesResult !== null && statusUpdatesResult.success
         ? statusUpdatesResult.value.statusUpdates.map((e) => {
             const goal = goalById.get(e.goalId)!;
-            return { ...e, goalTitle: goal.title, skillName: goal.canonicalSkill.name, measurementType: goal.canonicalSkill.measurementType };
+            return { ...e, goalTitle: goal.title, skillName: goal.canonicalSkill.name, domainName: goal.canonicalSkill.domain.name, measurementType: goal.canonicalSkill.measurementType };
           })
         : [];
 
