@@ -370,7 +370,11 @@ fieldset.form-group legend {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  overflow: hidden;
+  /* overflow-x: auto lets a wide table (many columns) scroll horizontally instead of silently
+     clipping columns past the container's width with no way to reach them -- overflow-y stays
+     hidden so the rounded corners still clip the table's square top/bottom edges as before. */
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: var(--shadow-sm);
 }
 
