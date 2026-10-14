@@ -13,80 +13,87 @@ import { EVIDENCE_FIELD_INSTRUCTIONS, MODALITIES, OUTCOMES, SUPPORT_LEVELS, evid
 import type { IepSource } from "./iepExtraction.schemas";
 
 // An IEP document commonly describes two different things at once: narrative progress on goals
-// this kid already has, and a structured plan introducing goals that aren't tracked yet. Rather
-// than treat everything as a new goal (which duplicates what's already being tracked), this asks
-// the model to classify each distinct thing it finds:
-//  - STATUS UPDATE -- matches one of this kid's own existing active goals -> extracted with the
-//    same evidence fields extractEvidenceService uses, so it saves through the exact same
-//    POST /goals/:goalId/evidence endpoint a manually logged note would.
-//  - NEW GOAL -- doesn't match anything this kid already has tracked -> matched against the FULL
-//    canonical taxonomy (unlike evidence matching, these are prospective new goals, so every one
-//    of the ~148 skills is a valid candidate), same discipline as goalSkillSuggestion.service.ts's
-//    single-title matcher: the model physically cannot return an id outside the real taxonomy.
-function buildSystemPrompt(hasActiveGoals: boolean): string {
-  const statusUpdateSection = hasActiveGoals
-    ? "1. STATUS UPDATE -- the source is reporting progress, performance, or status on a goal " +
-      "that matches one of \"This kid's existing active goals\" below. Extract it as a status " +
-      "update against that goal's id, using the evidence fields described below.\n"
-    : "1. STATUS UPDATE -- not applicable here: this kid has no existing active goals yet, so " +
-      "nothing can be a status update. Always leave statusUpdates empty.\n";
+// this kid already has, and a structured plan introducing goals that aren't tracked yet. These are
+// extracted as two SEPARATE, PARALLEL AI calls rather than one combined call -- a first attempt at
+// combining them into a single call's schema produced large enough output (up to 15 status updates
+// and 30 new goals, several with verbatim quoted excerpts) to repeatedly hit the provider's output
+// token cap on real multi-page documents, truncating mid-JSON. Splitting keeps each call's output
+// within the same budget that already worked reliably for each half on its own, and runs faster
+// (in parallel) than one call large enough to cover both -- at the cost of sending the document's
+// content to the model twice. To avoid the new-goals call re-extracting something the status-update
+// call is already handling, it's told which skills this kid already has goals for and told to
+// leave those alone.
+
+const STATUS_UPDATE_SYSTEM_PROMPT =
+  "You are helping a therapist find progress, performance, or status updates in an IEP " +
+  "(Individualized Education Plan) document, for goals a specific kid already has. The source may " +
+  "be the raw text of an IEP document, a photo/scan of one, or a list of goal titles a therapist " +
+  "already wrote down.\n\n" +
+  "Only extract an update for a goal that's in \"This kid's existing active goals\" below -- if the " +
+  "source describes something not covered by any of these goals (e.g. a new goal or plan), leave " +
+  "it out entirely, that's handled separately.\n\n" +
+  "For each status update found, extract: which existing goal it's about (goalId); itemHint -- the " +
+  "ONE specific, concrete item/word/task actually involved (e.g. \"Apple\", \"Ball\", \"kick\"), " +
+  "never a category (e.g. never \"fruits\"), null if the source only describes general practice " +
+  "with no specific item named; the outcome; the support level the child needed; the modality the " +
+  "child actually used to respond (verbal/manual_sign/aac/written/gestural/not_applicable/unknown " +
+  "-- infer only from what the source actually says); a confidence score; and the exact excerpt of " +
+  "the source that status update came from, so the therapist can see exactly what you based it " +
+  "on.\n\n" +
+  EVIDENCE_FIELD_INSTRUCTIONS +
+  "\n\n" +
+  "Extract every distinct status update you find, up to 15. Don't merge clearly separate updates " +
+  "into one, and don't split one update into several just because it mentions multiple " +
+  "examples.\n\n" +
+  "Respond with ONLY a single JSON object, no markdown fences, no prose before or after it, in " +
+  'exactly this shape: {"statusUpdates": [{"goalId": string, "itemHint": string or null, ' +
+  `"outcome": one of [${OUTCOMES.map((o) => `"${o}"`).join(",")}], "supportLevel": one of ` +
+  `[${SUPPORT_LEVELS.map((s) => `"${s}"`).join(",")}], "modality": one of [${MODALITIES.map((m) => `"${m}"`).join(",")}], ` +
+  '"measurementValue": number or null, "measurementUnit": string or null, "measurementBoolean": ' +
+  'boolean or null, "measurementText": string or null, "confidence": number between 0 and 1, ' +
+  '"excerpt": string}]}. "statusUpdates" must be an empty array if nothing matches an existing goal.';
+
+function buildStatusUpdateSchema(validGoalIds: Set<string>) {
+  return z.object({ statusUpdates: z.array(evidenceItemSchema(validGoalIds)).max(15) });
+}
+
+function buildNewGoalSystemPrompt(alreadyTrackedSkillNames: string[]): string {
+  const exclusionNote =
+    alreadyTrackedSkillNames.length > 0
+      ? "\n\nThis kid already has goals tracked for these skills -- do NOT extract a new goal for " +
+        "any of them, even if the source describes progress on them (that's handled separately): " +
+        `${alreadyTrackedSkillNames.join(", ")}.\n`
+      : "";
 
   return (
-    "You are helping a therapist turn an IEP (Individualized Education Plan) document into " +
-    "structured updates. The source may be the raw text of an IEP document, a photo/scan of one, " +
-    "or a list of goal titles a therapist already wrote down (e.g. from a spreadsheet).\n\n" +
-    "Decide, for each distinct goal or topic the source describes, which of two things it is:\n\n" +
-    statusUpdateSection +
-    "2. NEW GOAL -- the source describes a goal or plan that does NOT match any existing active " +
-    "goal (or there are none). Extract it as a new goal, matched to the single best-fitting entry " +
-    "in the shared clinical skill taxonomy in \"Candidate skills\" below (pick exactly one " +
-    "canonicalSkillId -- never invent an id that isn't in the candidate list, and if nothing is a " +
-    "close match, still pick the closest one).\n\n" +
-    "Decide per distinct goal/topic mentioned, not per page or section -- a single document " +
-    "commonly contains both narrative progress notes about ongoing goals and a structured plan " +
-    "introducing new ones.\n\n" +
-    "-- Status update fields --\n" +
-    "For each status update, extract: which existing goal it's about (goalId); itemHint -- the " +
-    "ONE specific, concrete item/word/task actually involved (e.g. \"Apple\", \"Ball\", \"kick\"), " +
-    "never a category (e.g. never \"fruits\"), null if the source only describes general practice " +
-    "with no specific item named; the outcome; the support level the child needed; the modality " +
-    "the child actually used to respond (verbal/manual_sign/aac/written/gestural/not_applicable/" +
-    "unknown -- infer only from what the source actually says); a confidence score; and the exact " +
-    "excerpt of the source that status update came from, so the therapist can see exactly what " +
-    "you based it on.\n\n" +
-    EVIDENCE_FIELD_INSTRUCTIONS +
-    "\n\n" +
-    "-- New goal fields --\n" +
-    "For each new goal, extract: which candidate skill it best matches (canonicalSkillId); a " +
-    "short, clear goal title in plain language (clean up the source wording if needed, but don't " +
-    "invent a goal that isn't actually there); a confidence score; and the exact excerpt of the " +
-    "source text that goal came from.\n\n" +
-    "Extract every distinct status update or new goal you find, up to 15 status updates and 30 " +
-    "new goals. Don't merge clearly separate items into one, and don't split one item into " +
-    "several just because it mentions multiple examples.\n\n" +
+    "You are helping a therapist turn an IEP (Individualized Education Plan) document into a list " +
+    "of structured NEW goals, each matched to the single best-fitting entry in a shared clinical " +
+    "skill taxonomy. The source may be the raw text of an IEP document, a photo/scan of one, or a " +
+    "list of goal titles a therapist already wrote down (e.g. from a spreadsheet)." +
+    exclusionNote +
+    "\n\nFor each distinct new goal you find, extract: which candidate skill it best matches (pick " +
+    "exactly one canonicalSkillId from the list provided -- never invent an id that isn't in the " +
+    "candidate list, and if nothing is a close match, still pick the closest one); a short, clear " +
+    "goal title in plain language (clean up the source wording if needed, but don't invent a goal " +
+    "that isn't actually there); a confidence score; and the exact excerpt of the source text that " +
+    "goal came from, so the therapist can see exactly what you based it on.\n\n" +
+    "Extract every distinct new goal you find, up to 30. Don't merge clearly separate goals into " +
+    "one, and don't split one goal into several just because it mentions multiple examples.\n\n" +
     "Respond with ONLY a single JSON object, no markdown fences, no prose before or after it, in " +
-    'exactly this shape: {"statusUpdates": [{"goalId": string, "itemHint": string or null, ' +
-    `"outcome": one of [${OUTCOMES.map((o) => `"${o}"`).join(",")}], "supportLevel": one of ` +
-    `[${SUPPORT_LEVELS.map((s) => `"${s}"`).join(",")}], "modality": one of [${MODALITIES.map((m) => `"${m}"`).join(",")}], ` +
-    '"measurementValue": number or null, "measurementUnit": string or null, "measurementBoolean": ' +
-    'boolean or null, "measurementText": string or null, "confidence": number between 0 and 1, ' +
-    '"excerpt": string}], "newGoals": [{"canonicalSkillId": string, "title": string, ' +
-    '"confidence": number between 0 and 1, "sourceExcerpt": string}]}. Both arrays must be empty ' +
-    "if nothing of that kind is described."
+    'exactly this shape: {"newGoals": [{"canonicalSkillId": string, "title": string, ' +
+    '"confidence": number between 0 and 1, "sourceExcerpt": string}]}. "newGoals" must be an empty ' +
+    "array if no new goal or plan is described in the source at all."
   );
 }
 
-function buildSchema(validSkillIds: Set<string>, validGoalIds: Set<string>) {
+function buildNewGoalSchema(validSkillIds: Set<string>) {
   const newGoalItem = z.object({
     canonicalSkillId: z.string().refine((id) => validSkillIds.has(id), { message: "Must be one of the provided candidate skill ids" }),
     title: z.string().min(1).max(300),
     confidence: z.number().min(0).max(1),
     sourceExcerpt: z.string().min(1).max(500)
   });
-  return z.object({
-    statusUpdates: z.array(evidenceItemSchema(validGoalIds)).max(15),
-    newGoals: z.array(newGoalItem).max(30)
-  });
+  return z.object({ newGoals: z.array(newGoalItem).max(30) });
 }
 
 export interface IepGoalCandidate {
@@ -211,84 +218,113 @@ export const iepExtractionService = {
             .join("\n")}`
         : null;
 
-    const candidateBlock = [goalCandidateBlock, skillCandidateBlock].filter((b): b is string => b !== null).join("\n\n");
-
-    const imageContentFor = (pageBase64s: string[], mimeType: string): AiContentPart[] => [
-      {
-        type: "text",
-        text: `The attached image${pageBase64s.length > 1 ? "s are pages" : " is a page"} from an IEP document -- read the text in ${
-          pageBase64s.length > 1 ? "them" : "it"
-        } and extract updates from it exactly as you would from typed text.\n\n${candidateBlock}`
-      },
-      ...pageBase64s.map((base64): AiContentPart => ({ type: "image", data: { base64 }, mimeType }))
-    ];
-
-    let content: AiContentPart[];
+    // The same document content (text, or rendered/uploaded page images) is sent to both the
+    // status-update and new-goal calls below -- each needs to read the actual document, and each
+    // call gets its own candidate block appended (existing goals for one, the full taxonomy for
+    // the other).
+    type ResolvedContent = { kind: "text"; text: string } | { kind: "image"; pageBase64s: string[]; mimeType: string };
+    let resolved: ResolvedContent;
     if (source.kind === "pdf") {
       const text = await extractPdfText(source.base64);
       if (isUsablePdfText(text)) {
-        content = [{ type: "text", text: `IEP document text:\n${text}\n\n${candidateBlock}` }];
+        resolved = { kind: "text", text: `IEP document text:\n${text}` };
       } else {
         // No usable embedded text (empty, or scanner-app watermark only) -- fall back to
         // rendering pages as images and reusing the proven multimodal "photo" path.
         const pageImages = await renderPdfPagesAsImages(source.base64);
         if (!pageImages) return { error: "Couldn't read any text from this PDF -- it may be a scanned image. Try uploading it as a photo instead." };
-        content = imageContentFor(pageImages, "image/png");
+        resolved = { kind: "image", pageBase64s: pageImages, mimeType: "image/png" };
       }
     } else if (source.kind === "csv") {
       const goalListText = csvToGoalListText(source.csvText);
       if (!goalListText) return { error: "No rows found -- make sure the CSV has a \"title\" column with at least one goal." };
-      content = [{ type: "text", text: `Goal list (one per line):\n${goalListText}\n\n${candidateBlock}` }];
+      resolved = { kind: "text", text: `Goal list (one per line):\n${goalListText}` };
     } else {
-      content = imageContentFor([source.base64], source.mimeType);
+      resolved = { kind: "image", pageBase64s: [source.base64], mimeType: source.mimeType };
     }
 
-    const result = await orchestrator.executeStructured({
-      name: "pravnyaadmin.extract-iep-goals",
+    const contentWith = (candidateBlock: string): AiContentPart[] => {
+      if (resolved.kind === "text") return [{ type: "text", text: `${resolved.text}\n\n${candidateBlock}` }];
+      const { pageBase64s, mimeType } = resolved;
+      return [
+        {
+          type: "text",
+          text: `The attached image${pageBase64s.length > 1 ? "s are pages" : " is a page"} from an IEP document -- read the text in ${
+            pageBase64s.length > 1 ? "them" : "it"
+          } and extract updates from it exactly as you would from typed text.\n\n${candidateBlock}`
+        },
+        ...pageBase64s.map((base64): AiContentPart => ({ type: "image", data: { base64 }, mimeType }))
+      ];
+    };
+
+    // Attributed to the kid's own tenant, not the (possibly guest) therapist's -- see kidAccess.ts
+    // on cross-tenant support-team links. Each call gets its own context (and so its own
+    // correlationId) even though both share a featureId -- they're two distinct provider calls,
+    // and sharing one id between them would make the per-call logs indistinguishable.
+    const makeContext = () => createExecutionContext({ productId: "pravnyaadmin", tenantId: kid.tenantId, featureId: "extract-iep-goals" });
+
+    const newGoalsPromise = orchestrator.executeStructured({
+      name: "pravnyaadmin.extract-iep-new-goals",
       request: {
-        systemPrompt: buildSystemPrompt(activeGoals.length > 0),
-        messages: [{ role: "user", content }],
-        // Default provider cap (4000) truncates mid-JSON on a real multi-goal document -- up to
-        // 30 new goals (schema max) plus 15 status updates, several with verbatim quoted excerpts,
-        // can need well more than that. 8000 comfortably covers the worst case with headroom. (The
-        // provider's client-level request timeout, which this call's size also strains, is fixed
-        // at provider construction -- see ai.platform.ts -- not overridable per-request here.)
+        systemPrompt: buildNewGoalSystemPrompt(activeGoals.map((g) => g.canonicalSkill.name)),
+        messages: [{ role: "user", content: contentWith(skillCandidateBlock) }],
         options: { maxOutputTokens: 8000 },
-        // Attributed to the kid's own tenant, not the (possibly guest) therapist's -- see
-        // kidAccess.ts on cross-tenant support-team links.
-        executionContext: createExecutionContext({ productId: "pravnyaadmin", tenantId: kid.tenantId, featureId: "extract-iep-goals" })
+        executionContext: makeContext()
       },
-      schema: buildSchema(validSkillIds, validGoalIds),
+      schema: buildNewGoalSchema(validSkillIds),
       maxRepairAttempts: 1
     });
 
-    if (!result.success) return { error: "Couldn't read goals from this document right now -- try again, or add goals manually." };
+    const statusUpdatesPromise =
+      goalCandidateBlock === null
+        ? Promise.resolve(null)
+        : orchestrator.executeStructured({
+            name: "pravnyaadmin.extract-iep-status-updates",
+            request: {
+              systemPrompt: STATUS_UPDATE_SYSTEM_PROMPT,
+              messages: [{ role: "user", content: contentWith(goalCandidateBlock) }],
+              executionContext: makeContext()
+            },
+            schema: buildStatusUpdateSchema(validGoalIds),
+            maxRepairAttempts: 1
+          });
+
+    const [newGoalsResult, statusUpdatesResult] = await Promise.all([newGoalsPromise, statusUpdatesPromise]);
+
+    if (!newGoalsResult.success && (statusUpdatesResult === null || !statusUpdatesResult.success)) {
+      return { error: "Couldn't read goals from this document right now -- try again, or add goals manually." };
+    }
 
     const tenantDisciplines = await prisma.tenantDiscipline.findMany({ where: { tenantId: kid.tenantId }, select: { disciplineId: true } });
     const enabledDisciplineIds = tenantDisciplines.map((d) => d.disciplineId);
 
     const skillById = new Map(skills.map((s) => [s.id, s]));
-    const newGoals: IepGoalCandidate[] = result.value.newGoals.map((g) => {
-      const skill = skillById.get(g.canonicalSkillId)!;
-      const { disciplineId, modality } = deriveDisciplineAndModality(skill, enabledDisciplineIds);
-      return {
-        canonicalSkillId: skill.id,
-        skillName: skill.name,
-        domainName: skill.domain.name,
-        measurementType: skill.measurementType,
-        disciplineId,
-        modality,
-        title: g.title,
-        confidence: g.confidence,
-        sourceExcerpt: g.sourceExcerpt
-      };
-    });
+    const newGoals: IepGoalCandidate[] = newGoalsResult.success
+      ? newGoalsResult.value.newGoals.map((g) => {
+          const skill = skillById.get(g.canonicalSkillId)!;
+          const { disciplineId, modality } = deriveDisciplineAndModality(skill, enabledDisciplineIds);
+          return {
+            canonicalSkillId: skill.id,
+            skillName: skill.name,
+            domainName: skill.domain.name,
+            measurementType: skill.measurementType,
+            disciplineId,
+            modality,
+            title: g.title,
+            confidence: g.confidence,
+            sourceExcerpt: g.sourceExcerpt
+          };
+        })
+      : [];
 
     const goalById = new Map(activeGoals.map((g) => [g.id, g]));
-    const statusUpdates: EvidenceCandidate[] = result.value.statusUpdates.map((e) => {
-      const goal = goalById.get(e.goalId)!;
-      return { ...e, goalTitle: goal.title, skillName: goal.canonicalSkill.name, measurementType: goal.canonicalSkill.measurementType };
-    });
+    const statusUpdates: EvidenceCandidate[] =
+      statusUpdatesResult !== null && statusUpdatesResult.success
+        ? statusUpdatesResult.value.statusUpdates.map((e) => {
+            const goal = goalById.get(e.goalId)!;
+            return { ...e, goalTitle: goal.title, skillName: goal.canonicalSkill.name, measurementType: goal.canonicalSkill.measurementType };
+          })
+        : [];
 
     return { statusUpdates, newGoals };
   }
