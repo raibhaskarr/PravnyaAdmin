@@ -2,7 +2,7 @@ import { Fragment, FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Modality, TenantDiscipline } from "../../api/types";
-import { EditableCentre, GoalEvidenceDetail, formatDate } from "./goalEvidence";
+import { EditableCentre, GoalEvidenceDetail, Th, formatDate } from "./goalEvidence";
 import { IepUploadForm } from "./IepUploadForm";
 
 const MODALITIES: Modality[] = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"];
@@ -364,13 +364,13 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
             <tr>
               <th></th>
               <th>Title</th>
-              <th>Canonical skill</th>
+              <Th tip="The domain and skill this goal is tagged to in the shared clinical taxonomy.">Canonical skill</Th>
               <th>Discipline</th>
               <th>Modality</th>
               <th>Items</th>
               <th>Status</th>
-              <th>Centre</th>
-              <th>Added</th>
+              <Th tip="Which clinic/organization this goal actually came from -- free text, doesn't need to be a registered tenant in this system. Click Edit to set or correct it.">Centre</Th>
+              <Th tip="When this goal was created.">Added</Th>
             </tr>
           </thead>
           <tbody>

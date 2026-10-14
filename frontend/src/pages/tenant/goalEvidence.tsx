@@ -1,7 +1,17 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import type { Goal, GoalItem, GoalItemEvidenceRow } from "../../api/types";
+
+// Same convention as the POC review page's column headers: dotted underline is the visual cue
+// that hovering shows an explanation (native title attribute) -- a plain <th> gives no hint.
+export function Th({ tip, children }: { tip: string; children: ReactNode }) {
+  return (
+    <th title={tip} style={{ textDecoration: "underline dotted", textDecorationColor: "var(--color-border)", cursor: "help" }}>
+      {children}
+    </th>
+  );
+}
 
 export const OUTCOME_LABEL: Record<string, string> = {
   CORRECT: "Correct",
@@ -145,7 +155,7 @@ export function GoalEvidenceDetail({ goal, canEdit, onUpdated }: { goal: Goal; c
                 <th>Result</th>
                 <th>Support</th>
                 <th>Modality</th>
-                <th>Centre</th>
+                <Th tip="Which clinic this session was logged at. 'Home' means no centre is set.">Centre</Th>
               </tr>
             </thead>
             <tbody>
