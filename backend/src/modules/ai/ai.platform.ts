@@ -17,7 +17,12 @@ function buildProviders() {
     defaultProvider = "gemini";
   }
   if (env.ANTHROPIC_API_KEY) {
-    providers.push(createAnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY }));
+    // Default client timeout (60s) is too short for IEP extraction's image-heavy, large-output
+    // calls -- the SDK client's timeout is fixed at construction (no per-request override exists
+    // in this provider), so it's raised here for every Claude call this app makes, not just that
+    // one. A longer ceiling only matters when a call actually needs it; it doesn't slow anything
+    // else down.
+    providers.push(createAnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY, timeoutMs: 150_000 }));
     defaultProvider = "claude";
   }
 
