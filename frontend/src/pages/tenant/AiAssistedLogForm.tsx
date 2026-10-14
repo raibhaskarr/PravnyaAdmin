@@ -46,6 +46,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
   const [reviewing, setReviewing] = useState(false);
   const [candidates, setCandidates] = useState<EvidenceCandidate[] | null>(null);
   const [approved, setApproved] = useState<Set<number>>(new Set());
+  const [centreName, setCentreName] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
@@ -158,6 +159,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
     reRecord();
     setCandidates(null);
     setApproved(new Set());
+    setCentreName("");
     setError("");
   }
 
@@ -165,6 +167,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
     if (!candidates) return;
     setSaving(true);
     setError("");
+    const trimmedCentre = centreName.trim() || null;
     let count = 0;
     try {
       for (const i of approved) {
@@ -172,7 +175,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
         await api.logEvidence(token!, c.goalId, {
           newItemCustomText: c.itemHint ?? undefined,
           logDate: new Date().toISOString(),
-          centreName: null,
+          centreName: trimmedCentre,
           outcome: c.outcome,
           supportLevel: c.supportLevel,
           modality: c.modality,
@@ -269,6 +272,12 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
           <div className="hint-text" style={{ marginBottom: "0.75rem" }}>
             Found {candidates.length} piece{candidates.length === 1 ? "" : "s"} of evidence -- review and uncheck anything that's wrong before adding.
           </div>
+
+          <label className="field" style={{ marginBottom: "1rem" }}>
+            <span className="field-label">Centre (optional)</span>
+            <input className="input" value={centreName} onChange={(e) => setCentreName(e.target.value)} placeholder="e.g. vListen -- leave blank for Home" />
+          </label>
+
           {candidates.map((c, i) => {
             const mLabel = measurementLabel(c);
             return (

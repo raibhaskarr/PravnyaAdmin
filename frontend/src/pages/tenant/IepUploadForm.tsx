@@ -39,6 +39,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
   const [result, setResult] = useState<ExtractionResult | null>(null);
   const [approvedUpdates, setApprovedUpdates] = useState<Set<number>>(new Set());
   const [approvedGoals, setApprovedGoals] = useState<Set<number>>(new Set());
+  const [centreName, setCentreName] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
@@ -49,6 +50,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
     setResult(null);
     setApprovedUpdates(new Set());
     setApprovedGoals(new Set());
+    setCentreName("");
     setSavedCount(0);
   }
 
@@ -123,6 +125,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
     setResult(null);
     setApprovedUpdates(new Set());
     setApprovedGoals(new Set());
+    setCentreName("");
     setError("");
   }
 
@@ -130,6 +133,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
     if (!result) return;
     setSaving(true);
     setError("");
+    const trimmedCentre = centreName.trim() || null;
     let count = 0;
     try {
       for (const i of approvedUpdates) {
@@ -137,7 +141,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
         await api.logEvidence(token!, c.goalId, {
           newItemCustomText: c.itemHint ?? undefined,
           logDate: new Date().toISOString(),
-          centreName: null,
+          centreName: trimmedCentre,
           outcome: c.outcome,
           supportLevel: c.supportLevel,
           modality: c.modality,
@@ -157,6 +161,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
           disciplineId: c.disciplineId,
           modality: c.modality,
           title: c.title,
+          centreName: trimmedCentre ?? undefined,
           notes: `Extracted from an uploaded IEP. Source: "${c.sourceExcerpt}"`
         });
         count += 1;
@@ -233,6 +238,19 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
             Found {result.statusUpdates.length} update{result.statusUpdates.length === 1 ? "" : "s"} to existing goals and {result.newGoals.length} new
             goal{result.newGoals.length === 1 ? "" : "s"} -- review and uncheck anything that's wrong before adding.
           </div>
+
+          <label className="field" style={{ marginBottom: "1rem" }}>
+            <span className="field-label">Centre / source clinic (optional)</span>
+            <input
+              className="input"
+              value={centreName}
+              onChange={(e) => setCentreName(e.target.value)}
+              placeholder="e.g. vListen -- doesn't need to be a registered organization"
+            />
+            <p className="hint-text" style={{ marginTop: "0.3rem" }}>
+              Applied to everything you approve below -- useful when this document came from a different clinic than the one you're logged into.
+            </p>
+          </label>
 
           {result.statusUpdates.length > 0 ? (
             <>

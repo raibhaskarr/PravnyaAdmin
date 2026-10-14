@@ -191,10 +191,27 @@ export const api = {
       modality: Modality;
       title: string;
       notes?: string;
+      centreName?: string;
       items?: GoalItemInput[];
     }
   ) {
     return request<Goal>("/goals", { token, method: "POST", body: input });
+  },
+  updateGoal(
+    token: string,
+    goalId: string,
+    input: {
+      canonicalSkillId?: string;
+      disciplineId?: string;
+      modality?: Modality;
+      title?: string;
+      status?: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
+      notes?: string | null;
+      centreName?: string | null;
+      items?: GoalItemInput[];
+    }
+  ) {
+    return request<Goal>(`/goals/${goalId}`, { token, method: "PATCH", body: input });
   },
   suggestGoalSkill(token: string, kidId: string, title: string) {
     return request<GoalSkillSuggestionResponse>("/ai/suggest-goal-skill", { token, method: "POST", body: { kidId, title } });
@@ -229,6 +246,12 @@ export const api = {
     return request<GoalItemEvidenceRow & { goalItem: { id: string; customText: string | null; canonicalSkillItem: { id: string; displayName: string } | null } }>(
       `/goals/${goalId}/evidence`,
       { token, method: "POST", body: input }
+    );
+  },
+  updateEvidenceCentre(token: string, goalId: string, evidenceId: string, centreName: string | null) {
+    return request<GoalItemEvidenceRow & { goalItem: { id: string; customText: string | null; canonicalSkillItem: { id: string; displayName: string } | null } }>(
+      `/goals/${goalId}/evidence/${evidenceId}`,
+      { token, method: "PATCH", body: { centreName } }
     );
   },
 

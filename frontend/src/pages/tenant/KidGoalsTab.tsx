@@ -2,7 +2,7 @@ import { Fragment, FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Modality, TenantDiscipline } from "../../api/types";
-import { GoalEvidenceDetail } from "./goalEvidence";
+import { EditableCentre, GoalEvidenceDetail } from "./goalEvidence";
 import { IepUploadForm } from "./IepUploadForm";
 
 const MODALITIES: Modality[] = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"];
@@ -27,6 +27,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
+  const [centreName, setCentreName] = useState("");
   const [canonicalSkillId, setCanonicalSkillId] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
   const [modality, setModality] = useState<Modality | "">("");
@@ -66,6 +67,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
     setPendingItems([]);
     setCustomText("");
     setTitle("");
+    setCentreName("");
     setCanonicalSkillId("");
     setDisciplineId("");
     setModality("");
@@ -135,6 +137,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
         disciplineId,
         modality: modality as Modality,
         title,
+        centreName: centreName.trim() || undefined,
         items: pendingItems.map(({ canonicalSkillItemId, customText: text }) => ({ canonicalSkillItemId, customText: text }))
       });
       setShowForm(false);
@@ -179,6 +182,15 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
               <label className="field">
                 <span className="field-label">Goal title (as written)</span>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} required className="input" />
+              </label>
+              <label className="field">
+                <span className="field-label">Centre / source clinic (optional)</span>
+                <input
+                  value={centreName}
+                  onChange={(e) => setCentreName(e.target.value)}
+                  className="input"
+                  placeholder="e.g. vListen -- doesn't need to be a registered organization"
+                />
               </label>
               <div style={{ marginTop: "-0.5rem", marginBottom: "0.75rem" }}>
                 <button type="button" className="btn btn-secondary" onClick={handleSuggest} disabled={suggesting}>
@@ -357,6 +369,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
               <th>Modality</th>
               <th>Items</th>
               <th>Status</th>
+              <th>Centre</th>
             </tr>
           </thead>
           <tbody>
@@ -382,11 +395,21 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
                     <td>{g.modality}</td>
                     <td>{g.items.length ? g.items.map(goalItemLabel).join(", ") : "—"}</td>
                     <td>{g.status}</td>
+                    <td>
+                      <EditableCentre
+                        value={g.centreName}
+                        canEdit={canEdit}
+                        onSave={async (next) => {
+                          await api.updateGoal(token!, g.id, { centreName: next });
+                          load();
+                        }}
+                      />
+                    </td>
                   </tr>
                   {isExpanded ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: 0 }}>
-                        <GoalEvidenceDetail goal={g} />
+                      <td colSpan={8} style={{ padding: 0 }}>
+                        <GoalEvidenceDetail goal={g} canEdit={canEdit} onUpdated={load} />
                       </td>
                     </tr>
                   ) : null}

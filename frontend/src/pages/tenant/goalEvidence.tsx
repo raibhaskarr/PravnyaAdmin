@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { api } from "../../api/client";
 import type { Goal, GoalItem, GoalItemEvidenceRow } from "../../api/types";
 
 export const OUTCOME_LABEL: Record<string, string> = {
@@ -51,7 +54,72 @@ export function itemLabel(item: GoalItem) {
   return item.customText ?? item.canonicalSkillItem?.displayName ?? "General practice";
 }
 
-export function GoalEvidenceDetail({ goal }: { goal: Goal }) {
+/** Shows which clinic/organization a goal or logged session actually came from -- free text, so it
+ * works whether or not that name matches a registered tenant (e.g. a guest therapist's own,
+ * possibly-unregistered clinic, as opposed to the kid's own tenant). Click-to-edit inline rather
+ * than a separate edit screen, since this is the one field that's turned out to need correcting
+ * after the fact (an AI-assisted upload attributed to the wrong clinic). */
+export function EditableCentre({ value, canEdit, onSave }: { value: string | null; canEdit: boolean; onSave: (next: string | null) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const [saving, setSaving] = useState(false);
+
+  if (editing) {
+    return (
+      <span style={{ display: "inline-flex", gap: "0.3rem", alignItems: "center" }}>
+        <input
+          className="input"
+          style={{ padding: "0.1rem 0.4rem", fontSize: "0.8rem", width: 110 }}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="e.g. vListen"
+          autoFocus
+        />
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ padding: "0.1rem 0.4rem", fontSize: "0.7rem" }}
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await onSave(draft.trim() || null);
+              setEditing(false);
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button type="button" className="btn btn-secondary" style={{ padding: "0.1rem 0.4rem", fontSize: "0.7rem" }} onClick={() => setEditing(false)} disabled={saving}>
+          Cancel
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display: "inline-flex", gap: "0.4rem", alignItems: "center" }}>
+      {value ? <span className="tag tag-framework">{value}</span> : <span className="hint-text">{canEdit ? "—" : "Home"}</span>}
+      {canEdit ? (
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(value ?? "");
+            setEditing(true);
+          }}
+          style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontSize: "0.7rem", textDecoration: "underline" }}
+        >
+          Edit
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+export function GoalEvidenceDetail({ goal, canEdit, onUpdated }: { goal: Goal; canEdit: boolean; onUpdated: () => void }) {
+  const { token } = useAuth();
   const itemsWithEvidence = goal.items.filter((i) => i.evidence.length > 0);
   const totalEvidence = goal.items.reduce((sum, i) => sum + i.evidence.length, 0);
 
@@ -89,7 +157,16 @@ export function GoalEvidenceDetail({ goal }: { goal: Goal }) {
                     <td>{mLabel ?? OUTCOME_LABEL[e.outcome] ?? e.outcome}</td>
                     <td>{e.supportLevel.replace(/_/g, " ").toLowerCase()}</td>
                     <td>{e.modality.replace(/_/g, " ").toLowerCase()}</td>
-                    <td>{e.centreName ?? "Home"}</td>
+                    <td>
+                      <EditableCentre
+                        value={e.centreName}
+                        canEdit={canEdit}
+                        onSave={async (next) => {
+                          await api.updateEvidenceCentre(token!, goal.id, e.id, next);
+                          onUpdated();
+                        }}
+                      />
+                    </td>
                   </tr>
                 );
               })}

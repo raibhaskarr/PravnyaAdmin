@@ -367,5 +367,6 @@ export type Goal = {
   title: string;
   status: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
   notes: string | null;
+  centreName: string | null;
   items: GoalItem[];
 };

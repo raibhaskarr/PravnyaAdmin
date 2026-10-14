@@ -2,7 +2,7 @@ import { prisma } from "../../config/prisma";
 import { notFound } from "../../common/errors/AppError";
 import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid, kidVisibilityFilter } from "../../common/access/kidAccess";
-import { CreateEvidenceInput, CreateGoalInput, UpdateGoalInput } from "./goals.schemas";
+import { CreateEvidenceInput, CreateGoalInput, UpdateEvidenceInput, UpdateGoalInput } from "./goals.schemas";
 
 const includeRelations = {
   kid: { select: { id: true, firstName: true, lastName: true } },
@@ -52,6 +52,7 @@ export const goalsService = {
         modality: input.modality,
         title: input.title,
         notes: input.notes,
+        centreName: input.centreName ?? null,
         createdById: user.id,
         updatedById: user.id,
         items: {
@@ -122,6 +123,25 @@ export const goalsService = {
         measurementBoolean: input.measurementBoolean ?? null,
         measurementText: input.measurementText ?? null
       },
+      include: { goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } } }
+    });
+  },
+
+  // Deliberately narrow -- see the updateEvidenceSchema comment. Only centreName, since that's the
+  // one thing that's turned out to be wrong after the fact in practice (an AI-assisted upload
+  // attributed to the wrong clinic); the rest of a logged evidence row is what was actually
+  // observed in the session and isn't meant to change later.
+  async updateEvidence(user: AuthUser, goalId: string, evidenceId: string, input: UpdateEvidenceInput) {
+    const goal = await prisma.goal.findUnique({ where: { id: goalId } });
+    if (!goal) throw notFound("Goal not found");
+    await assertCanAccessKid(user, goal.kidId);
+
+    const evidence = await prisma.goalItemEvidence.findUnique({ where: { id: evidenceId }, include: { goalItem: { select: { goalId: true } } } });
+    if (!evidence || evidence.goalItem.goalId !== goalId) throw notFound("Evidence not found on this goal");
+
+    return prisma.goalItemEvidence.update({
+      where: { id: evidenceId },
+      data: { centreName: input.centreName },
       include: { goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } } }
     });
   }

@@ -314,6 +314,12 @@ model Goal {
   title            String
   status           GoalStatus          @default(ACTIVE)
   notes            String?
+  /// Free-text label for which clinic/organization this goal actually came from -- independent of
+  /// tenantId (the kid's own home tenant) and independent of whether that clinic is a registered
+  /// Tenant in this system at all. e.g. a kid on a B2C/retail tenant can have a guest therapist
+  /// from another (possibly unregistered) clinic contribute a goal plan; this records that clinic's
+  /// name for display, not a hard reference to any Tenant row.
+  centreName       String?
   items            GoalItem[]
   /// The real IEPGoal.id this Goal was migrated from, when it came from the reviewed POC tagging
   /// pipeline rather than being created by hand in the product -- unique so re-running the migration

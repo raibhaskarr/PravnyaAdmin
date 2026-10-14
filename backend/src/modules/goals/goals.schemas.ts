@@ -16,6 +16,9 @@ export const createGoalSchema = z.object({
   modality: z.enum(["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"]),
   title: z.string().min(1).max(300),
   notes: z.string().max(4000).optional(),
+  // Free text, independent of the kid's own tenant -- doesn't need to match a real registered
+  // Tenant (a goal can come from a clinic that isn't one), see the schema comment on Goal.
+  centreName: z.string().max(200).optional(),
   items: z.array(goalItemSchema).max(50).default([])
 });
 
@@ -26,10 +29,12 @@ export const updateGoalSchema = z.object({
   title: z.string().min(1).max(300).optional(),
   status: z.enum(["ACTIVE", "ACHIEVED", "DISCONTINUED"]).optional(),
   notes: z.string().max(4000).nullable().optional(),
+  centreName: z.string().max(200).nullable().optional(),
   items: z.array(goalItemSchema).max(50).optional()
 });
 
 export const goalParamsSchema = z.object({ goalId: z.string().uuid() });
+export const evidenceParamsSchema = z.object({ goalId: z.string().uuid(), evidenceId: z.string().uuid() });
 export const goalQuerySchema = z.object({ kidId: z.string().uuid().optional() });
 
 // A therapist logging a session picks an existing item, types a new one on the fly, or leaves both
@@ -49,6 +54,14 @@ export const createEvidenceSchema = z.object({
   measurementText: z.string().max(500).nullable().optional()
 });
 
+// Narrow on purpose -- correcting which centre a logged session actually happened at is the one
+// real need (see the Goal.centreName schema comment); the rest of an evidence row reflects what
+// was actually observed at the time and isn't meant to be edited after the fact.
+export const updateEvidenceSchema = z.object({
+  centreName: z.string().max(200).nullable()
+});
+
 export type CreateGoalInput = z.infer<typeof createGoalSchema>;
 export type UpdateGoalInput = z.infer<typeof updateGoalSchema>;
 export type CreateEvidenceInput = z.infer<typeof createEvidenceSchema>;
+export type UpdateEvidenceInput = z.infer<typeof updateEvidenceSchema>;
