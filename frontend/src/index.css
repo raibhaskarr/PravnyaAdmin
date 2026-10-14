@@ -261,7 +261,10 @@ select.input {
 .content {
   flex: 1;
   padding: 2rem 2.5rem;
-  max-width: 1150px;
+  /* No max-width here -- forms, docs, and other reading-width content already cap themselves
+     explicitly (see .form-panel, .manual-doc, etc.), so this stays unconstrained to let wide
+     tables actually use the available screen width instead of scrolling sooner than they need to. */
+  min-width: 0;
 }
 
 .page-toolbar {
@@ -375,7 +378,28 @@ fieldset.form-group legend {
      hidden so the rounded corners still clip the table's square top/bottom edges as before. */
   overflow-x: auto;
   overflow-y: hidden;
+  /* Make the horizontal scrollbar an always-visible affordance (not an OS overlay scrollbar that
+     only appears on hover/scroll, e.g. macOS's default) -- it's the only visual cue that a wide
+     table has more columns, so it needs to actually be seen, not discovered by accident. */
+  scrollbar-width: thin;
   box-shadow: var(--shadow-sm);
+}
+
+.table-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+  background: var(--color-surface-muted);
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-faint);
 }
 
 table.data-table {
