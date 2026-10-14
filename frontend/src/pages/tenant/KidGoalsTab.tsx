@@ -34,6 +34,10 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
   const [pendingSkillId, setPendingSkillId] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const [suggestNote, setSuggestNote] = useState("");
+  // Only set when handleSuggest actually got a real AI suggestion back -- unlike suggestNote,
+  // which doubles as the UI hint for failures too ("No suggestion available...", "Type a goal
+  // title first."), this is specifically the rationale to persist on the created goal.
+  const [appliedRationale, setAppliedRationale] = useState<string | null>(null);
 
   const suggestedModalities = selectedSkill?.supportedModalities ?? [];
 
@@ -73,6 +77,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
     setModality("");
     setPendingSkillId("");
     setSuggestNote("");
+    setAppliedRationale(null);
   }
 
   async function handleSkillChange(skillId: string) {
@@ -88,10 +93,12 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
     const trimmed = title.trim();
     if (!trimmed) {
       setSuggestNote("Type a goal title first.");
+      setAppliedRationale(null);
       return;
     }
     setSuggesting(true);
     setSuggestNote("");
+    setAppliedRationale(null);
     try {
       const result = await api.suggestGoalSkill(token!, kidId, trimmed);
       if (!result.suggestion) {
@@ -104,6 +111,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
       setDisciplineId(discId ?? "");
       setModality(mod ?? "");
       setSuggestNote(rationale);
+      setAppliedRationale(rationale);
     } catch {
       setSuggestNote("Couldn't reach the AI suggestion service -- pick manually below.");
     } finally {
@@ -138,6 +146,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
         modality: modality as Modality,
         title,
         centreName: centreName.trim() || undefined,
+        rationale: appliedRationale ?? undefined,
         items: pendingItems.map(({ canonicalSkillItemId, customText: text }) => ({ canonicalSkillItemId, customText: text }))
       });
       setShowForm(false);
@@ -371,6 +380,8 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
               <th>Status</th>
               <Th tip="Which clinic/organization this goal actually came from -- free text, doesn't need to be a registered tenant in this system. Click Edit to set or correct it.">Centre</Th>
               <Th tip="When this goal was created.">Added</Th>
+              <Th tip="How confident the AI was in this skill match (0-100%), when this goal came from an AI-assisted flow. Blank means it was picked by hand, with no AI involved.">Confidence</Th>
+              <Th tip="Why this skill was picked: the AI's own explanation, or the source document excerpt it was extracted from. Blank means it was picked by hand, with no AI involved.">Rationale</Th>
             </tr>
           </thead>
           <tbody>
@@ -409,10 +420,12 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
                       />
                     </td>
                     <td>{formatDate(g.createdAt)}</td>
+                    <td>{g.confidence != null ? `${Math.round(g.confidence * 100)}%` : "—"}</td>
+                    <td style={{ maxWidth: 280 }}>{g.rationale ?? "—"}</td>
                   </tr>
                   {isExpanded ? (
                     <tr>
-                      <td colSpan={9} style={{ padding: 0 }}>
+                      <td colSpan={11} style={{ padding: 0 }}>
                         <GoalEvidenceDetail goal={g} canEdit={canEdit} onUpdated={load} />
                       </td>
                     </tr>

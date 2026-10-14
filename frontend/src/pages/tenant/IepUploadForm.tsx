@@ -162,7 +162,9 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
           modality: c.modality,
           title: c.title,
           centreName: trimmedCentre ?? undefined,
-          notes: `Extracted from an uploaded IEP. Source: "${c.sourceExcerpt}"`
+          confidence: c.confidence,
+          rationale: c.sourceExcerpt,
+          notes: "Extracted from an uploaded IEP."
         });
         count += 1;
       }

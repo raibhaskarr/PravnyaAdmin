@@ -53,6 +53,8 @@ export const goalsService = {
         title: input.title,
         notes: input.notes,
         centreName: input.centreName ?? null,
+        confidence: input.confidence ?? null,
+        rationale: input.rationale ?? null,
         createdById: user.id,
         updatedById: user.id,
         items: {

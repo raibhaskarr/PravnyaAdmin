@@ -320,6 +320,14 @@ model Goal {
   /// from another (possibly unregistered) clinic contribute a goal plan; this records that clinic's
   /// name for display, not a hard reference to any Tenant row.
   centreName       String?
+  /// How confident the AI was in this skill match (0-1), when this goal came from an AI-assisted
+  /// flow (IEP extraction). Null for a goal created by hand with no AI involved -- there's no
+  /// number to show, not a 0.
+  confidence       Float?
+  /// Why this skill was picked: the AI's own explanation (from "Suggest skill from title"), or the
+  /// source document excerpt it was extracted from (from an IEP upload). Null for a goal created
+  /// by hand with no AI involved.
+  rationale        String?
   items            GoalItem[]
   /// The real IEPGoal.id this Goal was migrated from, when it came from the reviewed POC tagging
   /// pipeline rather than being created by hand in the product -- unique so re-running the migration

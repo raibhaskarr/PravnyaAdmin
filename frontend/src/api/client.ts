@@ -192,6 +192,8 @@ export const api = {
       title: string;
       notes?: string;
       centreName?: string;
+      confidence?: number;
+      rationale?: string;
       items?: GoalItemInput[];
     }
   ) {
@@ -208,6 +210,8 @@ export const api = {
       status?: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
       notes?: string | null;
       centreName?: string | null;
+      confidence?: number | null;
+      rationale?: string | null;
       items?: GoalItemInput[];
     }
   ) {

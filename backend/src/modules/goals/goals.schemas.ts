@@ -19,6 +19,9 @@ export const createGoalSchema = z.object({
   // Free text, independent of the kid's own tenant -- doesn't need to match a real registered
   // Tenant (a goal can come from a clinic that isn't one), see the schema comment on Goal.
   centreName: z.string().max(200).optional(),
+  // Only present when an AI-assisted flow produced this goal -- see the schema comment on Goal.
+  confidence: z.number().min(0).max(1).optional(),
+  rationale: z.string().max(2000).optional(),
   items: z.array(goalItemSchema).max(50).default([])
 });
 
@@ -29,6 +32,8 @@ export const updateGoalSchema = z.object({
   title: z.string().min(1).max(300).optional(),
   status: z.enum(["ACTIVE", "ACHIEVED", "DISCONTINUED"]).optional(),
   notes: z.string().max(4000).nullable().optional(),
+  confidence: z.number().min(0).max(1).nullable().optional(),
+  rationale: z.string().max(2000).nullable().optional(),
   centreName: z.string().max(200).nullable().optional(),
   items: z.array(goalItemSchema).max(50).optional()
 });
