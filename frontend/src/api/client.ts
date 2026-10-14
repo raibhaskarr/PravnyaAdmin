@@ -204,7 +204,7 @@ export const api = {
     kidId: string,
     source: { kind: "pdf"; base64: string } | { kind: "image"; base64: string; mimeType: string } | { kind: "csv"; csvText: string }
   ) {
-    return request<{ candidates: IepGoalCandidate[] } | { error: string }>("/iep/extract", { token, method: "POST", body: { kidId, source } });
+    return request<{ statusUpdates: EvidenceCandidate[]; newGoals: IepGoalCandidate[] } | { error: string }>("/iep/extract", { token, method: "POST", body: { kidId, source } });
   },
   extractEvidence(token: string, kidId: string, input: { freeText: string } | { media: { kind: "image" | "audio"; mimeType: string; base64: string } }) {
     return request<{ candidates: EvidenceCandidate[] } | { error: string }>("/ai/extract-evidence", { token, method: "POST", body: { kidId, ...input } });

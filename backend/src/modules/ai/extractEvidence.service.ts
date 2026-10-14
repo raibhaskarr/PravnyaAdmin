@@ -5,16 +5,13 @@ import { prisma } from "../../config/prisma";
 import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { orchestrator } from "./ai.platform";
+import { evidenceItemSchema, type EvidenceCandidate } from "./evidenceFields.shared";
 
 export interface EvidenceMedia {
   kind: "image" | "audio";
   mimeType: string;
   base64: string;
 }
-
-const OUTCOMES = ["CORRECT", "INCORRECT", "PARTIAL", "ATTEMPTED", "NOT_OBSERVED", "UNKNOWN"] as const;
-const SUPPORT_LEVELS = ["INDEPENDENT", "VISUAL_PROMPT", "VERBAL_PROMPT", "GESTURAL_PROMPT", "PHYSICAL_PROMPT", "PARTIAL_ASSISTANCE", "FULL_ASSISTANCE", "UNKNOWN"] as const;
-const MODALITIES = ["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL", "UNKNOWN", "NOT_APPLICABLE"] as const;
 
 // Same measurement-type-aware extraction the L12 POC pipeline validated against real data, adapted
 // to match against a specific kid's own real goals (a much smaller, already-curated list) instead
@@ -65,21 +62,8 @@ const SYSTEM_PROMPT =
   '"evidence" must be an empty array when hasEvidence is false. Up to 15 evidence items.';
 
 function buildSchema(validGoalIds: Set<string>) {
-  const evidenceItem = z.object({
-    goalId: z.string().refine((id) => validGoalIds.has(id), { message: "Must be one of the provided candidate goal ids" }),
-    itemHint: z.string().max(120).nullable(),
-    outcome: z.enum(OUTCOMES),
-    supportLevel: z.enum(SUPPORT_LEVELS),
-    modality: z.enum(MODALITIES),
-    measurementValue: z.number().nullable(),
-    measurementUnit: z.string().max(20).nullable(),
-    measurementBoolean: z.boolean().nullable(),
-    measurementText: z.string().max(200).nullable(),
-    confidence: z.number().min(0).max(1),
-    excerpt: z.string().min(1).max(300)
-  });
   return z
-    .object({ hasEvidence: z.boolean(), evidence: z.array(evidenceItem).max(15) })
+    .object({ hasEvidence: z.boolean(), evidence: z.array(evidenceItemSchema(validGoalIds)).max(15) })
     .superRefine((value, ctx) => {
       if (!value.hasEvidence && value.evidence.length > 0) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "evidence must be empty when hasEvidence is false" });
@@ -87,22 +71,7 @@ function buildSchema(validGoalIds: Set<string>) {
     });
 }
 
-export interface EvidenceCandidate {
-  goalId: string;
-  goalTitle: string;
-  skillName: string;
-  measurementType: "TRIALS" | "FREQUENCY" | "DURATION" | "PERCENTAGE" | "PROMPT_LEVEL" | "YES_NO" | "RATING" | "FREE_OBSERVATION" | null;
-  itemHint: string | null;
-  outcome: (typeof OUTCOMES)[number];
-  supportLevel: (typeof SUPPORT_LEVELS)[number];
-  modality: (typeof MODALITIES)[number];
-  measurementValue: number | null;
-  measurementUnit: string | null;
-  measurementBoolean: boolean | null;
-  measurementText: string | null;
-  confidence: number;
-  excerpt: string;
-}
+export type { EvidenceCandidate };
 
 export const extractEvidenceService = {
   async extract(
