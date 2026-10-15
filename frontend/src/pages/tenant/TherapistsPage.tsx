@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
+import { Tag } from "primereact/tag";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { TenantDiscipline, Therapist, TherapistInvitation } from "../../api/types";
@@ -15,6 +17,7 @@ const STATUS_LABEL: Record<TherapistInvitation["status"], string> = {
 
 export function TherapistsPage() {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [invitations, setInvitations] = useState<TherapistInvitation[]>([]);
   const [disciplines, setDisciplines] = useState<TenantDiscipline[]>([]);
@@ -64,6 +67,15 @@ export function TherapistsPage() {
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to revoke invitation");
+    }
+  }
+
+  async function toggleStatus(therapist: Therapist) {
+    try {
+      await api.updateTherapist(token!, therapist.id, { status: therapist.status === "ACTIVE" ? "DEACTIVATED" : "ACTIVE" });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to update status");
     }
   }
 
@@ -130,11 +142,38 @@ export function TherapistsPage() {
 
       {error ? <p className="error-text">{error}</p> : null}
 
-      <DataTable value={therapists} emptyMessage="No therapists yet." sortMode="multiple" removableSort stripedRows size="small">
+      <DataTable
+        value={therapists}
+        emptyMessage="No therapists yet."
+        sortMode="multiple"
+        removableSort
+        stripedRows
+        size="small"
+        onRowClick={canEdit ? (e) => navigate(`/tenant/therapists/${(e.data as Therapist).id}`) : undefined}
+        rowClassName={() => (canEdit ? "clickable-row" : "")}
+      >
         <Column field="name" header="Name" sortable />
         <Column field="user.email" header="Email" sortable body={(t: Therapist) => t.user.email} />
         <Column field="phone" header="Phone" body={(t: Therapist) => t.phone ?? "—"} />
         <Column header="Disciplines" body={(t: Therapist) => t.disciplineIds.map(disciplineName).join(", ") || "—"} />
+        <Column
+          header="Status"
+          body={(t: Therapist) => <Tag value={t.status === "ACTIVE" ? "Active" : "Deactivated"} severity={t.status === "ACTIVE" ? "success" : "danger"} />}
+        />
+        {canEdit ? (
+          <Column
+            body={(t: Therapist) => (
+              <Button
+                label={t.status === "ACTIVE" ? "Deactivate" : "Reactivate"}
+                className={`p-button-sm p-button-outlined ${t.status === "ACTIVE" ? "p-button-danger" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleStatus(t);
+                }}
+              />
+            )}
+          />
+        ) : null}
       </DataTable>
 
       {canEdit && pendingInvitations.length > 0 ? (

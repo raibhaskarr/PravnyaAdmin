@@ -65,11 +65,13 @@ export function KidsPage() {
               </label>
               <fieldset className="form-group">
                 <legend>Assigned therapists</legend>
-                {therapists.map((t) => (
-                  <label key={t.id} className="checkbox-row">
-                    <input type="checkbox" name={`therapist_${t.id}`} /> {t.name}
-                  </label>
-                ))}
+                {therapists
+                  .filter((t) => t.status === "ACTIVE")
+                  .map((t) => (
+                    <label key={t.id} className="checkbox-row">
+                      <input type="checkbox" name={`therapist_${t.id}`} /> {t.name}
+                    </label>
+                  ))}
               </fieldset>
               <button type="submit" className="btn btn-primary">
                 Create kid

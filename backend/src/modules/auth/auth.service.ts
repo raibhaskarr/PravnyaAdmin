@@ -13,6 +13,13 @@ export const authService = {
     const valid = await bcrypt.compare(input.password, user.passwordHash);
     if (!valid) throw new AppError(401, "INVALID_CREDENTIALS", "Incorrect email or password");
 
+    if (user.role === "THERAPIST") {
+      const therapist = await prisma.therapist.findUnique({ where: { userId: user.id }, select: { status: true } });
+      if (therapist?.status === "DEACTIVATED") {
+        throw new AppError(403, "ACCOUNT_DEACTIVATED", "This account has been deactivated. Contact your centre admin.");
+      }
+    }
+
     const token = signToken({ id: user.id, role: user.role, tenantId: user.tenantId });
     return {
       token,

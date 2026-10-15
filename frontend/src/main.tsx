@@ -16,6 +16,7 @@ import { SuperadminsPage } from "./pages/admin/SuperadminsPage";
 import { AccountPage } from "./pages/admin/AccountPage";
 import { DisciplinesPage } from "./pages/tenant/DisciplinesPage";
 import { TherapistsPage } from "./pages/tenant/TherapistsPage";
+import { TherapistDetailPage } from "./pages/tenant/TherapistDetailPage";
 import { KidsPage } from "./pages/tenant/KidsPage";
 import { KidDetailPage } from "./pages/tenant/KidDetailPage";
 import { LogSessionPage } from "./pages/tenant/LogSessionPage";
@@ -48,6 +49,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route element={<ProtectedRoute allow={["TENANT_ADMIN"]} />}>
             <Route element={<AdminLayout />}>
               <Route path="/tenant/profile" element={<TenantProfilePage />} />
+              <Route path="/tenant/therapists/:therapistId" element={<TherapistDetailPage />} />
             </Route>
           </Route>
 

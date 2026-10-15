@@ -1,22 +1,38 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { Kid, TenantDiscipline, Therapist } from "../../api/types";
+import type { Kid, TenantDiscipline, Therapist, TherapistInvitation } from "../../api/types";
 
 export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEdit: boolean; onUpdated: () => void }) {
   const { token } = useAuth();
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [disciplines, setDisciplines] = useState<TenantDiscipline[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<TherapistInvitation[]>([]);
   const [editing, setEditing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
 
+  function loadInvitations() {
+    api.listTherapistInvitations(token!).then((rows) => setPendingInvitations(rows.filter((inv) => inv.status === "PENDING" && inv.kid?.id === kid.id)));
+  }
+
   useEffect(() => {
     api.listTherapists(token!).then(setTherapists);
     api.listTenantDisciplines(token!).then(setDisciplines);
-  }, [token]);
+    loadInvitations();
+  }, [token, kid.id]);
+
+  async function handleRevokeInvitation(invitationId: string) {
+    setError("");
+    try {
+      await api.revokeTherapistInvitation(token!, invitationId);
+      loadInvitations();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to revoke invitation");
+    }
+  }
 
   async function handleInviteByEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,6 +52,7 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
       }
       form.reset();
       onUpdated();
+      loadInvitations();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to invite this email");
     } finally {
@@ -129,18 +146,60 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
           </table>
           {kid.therapists.length === 0 ? <p className="empty-state">No therapists assigned yet.</p> : null}
         </div>
+
+        {canEdit && pendingInvitations.length > 0 ? (
+          <>
+            <h3 style={{ marginTop: "1rem" }}>Pending invitations</h3>
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingInvitations.map((inv) => (
+                    <tr key={inv.id}>
+                      <td>{inv.email}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => handleRevokeInvitation(inv.id)}
+                          style={{ padding: "0.15rem 0.6rem", fontSize: "0.8rem" }}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
       </div>
     );
   }
 
-  // Union of the home-tenant roster (for adding someone new) and the kid's currently-linked
-  // therapists (which may include guests from another tenant, via the "Add by email" flow) --
-  // otherwise an already-linked guest has no checkbox at all and becomes unmanageable here.
+  // Union of the home-tenant ACTIVE roster (for adding someone new) and the kid's
+  // currently-linked therapists (which may include guests from another tenant, via the "Add by
+  // email" flow, or a now-deactivated home therapist this kid was already assigned before they
+  // were deactivated) -- otherwise an already-linked therapist has no checkbox at all and becomes
+  // unmanageable here. Deactivated home therapists are excluded only from being newly *added*.
+  const activeHomeTherapists = therapists.filter((t) => t.status === "ACTIVE");
   const pickerOptions = [
-    ...therapists.map((t) => ({ id: t.id, name: t.name, tenantId: t.tenantId, tenantName: t.tenant?.name ?? "" })),
+    ...activeHomeTherapists.map((t) => ({ id: t.id, name: t.name, tenantId: t.tenantId, tenantName: t.tenant?.name ?? "", deactivated: false })),
     ...kid.therapists
-      .filter((t) => !therapists.some((home) => home.id === t.therapist.id))
-      .map((t) => ({ id: t.therapist.id, name: t.therapist.name, tenantId: t.therapist.tenant.id, tenantName: t.therapist.tenant.name }))
+      .filter((t) => !activeHomeTherapists.some((home) => home.id === t.therapist.id))
+      .map((t) => ({
+        id: t.therapist.id,
+        name: t.therapist.name,
+        tenantId: t.therapist.tenant.id,
+        tenantName: t.therapist.tenant.name,
+        deactivated: therapists.find((home) => home.id === t.therapist.id)?.status === "DEACTIVATED"
+      }))
   ];
 
   return (
@@ -151,6 +210,7 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
           <label key={t.id} className="checkbox-row">
             <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggle(t.id)} /> {t.name}
             {guestLabel(t.tenantId, t.tenantName)}
+            {t.deactivated ? " — deactivated" : null}
           </label>
         ))}
         {pickerOptions.length === 0 ? <p className="empty-state">No therapists to assign yet.</p> : null}

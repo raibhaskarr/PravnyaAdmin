@@ -170,12 +170,15 @@ export type CanonicalSkillItem = {
 
 export type CanonicalSkillDetail = CanonicalSkill & { items: CanonicalSkillItem[] };
 
+export type TherapistStatus = "ACTIVE" | "DEACTIVATED";
+
 export type Therapist = {
   id: string;
   tenantId: string;
   name: string;
   phone: string | null;
   disciplineIds: string[];
+  status: TherapistStatus;
   user: { email: string; name: string };
   tenant?: { id: string; name: string };
 };

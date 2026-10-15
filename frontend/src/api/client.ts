@@ -185,6 +185,15 @@ export const api = {
   listTherapists(token: string) {
     return request<Therapist[]>("/therapists", { token });
   },
+  getTherapist(token: string, therapistId: string) {
+    return request<Therapist>(`/therapists/${therapistId}`, { token });
+  },
+  updateTherapist(token: string, therapistId: string, input: { name?: string; phone?: string; disciplineIds?: string[]; status?: "ACTIVE" | "DEACTIVATED" }) {
+    return request<Therapist>(`/therapists/${therapistId}`, { token, method: "PATCH", body: input });
+  },
+  setTherapistKids(token: string, therapistId: string, kidIds: string[]) {
+    return request<void>(`/therapists/${therapistId}/kids`, { token, method: "PATCH", body: { kidIds } });
+  },
 
   // Therapist invitations
   listTherapistInvitations(token: string) {
