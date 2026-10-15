@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { Button } from "primereact/button";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 
@@ -81,9 +82,7 @@ export function AccountPage() {
           {error ? <p className="error-text">{error}</p> : null}
           {saved ? <p className="hint-text">Password changed.</p> : null}
 
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? "Saving..." : "Change password"}
-          </button>
+          <Button label={saving ? "Saving..." : "Change password"} className="p-button-sm" type="submit" disabled={saving} />
         </form>
       </div>
     </div>

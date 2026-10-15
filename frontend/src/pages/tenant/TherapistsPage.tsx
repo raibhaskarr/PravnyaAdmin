@@ -1,4 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
+import { Button } from "primereact/button";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { TenantDiscipline, Therapist, TherapistInvitation } from "../../api/types";
@@ -127,57 +130,25 @@ export function TherapistsPage() {
 
       {error ? <p className="error-text">{error}</p> : null}
 
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Disciplines</th>
-            </tr>
-          </thead>
-          <tbody>
-            {therapists.map((t) => (
-              <tr key={t.id}>
-                <td>{t.name}</td>
-                <td>{t.user.email}</td>
-                <td>{t.phone ?? "—"}</td>
-                <td>{t.disciplineIds.map(disciplineName).join(", ") || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {therapists.length === 0 ? <p className="empty-state">No therapists yet.</p> : null}
-      </div>
+      <DataTable value={therapists} emptyMessage="No therapists yet." sortMode="multiple" removableSort stripedRows size="small">
+        <Column field="name" header="Name" sortable />
+        <Column field="user.email" header="Email" sortable body={(t: Therapist) => t.user.email} />
+        <Column field="phone" header="Phone" body={(t: Therapist) => t.phone ?? "—"} />
+        <Column header="Disciplines" body={(t: Therapist) => t.disciplineIds.map(disciplineName).join(", ") || "—"} />
+      </DataTable>
 
       {canEdit && pendingInvitations.length > 0 ? (
         <>
           <h2 style={{ marginTop: "1.5rem" }}>Pending invitations</h2>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingInvitations.map((inv) => (
-                  <tr key={inv.id}>
-                    <td>{inv.email}</td>
-                    <td>{STATUS_LABEL[inv.status]}</td>
-                    <td>
-                      <button type="button" className="btn btn-secondary" onClick={() => handleRevoke(inv.id)} style={{ padding: "0.15rem 0.6rem", fontSize: "0.8rem" }}>
-                        Revoke
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable value={pendingInvitations} size="small" stripedRows>
+            <Column field="email" header="Email" />
+            <Column header="Status" body={(inv: TherapistInvitation) => STATUS_LABEL[inv.status]} />
+            <Column
+              body={(inv: TherapistInvitation) => (
+                <Button label="Revoke" className="p-button-sm p-button-outlined p-button-danger" onClick={() => handleRevoke(inv.id)} />
+              )}
+            />
+          </DataTable>
         </>
       ) : null}
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { TabView, TabPanel } from "primereact/tabview";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import type { Kid } from "../../api/types";
@@ -7,13 +8,10 @@ import { KidGoalsTab } from "./KidGoalsTab";
 import { KidGrowthTab } from "./KidGrowthTab";
 import { KidSupportTeamTab } from "./KidSupportTeamTab";
 
-type Tab = "goals" | "growth" | "team";
-
 export function KidDetailPage() {
   const { kidId } = useParams<{ kidId: string }>();
   const { token, user } = useAuth();
   const [kid, setKid] = useState<Kid | null>(null);
-  const [tab, setTab] = useState<Tab>("goals");
   const canEdit = user?.role !== "VIEWER";
   // Inviting or reassigning a kid's support team is a Tenant Admin call, not a therapist's --
   // even a therapist already assigned to this kid can't bring on another therapist for it.
@@ -40,21 +38,17 @@ export function KidDetailPage() {
         {kidLabel} <span className="hint-text" style={{ fontWeight: 400, fontSize: "0.9rem" }}>{kid.status}</span>
       </h1>
 
-      <div className="page-toolbar" style={{ marginBottom: "1.25rem" }}>
-        <button type="button" className={`btn ${tab === "goals" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("goals")}>
-          Goals
-        </button>
-        <button type="button" className={`btn ${tab === "growth" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("growth")}>
-          Growth
-        </button>
-        <button type="button" className={`btn ${tab === "team" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("team")}>
-          Support Team
-        </button>
-      </div>
-
-      {tab === "goals" ? <KidGoalsTab kidId={kid.id} canEdit={canEdit} /> : null}
-      {tab === "growth" ? <KidGrowthTab kidId={kid.id} kidLabel={kidLabel} /> : null}
-      {tab === "team" ? <KidSupportTeamTab kid={kid} canEdit={canManageTeam} onUpdated={load} /> : null}
+      <TabView renderActiveOnly>
+        <TabPanel header="Goals">
+          <KidGoalsTab kidId={kid.id} canEdit={canEdit} />
+        </TabPanel>
+        <TabPanel header="Growth">
+          <KidGrowthTab kidId={kid.id} kidLabel={kidLabel} />
+        </TabPanel>
+        <TabPanel header="Support Team">
+          <KidSupportTeamTab kid={kid} canEdit={canManageTeam} onUpdated={load} />
+        </TabPanel>
+      </TabView>
     </div>
   );
 }

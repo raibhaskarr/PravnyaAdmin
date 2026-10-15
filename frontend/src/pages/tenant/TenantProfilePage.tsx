@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+import { TabView, TabPanel } from "primereact/tabview";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
+import { Button } from "primereact/button";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { AuditLogEntry, Tenant, TenantHealth } from "../../api/types";
@@ -31,8 +35,19 @@ function auditLabel(entry: AuditLogEntry): string {
   return label;
 }
 
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: "0.6rem" }}>
+      <span className="field-label">{label}</span>
+      <p style={{ margin: "0.1rem 0 0" }}>{value ?? <span className="hint-text">—</span>}</p>
+    </div>
+  );
+}
+
 /** Self-service business profile for a tenant admin -- same fields as the superadmin's
- * TenantDetailPage, minus KYC editing (that's a Pravnya-side decision, shown read-only here). */
+ * TenantDetailPage, minus KYC editing (that's a Pravnya-side decision, shown read-only here), and
+ * the business profile form here stays always-editable rather than behind an Edit toggle -- it's
+ * the admin's own tenant, not someone else's record being reviewed. */
 export function TenantProfilePage() {
   const { token } = useAuth();
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -78,70 +93,44 @@ export function TenantProfilePage() {
 
   return (
     <div>
-      <h1>Business profile</h1>
-      <p className="hint-text" style={{ marginBottom: "1.25rem" }}>
-        Tell us more about {tenant.name} -- this helps us verify your account and shows up wherever your profile is displayed.
-      </p>
+      <h1>{tenant.name}</h1>
 
-      <fieldset className="form-group" style={{ maxWidth: 820, marginBottom: "1.25rem" }}>
-        <legend>Centre health</legend>
-        {health ? (
-          <div className="field-grid">
-            <div>
-              <span className="field-label">Kids</span>
-              <p style={{ margin: "0.1rem 0 0" }}>{health.totalKids}</p>
-            </div>
-            <div>
-              <span className="field-label">No goals yet</span>
-              <p style={{ margin: "0.1rem 0 0" }}>{health.kidsWithNoGoals}</p>
-            </div>
-            <div>
-              <span className="field-label">No activity in 30 days</span>
-              <p style={{ margin: "0.1rem 0 0" }}>{health.kidsWithNoRecentActivity}</p>
-            </div>
+      <TabView>
+        <TabPanel header="Overview">
+          <div className="form-panel" style={{ maxWidth: 480 }}>
+            <Field label="Kids" value={health?.totalKids} />
+            <Field label="No goals yet" value={health?.kidsWithNoGoals} />
+            <Field label="No activity in 30 days" value={health?.kidsWithNoRecentActivity} />
           </div>
-        ) : (
-          <p className="hint-text">Loading...</p>
-        )}
-      </fieldset>
+        </TabPanel>
 
-      <div className="form-panel" style={{ maxWidth: 820 }}>
-        <TenantBusinessFieldsSection form={form} onChange={set} />
+        <TabPanel header="Business Profile">
+          <p className="hint-text" style={{ marginBottom: "1.25rem" }}>
+            Tell us more about {tenant.name} -- this helps us verify your account and shows up wherever your profile is displayed.
+          </p>
+          <div className="form-panel" style={{ maxWidth: 820 }}>
+            <TenantBusinessFieldsSection form={form} onChange={set} />
 
-        <fieldset className="form-group">
-          <legend>KYC</legend>
-          <p>{KYC_LABEL[tenant.kycStatus]}</p>
-          {tenant.kycNotes ? <p className="hint-text">{tenant.kycNotes}</p> : null}
-        </fieldset>
+            <fieldset className="form-group">
+              <legend>KYC</legend>
+              <p>{KYC_LABEL[tenant.kycStatus]}</p>
+              {tenant.kycNotes ? <p className="hint-text">{tenant.kycNotes}</p> : null}
+            </fieldset>
 
-        {error ? <p className="error-text">{error}</p> : null}
-        {saved ? <p className="hint-text">Saved.</p> : null}
+            {error ? <p className="error-text">{error}</p> : null}
+            {saved ? <p className="hint-text">Saved.</p> : null}
 
-        <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save"}
-        </button>
-      </div>
+            <Button label={saving ? "Saving..." : "Save"} className="p-button-sm" onClick={handleSave} disabled={saving} />
+          </div>
+        </TabPanel>
 
-      <h2 style={{ marginTop: "1.5rem" }}>Activity</h2>
-      <div className="table-wrap" style={{ maxWidth: 820 }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Change</th>
-            </tr>
-          </thead>
-          <tbody>
-            {auditLog.map((entry) => (
-              <tr key={entry.id}>
-                <td>{new Date(entry.createdAt).toLocaleString()}</td>
-                <td>{auditLabel(entry)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {auditLog.length === 0 ? <p className="empty-state">No activity recorded yet.</p> : null}
-      </div>
+        <TabPanel header="Activity">
+          <DataTable value={auditLog} emptyMessage="No activity recorded yet." size="small" stripedRows>
+            <Column header="When" body={(entry: AuditLogEntry) => new Date(entry.createdAt).toLocaleString()} />
+            <Column header="Change" body={auditLabel} />
+          </DataTable>
+        </TabPanel>
+      </TabView>
     </div>
   );
 }

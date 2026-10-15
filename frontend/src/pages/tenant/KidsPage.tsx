@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, Therapist } from "../../api/types";
@@ -79,29 +81,20 @@ export function KidsPage() {
 
       {error ? <p className="error-text">{error}</p> : null}
 
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Therapists</th>
-            </tr>
-          </thead>
-          <tbody>
-            {kids.map((k) => (
-              <tr key={k.id} onClick={() => navigate(`/tenant/kids/${k.id}`)} style={{ cursor: "pointer" }}>
-                <td>
-                  {k.firstName} {k.lastName}
-                </td>
-                <td>{k.status}</td>
-                <td>{k.therapists.map((t) => t.therapist.name).join(", ") || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {kids.length === 0 ? <p className="empty-state">No kids visible to your account yet.</p> : null}
-      </div>
+      <DataTable
+        value={kids}
+        emptyMessage="No kids visible to your account yet."
+        sortMode="multiple"
+        removableSort
+        stripedRows
+        size="small"
+        onRowClick={(e) => navigate(`/tenant/kids/${(e.data as Kid).id}`)}
+        rowClassName={() => "clickable-row"}
+      >
+        <Column header="Name" sortable sortField="firstName" body={(k: Kid) => `${k.firstName} ${k.lastName}`} />
+        <Column field="status" header="Status" sortable />
+        <Column header="Therapists" body={(k: Kid) => k.therapists.map((t) => t.therapist.name).join(", ") || "—"} />
+      </DataTable>
     </div>
   );
 }

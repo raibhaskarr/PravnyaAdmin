@@ -5,32 +5,54 @@ import { Button } from "primereact/button";
 import { Avatar } from "primereact/avatar";
 import { BreadCrumb } from "primereact/breadcrumb";
 import { useAuth } from "../context/AuthContext";
+import type { AuthUser } from "../api/types";
 import "../adminLayout.css";
 
-// /manual is a shared, cross-role page -- RoleAwareLayout (see main.tsx) picks this layout for it
-// specifically when the current user is a superadmin, so it's safe to link to here without a
-// jarring layout swap on click, even though the route itself isn't nested under the
-// superadmin-only route block the rest of this nav lives in.
-const NAV_ITEMS = [
-  { to: "/admin/tenants", label: "Tenants", icon: "pi pi-building" },
-  { to: "/admin/taxonomy", label: "Taxonomy", icon: "pi pi-sitemap" },
-  { to: "/admin/poc-review", label: "AI Tagging POC", icon: "pi pi-chart-line" },
-  { to: "/admin/superadmins", label: "Superadmins", icon: "pi pi-shield" },
-  { to: "/manual", label: "Manual", icon: "pi pi-book" }
-];
+type NavItem = { to: string; label: string; icon: string };
 
-/** Pilot of PrimeReact for the superadmin section only -- see docs/manual/03-business-logic.md
- * for why this is scoped here rather than replacing Layout.tsx everywhere at once. Tenant-scoped
- * pages keep using the existing hand-rolled Layout/CSS unchanged. */
+const ROLE_LABEL: Record<AuthUser["role"], string> = {
+  SUPERADMIN: "Superadmin",
+  TENANT_ADMIN: "Tenant Admin",
+  THERAPIST: "Therapist",
+  VIEWER: "Viewer"
+};
+
+// Single shared sidebar for every role -- nav items and the account-settings target both depend
+// on who's logged in, everything else (shell, breadcrumb, logout) is identical.
+function navItemsForRole(role: AuthUser["role"]): NavItem[] {
+  if (role === "SUPERADMIN") {
+    return [
+      { to: "/admin/tenants", label: "Tenants", icon: "pi pi-building" },
+      { to: "/admin/taxonomy", label: "Taxonomy", icon: "pi pi-sitemap" },
+      { to: "/admin/poc-review", label: "AI Tagging POC", icon: "pi pi-chart-line" },
+      { to: "/admin/superadmins", label: "Superadmins", icon: "pi pi-shield" },
+      { to: "/manual", label: "Manual", icon: "pi pi-book" }
+    ];
+  }
+  return [
+    ...(role !== "VIEWER" ? [{ to: "/tenant/log", label: "Log a session", icon: "pi pi-pencil" }] : []),
+    { to: "/tenant/disciplines", label: "Disciplines", icon: "pi pi-sitemap" },
+    { to: "/tenant/therapists", label: "Therapists", icon: "pi pi-users" },
+    { to: "/tenant/kids", label: "Kids", icon: "pi pi-id-card" },
+    ...(role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile", icon: "pi pi-briefcase" }] : []),
+    { to: "/manual", label: "Manual", icon: "pi pi-book" }
+  ];
+}
+
+function accountPathForRole(role: AuthUser["role"]): string {
+  return role === "SUPERADMIN" ? "/admin/account" : "/tenant/account";
+}
+
 export function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   if (!user) return null;
 
-  const activeItem = NAV_ITEMS.find((item) => location.pathname.startsWith(item.to));
+  const navItems = navItemsForRole(user.role);
+  const activeItem = navItems.find((item) => location.pathname.startsWith(item.to));
 
-  const menuItems: MenuItem[] = NAV_ITEMS.map((item) => ({
+  const menuItems: MenuItem[] = navItems.map((item) => ({
     label: item.label,
     icon: item.icon,
     className: item === activeItem ? "admin-nav-active" : undefined,
@@ -43,14 +65,14 @@ export function AdminLayout() {
         <button
           type="button"
           className="admin-sidebar-brand"
-          onClick={() => navigate("/admin/account")}
+          onClick={() => navigate(accountPathForRole(user.role))}
           title="Account settings"
           style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", width: "100%" }}
         >
           <Avatar label={user.name.charAt(0).toUpperCase()} shape="circle" style={{ backgroundColor: "#6366f1", color: "#ffffff" }} />
           <div>
             <p className="admin-sidebar-name">{user.name}</p>
-            <p className="admin-sidebar-role">Superadmin</p>
+            <p className="admin-sidebar-role">{ROLE_LABEL[user.role]}</p>
           </div>
         </button>
         <Menu model={menuItems} className="admin-nav" />
@@ -60,7 +82,7 @@ export function AdminLayout() {
         {activeItem ? (
           <BreadCrumb
             model={[{ label: activeItem.label }]}
-            home={{ icon: "pi pi-home", command: () => navigate("/admin/tenants") }}
+            home={{ icon: "pi pi-home", command: () => navigate(navItems[0].to) }}
             className="admin-breadcrumb"
           />
         ) : null}

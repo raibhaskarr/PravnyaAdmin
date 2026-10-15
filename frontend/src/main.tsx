@@ -3,9 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { Layout } from "./components/Layout";
 import { AdminLayout } from "./components/AdminLayout";
-import { RoleAwareLayout } from "./components/RoleAwareLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { AcceptTenantInvitePage } from "./pages/AcceptTenantInvitePage";
@@ -48,13 +46,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </Route>
 
           <Route element={<ProtectedRoute allow={["TENANT_ADMIN"]} />}>
-            <Route element={<Layout />}>
+            <Route element={<AdminLayout />}>
               <Route path="/tenant/profile" element={<TenantProfilePage />} />
             </Route>
           </Route>
 
           <Route element={<ProtectedRoute allow={["TENANT_ADMIN", "THERAPIST", "VIEWER"]} />}>
-            <Route element={<Layout />}>
+            <Route element={<AdminLayout />}>
               <Route path="/tenant/disciplines" element={<DisciplinesPage />} />
               <Route path="/tenant/therapists" element={<TherapistsPage />} />
               <Route path="/tenant/log" element={<LogSessionPage />} />
@@ -65,7 +63,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </Route>
 
           <Route element={<ProtectedRoute />}>
-            <Route element={<RoleAwareLayout />}>
+            <Route element={<AdminLayout />}>
               <Route path="/manual" element={<ManualPage />} />
             </Route>
           </Route>

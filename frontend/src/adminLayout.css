@@ -107,3 +107,7 @@
   border: none;
   padding: 0 0 1.25rem;
 }
+
+.clickable-row {
+  cursor: pointer;
+}
