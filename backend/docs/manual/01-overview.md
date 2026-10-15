@@ -6,9 +6,10 @@ layers:
 - **Superadmin** (platform level, no tenant) — manages `Tenant` records (therapy centres) and the
   canonical clinical taxonomy: the shared library of Domains, Skills, and Items that every
   tenant's goals are built from.
-- **Tenant** (a therapy centre) — manages its own offered Disciplines, Therapists, Kids, and
-  Goals. Three roles inside a tenant: **Tenant Admin** (full control), **Therapist** (sees and
-  manages only their own assigned kids), **Viewer** (read-only).
+- **Tenant** (a therapy centre, or Pravnix's own account for directly-onboarded retail families)
+  — manages its own offered Disciplines, Therapists, Kids, and Goals. Three roles inside a tenant:
+  **Tenant Admin** (full control), **Therapist** (sees and manages only their own assigned kids,
+  including as a guest on another tenant's kid), **Viewer** (read-only).
 
 ## Why a shared taxonomy
 

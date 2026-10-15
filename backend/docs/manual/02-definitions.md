@@ -34,22 +34,49 @@ Goal can pick any modality.
 
 ## Tenant-scoped (per centre)
 
-**Tenant** — a therapy centre. All tenant-scoped data (`Kid`, `Therapist`, `Goal`, etc.) carries a
-`tenantId` directly, so no centre can ever see another's data.
+**Tenant** — an organization with its own login access and billing relationship with the
+platform: a therapy centre (B2B), or Pravnix's own account, which every directly-onboarded retail
+family's `Kid` belongs to (B2C) — see `03-business-logic.md`'s "Tenant vs. Centre" section for why
+these are kept distinct rather than treating every centre a kid mentions as a tenant. All
+tenant-scoped data (`Kid`, `Therapist`, `Goal`, etc.) carries a `tenantId` directly, and every
+tenant-scoped query is filtered by it — *implicit* cross-tenant access is never possible. Explicit
+cross-tenant access (a kid's support team deliberately including a therapist from another tenant)
+is a separate, intentional mechanism — see **Cross-tenant support team** below, not a leak of the
+isolation above.
 
 **Tenant Discipline** — which of the platform's disciplines a specific tenant actually offers
 (e.g. a pure-SLP centre wouldn't enable OT). Controls which disciplines show up when that tenant
 creates therapists and goals.
 
 **Therapist** — a person at a tenant who practices one or more of that tenant's enabled
-disciplines, and is assigned to specific kids.
+disciplines. Assigned to specific kids at their own tenant by default, but can also be added as a
+guest to a kid at a *different* tenant — see **Cross-tenant support team** below.
 
-**Kid** — a child at a tenant. Visible to Tenant Admins and Viewers tenant-wide; visible to a
-Therapist only for kids they're explicitly assigned to.
+**Kid** — a child whose account belongs to one tenant (`tenantId`) — either a centre they
+onboarded through (B2B) or Pravnix's own account for a directly-onboarded retail family (B2C).
+Visible to that tenant's Admins and Viewers tenant-wide; visible to a Therapist only for kids they
+are explicitly assigned to, whether at their own tenant or as a cross-tenant guest.
+
+**Cross-tenant support team** — a kid's `tenantId` only determines whose account they belong to,
+not which therapists can work with them: `KidTherapist` can link a kid to a therapist from *any*
+tenant, not just their own (e.g. a kid onboarded on a retail account bringing in a therapist from
+a centre they separately attend). Deliberately free and unlimited today, independent of either
+side's subscription — see `03-business-logic.md` for the billing question this raises and why it's
+intentionally deferred rather than solved now.
+
+**Centre** (`Goal.centreName` / `GoalItemEvidence.centreName`) — free text naming which
+clinic/organization a goal or logged session actually came from. Deliberately *not* a reference to
+`Tenant` — the centre a document or session came from doesn't need to be a registered tenant at
+all (e.g. a clinic that's never signed up), and even when it happens to share a name with a real
+tenant, that's coincidental, not a link. See `03-business-logic.md` for why this stayed free text
+instead of becoming its own entity.
 
 **Goal** — a specific clinical target for one kid: which Canonical Skill, which Discipline, which
 Modality, plus the therapist's own free-text title (the actual wording they'd use, e.g. copied
-from an IEP) and status (Active / Achieved / Discontinued).
+from an IEP), status (Active / Achieved / Discontinued), and which Centre it came from (above).
+When an AI-assisted flow (IEP upload, or "Suggest skill from title") produced the goal, it also
+carries that model's `confidence` (0–1) and `rationale` (its own explanation, or the source
+document excerpt) — both null for a goal entered by hand with no AI involved.
 
 **Goal Item** — the concrete, per-kid content a goal is actually practiced with. Two things can
 live on one row: a link to a shared Canonical Skill Item (e.g. the "Where" question type), and/or
@@ -63,5 +90,5 @@ for why this is split into two fields instead of one.
 |---|---|---|
 | Superadmin | Platform-wide, no tenant | Manage tenants; manage the canonical taxonomy |
 | Tenant Admin | One tenant | Everything within that tenant: disciplines offered, therapists, kids, goals |
-| Therapist | One tenant, scoped to assigned kids | View/manage goals only for kids they're assigned to |
+| Therapist | One tenant, scoped to assigned kids | View/manage goals only for kids they're assigned to — including as a cross-tenant guest on a kid belonging to a different tenant |
 | Viewer | One tenant, tenant-wide | Read everything in the tenant; cannot create or edit anything |
