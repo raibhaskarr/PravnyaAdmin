@@ -210,7 +210,9 @@ export type Kid = {
   lastName: string;
   dob: string | null;
   status: "ACTIVE" | "ARCHIVED";
-  therapists: { therapist: { id: string; name: string; tenant: { id: string; name: string } } }[];
+  therapists: {
+    therapist: { id: string; name: string; disciplineIds: string[]; status: TherapistStatus; tenant: { id: string; name: string } };
+  }[];
 };
 
 export type Modality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL";

@@ -7,9 +7,13 @@ import { CreateKidInput, UpdateKidInput } from "./kids.schemas";
 
 // Shared across list/get -- includes each assigned therapist's own tenant so the frontend can
 // label a cross-tenant ("guest") therapist, since a kid's support team is no longer guaranteed to
-// all share the kid's own tenant. See kidAccess.ts.
+// all share the kid's own tenant, plus disciplineIds/status so the support team table can render
+// a discipline and an active/deactivated role without a second lookup against the home roster
+// (which wouldn't even cover a cross-tenant guest). See kidAccess.ts.
 const therapistsInclude = {
-  therapists: { include: { therapist: { select: { id: true, name: true, tenant: { select: { id: true, name: true } } } } } }
+  therapists: {
+    include: { therapist: { select: { id: true, name: true, disciplineIds: true, status: true, tenant: { select: { id: true, name: true } } } } }
+  }
 };
 
 export const kidsService = {

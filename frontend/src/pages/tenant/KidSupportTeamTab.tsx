@@ -1,33 +1,54 @@
 import { FormEvent, useEffect, useState } from "react";
+import { TabView, TabPanel } from "primereact/tabview";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
+import { Button } from "primereact/button";
+import { Tag } from "primereact/tag";
 import { AutoComplete } from "primereact/autocomplete";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, TenantDiscipline, Therapist, TherapistInvitation } from "../../api/types";
+
+type AssignedTherapist = Kid["therapists"][number]["therapist"];
 
 export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEdit: boolean; onUpdated: () => void }) {
   const { token } = useAuth();
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [disciplines, setDisciplines] = useState<TenantDiscipline[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<TherapistInvitation[]>([]);
-  const [editing, setEditing] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [addOpen, setAddOpen] = useState(false);
   const [error, setError] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [nameSearch, setNameSearch] = useState("");
   const [nameSuggestions, setNameSuggestions] = useState<Therapist[]>([]);
   const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
-  // Active home-tenant roster -- used both by the "search by name" quick-add below and by the
-  // edit-mode checkbox picker further down, so it's computed once up top.
-  const activeHomeTherapists = therapists.filter((t) => t.status === "ACTIVE");
   const assignedTherapistIds = new Set(kid.therapists.map((t) => t.therapist.id));
+  const activeHomeTherapists = therapists.filter((t) => t.status === "ACTIVE" && !assignedTherapistIds.has(t.id));
+
+  function loadInvitations() {
+    api.listTherapistInvitations(token!).then((rows) => setPendingInvitations(rows.filter((inv) => inv.status === "PENDING" && inv.kid?.id === kid.id)));
+  }
+
+  useEffect(() => {
+    api.listTherapists(token!).then(setTherapists);
+    api.listTenantDisciplines(token!).then(setDisciplines);
+    loadInvitations();
+  }, [token, kid.id]);
+
+  const disciplineName = (id: string) => disciplines.find((d) => d.id === id)?.name ?? id;
+
+  function roleLabel(t: AssignedTherapist): { text: string; severity: "success" | "warning" | "info" } {
+    const guest = t.tenant.id !== kid.tenantId;
+    if (t.status === "DEACTIVATED") return { text: guest ? `Guest, ${t.tenant.name} — deactivated` : "Deactivated", severity: "warning" };
+    return guest ? { text: `Guest, ${t.tenant.name}`, severity: "info" } : { text: "Home", severity: "success" };
+  }
 
   function searchByName(query: string) {
     const needle = query.trim().toLowerCase();
-    setNameSuggestions(
-      needle ? activeHomeTherapists.filter((t) => !assignedTherapistIds.has(t.id) && t.name.toLowerCase().includes(needle)) : []
-    );
+    setNameSuggestions(needle ? activeHomeTherapists.filter((t) => t.name.toLowerCase().includes(needle)) : []);
   }
 
   async function handleAddExisting(therapist: Therapist) {
@@ -44,15 +65,18 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
     }
   }
 
-  function loadInvitations() {
-    api.listTherapistInvitations(token!).then((rows) => setPendingInvitations(rows.filter((inv) => inv.status === "PENDING" && inv.kid?.id === kid.id)));
+  async function handleRemove(therapistId: string) {
+    setError("");
+    setRemovingId(therapistId);
+    try {
+      await api.updateKid(token!, kid.id, { therapistIds: [...assignedTherapistIds].filter((id) => id !== therapistId) });
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to remove therapist");
+    } finally {
+      setRemovingId(null);
+    }
   }
-
-  useEffect(() => {
-    api.listTherapists(token!).then(setTherapists);
-    api.listTenantDisciplines(token!).then(setDisciplines);
-    loadInvitations();
-  }, [token, kid.id]);
 
   async function handleRevokeInvitation(invitationId: string) {
     setError("");
@@ -90,192 +114,109 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
     }
   }
 
-  function startEditing() {
-    setSelectedIds(new Set(kid.therapists.map((t) => t.therapist.id)));
-    setEditing(true);
-  }
-
-  function guestLabel(therapistTenantId: string, therapistTenantName: string) {
-    return therapistTenantId === kid.tenantId ? null : ` — guest, ${therapistTenantName}`;
-  }
-
-  function toggle(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  async function save() {
-    setError("");
-    try {
-      await api.updateKid(token!, kid.id, { therapistIds: [...selectedIds] });
-      setEditing(false);
-      onUpdated();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to update support team");
-    }
-  }
-
-  if (!editing) {
-    return (
-      <div>
-        {canEdit ? (
-          <div className="page-toolbar">
-            <button type="button" className="btn btn-secondary" onClick={startEditing}>
-              Edit support team
-            </button>
-          </div>
-        ) : null}
-
-        {canEdit ? (
-          <div className="form-panel" style={{ maxWidth: 420, marginBottom: "1rem" }}>
-            <label className="field">
-              <span className="field-label">Add an existing therapist</span>
-              <AutoComplete
-                value={nameSearch}
-                suggestions={nameSuggestions}
-                completeMethod={(e) => searchByName(e.query)}
-                field="name"
-                placeholder="Search by name..."
-                disabled={adding}
-                onChange={(e) => setNameSearch(typeof e.value === "string" ? e.value : e.value?.name ?? "")}
-                onSelect={(e) => handleAddExisting(e.value as Therapist)}
-                inputClassName="input"
-                style={{ width: "100%" }}
-              />
-            </label>
-            <p className="hint-text" style={{ marginTop: "0.2rem" }}>
-              Only matches therapists already on this tenant's roster. For someone not listed, invite them by email below.
-            </p>
-          </div>
-        ) : null}
-
-        {canEdit ? (
-          <form onSubmit={handleInviteByEmail} className="form-panel" style={{ maxWidth: 420, marginBottom: "1rem" }}>
-            <label className="field">
-              <span className="field-label">Add by email</span>
-              <input className="input" name="email" type="email" required placeholder="therapist@example.com" />
-            </label>
-            <fieldset className="form-group">
-              <legend>Disciplines (if inviting someone new)</legend>
-              {disciplines
-                .filter((d) => d.enabled)
-                .map((d) => (
-                  <label key={d.id} className="checkbox-row">
-                    <input type="checkbox" name={`discipline_${d.id}`} /> {d.name}
-                  </label>
-                ))}
-            </fieldset>
-            <button type="submit" className="btn btn-primary" disabled={inviting}>
-              {inviting ? "Adding..." : "Add"}
-            </button>
-            <p className="hint-text" style={{ marginTop: "0.4rem" }}>
-              If this email already belongs to a therapist here, they're added right away (disciplines above are ignored). Otherwise they'll get an invite to set up their account with these disciplines.
-            </p>
-          </form>
-        ) : null}
-        {inviteNotice ? <p className="hint-text">{inviteNotice}</p> : null}
-        {error ? <p className="error-text">{error}</p> : null}
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Therapist</th>
-              </tr>
-            </thead>
-            <tbody>
-              {kid.therapists.map((t) => (
-                <tr key={t.therapist.id}>
-                  <td>
-                    {t.therapist.name}
-                    {guestLabel(t.therapist.tenant.id, t.therapist.tenant.name)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {kid.therapists.length === 0 ? <p className="empty-state">No therapists assigned yet.</p> : null}
-        </div>
-
-        {canEdit && pendingInvitations.length > 0 ? (
-          <>
-            <h3 style={{ marginTop: "1rem" }}>Pending invitations</h3>
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Email</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingInvitations.map((inv) => (
-                    <tr key={inv.id}>
-                      <td>{inv.email}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => handleRevokeInvitation(inv.id)}
-                          style={{ padding: "0.15rem 0.6rem", fontSize: "0.8rem" }}
-                        >
-                          Revoke
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : null}
-      </div>
-    );
-  }
-
-  // Union of the home-tenant ACTIVE roster (for adding someone new) and the kid's
-  // currently-linked therapists (which may include guests from another tenant, via the "Add by
-  // email" flow, or a now-deactivated home therapist this kid was already assigned before they
-  // were deactivated) -- otherwise an already-linked therapist has no checkbox at all and becomes
-  // unmanageable here. Deactivated home therapists are excluded only from being newly *added*.
-  const pickerOptions = [
-    ...activeHomeTherapists.map((t) => ({ id: t.id, name: t.name, tenantId: t.tenantId, tenantName: t.tenant?.name ?? "", deactivated: false })),
-    ...kid.therapists
-      .filter((t) => !activeHomeTherapists.some((home) => home.id === t.therapist.id))
-      .map((t) => ({
-        id: t.therapist.id,
-        name: t.therapist.name,
-        tenantId: t.therapist.tenant.id,
-        tenantName: t.therapist.tenant.name,
-        deactivated: therapists.find((home) => home.id === t.therapist.id)?.status === "DEACTIVATED"
-      }))
-  ];
-
   return (
-    <div className="form-panel" style={{ maxWidth: 480 }}>
-      <fieldset className="form-group">
-        <legend>Assigned therapists</legend>
-        {pickerOptions.map((t) => (
-          <label key={t.id} className="checkbox-row">
-            <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggle(t.id)} /> {t.name}
-            {guestLabel(t.tenantId, t.tenantName)}
-            {t.deactivated ? " — deactivated" : null}
-          </label>
-        ))}
-        {pickerOptions.length === 0 ? <p className="empty-state">No therapists to assign yet.</p> : null}
-      </fieldset>
+    <div>
+      {canEdit ? (
+        <div className="page-toolbar">
+          <Button
+            label={addOpen ? "Close" : "Add therapist"}
+            icon={addOpen ? "pi pi-times" : "pi pi-plus"}
+            className="p-button-sm p-button-outlined"
+            onClick={() => setAddOpen((v) => !v)}
+          />
+        </div>
+      ) : null}
+
+      {canEdit && addOpen ? (
+        <div className="form-panel" style={{ maxWidth: 480, marginBottom: "1.25rem" }}>
+          <TabView>
+            <TabPanel header="Search roster">
+              <label className="field">
+                <span className="field-label">Add an existing therapist</span>
+                <AutoComplete
+                  value={nameSearch}
+                  suggestions={nameSuggestions}
+                  completeMethod={(e) => searchByName(e.query)}
+                  field="name"
+                  placeholder="Search by name..."
+                  disabled={adding}
+                  onChange={(e) => setNameSearch(typeof e.value === "string" ? e.value : e.value?.name ?? "")}
+                  onSelect={(e) => handleAddExisting(e.value as Therapist)}
+                  inputClassName="input"
+                  style={{ width: "100%" }}
+                />
+              </label>
+              <p className="hint-text" style={{ marginTop: "0.4rem" }}>
+                Only matches therapists already on this tenant's roster. For someone not listed, use the Invite by email tab.
+              </p>
+            </TabPanel>
+
+            <TabPanel header="Invite by email">
+              <form onSubmit={handleInviteByEmail} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <label className="field">
+                  <span className="field-label">Email</span>
+                  <input className="input" name="email" type="email" required placeholder="therapist@example.com" />
+                </label>
+                <fieldset className="form-group">
+                  <legend>Disciplines (if inviting someone new)</legend>
+                  {disciplines
+                    .filter((d) => d.enabled)
+                    .map((d) => (
+                      <label key={d.id} className="checkbox-row">
+                        <input type="checkbox" name={`discipline_${d.id}`} /> {d.name}
+                      </label>
+                    ))}
+                </fieldset>
+                <Button label={inviting ? "Adding..." : "Add"} className="p-button-sm" type="submit" disabled={inviting} />
+                <p className="hint-text">
+                  If this email already belongs to a therapist here, they're added right away (disciplines above are ignored). Otherwise they'll get an invite to set up their account with these disciplines.
+                </p>
+              </form>
+            </TabPanel>
+          </TabView>
+        </div>
+      ) : null}
+
+      {inviteNotice ? <p className="hint-text">{inviteNotice}</p> : null}
       {error ? <p className="error-text">{error}</p> : null}
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button type="button" className="btn btn-primary" onClick={save}>
-          Save
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>
-          Cancel
-        </button>
-      </div>
+
+      <DataTable value={kid.therapists} emptyMessage="No therapists assigned yet." size="small" stripedRows>
+        <Column header="Name" body={(row: Kid["therapists"][number]) => row.therapist.name} />
+        <Column header="Discipline" body={(row: Kid["therapists"][number]) => row.therapist.disciplineIds.map(disciplineName).join(", ") || "—"} />
+        <Column
+          header="Role"
+          body={(row: Kid["therapists"][number]) => {
+            const role = roleLabel(row.therapist);
+            return <Tag value={role.text} severity={role.severity} />;
+          }}
+        />
+        {canEdit ? (
+          <Column
+            body={(row: Kid["therapists"][number]) => (
+              <Button
+                label="Remove"
+                className="p-button-sm p-button-outlined p-button-danger"
+                onClick={() => handleRemove(row.therapist.id)}
+                disabled={removingId === row.therapist.id}
+              />
+            )}
+          />
+        ) : null}
+      </DataTable>
+
+      {canEdit && pendingInvitations.length > 0 ? (
+        <>
+          <h2 style={{ marginTop: "1.5rem" }}>Pending invitations</h2>
+          <DataTable value={pendingInvitations} size="small" stripedRows>
+            <Column field="email" header="Email" />
+            <Column
+              body={(inv: TherapistInvitation) => (
+                <Button label="Revoke" className="p-button-sm p-button-outlined p-button-danger" onClick={() => handleRevokeInvitation(inv.id)} />
+              )}
+            />
+          </DataTable>
+        </>
+      ) : null}
     </div>
   );
 }
