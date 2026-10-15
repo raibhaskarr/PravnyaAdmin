@@ -64,7 +64,7 @@ export function TenantProfilePage() {
         Tell us more about {tenant.name} -- this helps us verify your account and shows up wherever your profile is displayed.
       </p>
 
-      <div className="form-panel" style={{ maxWidth: 560 }}>
+      <div className="form-panel" style={{ maxWidth: 820 }}>
         <TenantBusinessFieldsSection form={form} onChange={set} />
 
         <fieldset className="form-group">

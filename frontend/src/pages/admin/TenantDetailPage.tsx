@@ -56,30 +56,38 @@ function BusinessProfileReadOnly({ form }: { form: BusinessFormState }) {
     <>
       <fieldset className="form-group">
         <legend>Lead owner</legend>
-        <Field label="Name" value={form.leadOwnerName} />
-        <Field label="Email" value={form.leadOwnerEmail} />
-        <Field label="Phone" value={form.leadOwnerPhone} />
+        <div className="field-grid">
+          <Field label="Name" value={form.leadOwnerName} />
+          <Field label="Email" value={form.leadOwnerEmail} />
+          <Field label="Phone" value={form.leadOwnerPhone} />
+        </div>
       </fieldset>
       <fieldset className="form-group">
         <legend>Address</legend>
-        <Field label="Address line 1" value={form.addressLine1} />
-        <Field label="Address line 2" value={form.addressLine2} />
-        <Field label="City" value={form.city} />
-        <Field label="State" value={form.state} />
-        <Field label="Country" value={form.country} />
-        <Field label="Pincode" value={form.pincode} />
+        <div className="field-grid">
+          <Field label="Address line 1" value={form.addressLine1} />
+          <Field label="Address line 2" value={form.addressLine2} />
+          <Field label="City" value={form.city} />
+          <Field label="State" value={form.state} />
+          <Field label="Country" value={form.country} />
+          <Field label="Pincode" value={form.pincode} />
+        </div>
       </fieldset>
       <fieldset className="form-group">
         <legend>Contact &amp; web</legend>
-        <Field label="Contact phone" value={form.phone} />
-        <LinkField label="Website" href={form.website} />
+        <div className="field-grid">
+          <Field label="Contact phone" value={form.phone} />
+          <LinkField label="Website" href={form.website} />
+        </div>
       </fieldset>
       <fieldset className="form-group">
         <legend>Social media</legend>
-        <LinkField label="Instagram" href={form.instagram} />
-        <LinkField label="Facebook" href={form.facebook} />
-        <LinkField label="LinkedIn" href={form.linkedin} />
-        <LinkField label="YouTube" href={form.youtube} />
+        <div className="field-grid">
+          <LinkField label="Instagram" href={form.instagram} />
+          <LinkField label="Facebook" href={form.facebook} />
+          <LinkField label="LinkedIn" href={form.linkedin} />
+          <LinkField label="YouTube" href={form.youtube} />
+        </div>
       </fieldset>
       <fieldset className="form-group">
         <legend>Logo</legend>
@@ -213,7 +221,7 @@ export function TenantDetailPage() {
         </TabPanel>
 
         <TabPanel header="Business Profile">
-          <div className="form-panel" style={{ maxWidth: 560 }}>
+          <div className="form-panel" style={{ maxWidth: 820 }}>
             {editingBusiness ? (
               <>
                 <TenantBusinessFieldsSection form={businessForm} onChange={setBusinessField} />

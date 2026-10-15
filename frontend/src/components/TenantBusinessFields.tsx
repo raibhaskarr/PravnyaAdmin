@@ -98,102 +98,110 @@ export function TenantBusinessFieldsSection({
     <>
       <fieldset className="form-group">
         <legend>Lead owner</legend>
-        <label className="field">
-          <span className="field-label">Name</span>
-          <input className="input" value={form.leadOwnerName} onChange={(e) => onChange("leadOwnerName", e.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field-label">Email</span>
-          <input className="input" type="email" value={form.leadOwnerEmail} onChange={(e) => onChange("leadOwnerEmail", e.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field-label">Phone</span>
-          <input className="input" value={form.leadOwnerPhone} onChange={(e) => onChange("leadOwnerPhone", e.target.value)} />
-        </label>
+        <div className="field-grid">
+          <label className="field">
+            <span className="field-label">Name</span>
+            <input className="input" value={form.leadOwnerName} onChange={(e) => onChange("leadOwnerName", e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Email</span>
+            <input className="input" type="email" value={form.leadOwnerEmail} onChange={(e) => onChange("leadOwnerEmail", e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Phone</span>
+            <input className="input" value={form.leadOwnerPhone} onChange={(e) => onChange("leadOwnerPhone", e.target.value)} />
+          </label>
+        </div>
       </fieldset>
 
       <fieldset className="form-group">
         <legend>Address</legend>
-        <label className="field">
-          <span className="field-label">Address line 1</span>
-          <input className="input" value={form.addressLine1} onChange={(e) => onChange("addressLine1", e.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field-label">Address line 2</span>
-          <input className="input" value={form.addressLine2} onChange={(e) => onChange("addressLine2", e.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field-label">City</span>
-          <input className="input" value={form.city} onChange={(e) => onChange("city", e.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field-label">State</span>
-          <input className="input" value={form.state} onChange={(e) => onChange("state", e.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field-label">Country</span>
-          <input className="input" value={form.country} onChange={(e) => onChange("country", e.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field-label">Pincode</span>
-          <input className="input" value={form.pincode} onChange={(e) => onChange("pincode", e.target.value)} />
-        </label>
+        <div className="field-grid">
+          <label className="field">
+            <span className="field-label">Address line 1</span>
+            <input className="input" value={form.addressLine1} onChange={(e) => onChange("addressLine1", e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Address line 2</span>
+            <input className="input" value={form.addressLine2} onChange={(e) => onChange("addressLine2", e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">City</span>
+            <input className="input" value={form.city} onChange={(e) => onChange("city", e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">State</span>
+            <input className="input" value={form.state} onChange={(e) => onChange("state", e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Country</span>
+            <input className="input" value={form.country} onChange={(e) => onChange("country", e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Pincode</span>
+            <input className="input" value={form.pincode} onChange={(e) => onChange("pincode", e.target.value)} />
+          </label>
+        </div>
       </fieldset>
 
       <fieldset className="form-group">
         <legend>Contact &amp; web</legend>
-        <label className="field">
-          <span className="field-label">Contact phone</span>
-          <input className="input" value={form.phone} onChange={(e) => onChange("phone", e.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field-label">Website</span>
-          <input className="input" type="url" placeholder="https://..." value={form.website} onChange={(e) => onChange("website", e.target.value)} />
-        </label>
+        <div className="field-grid">
+          <label className="field">
+            <span className="field-label">Contact phone</span>
+            <input className="input" value={form.phone} onChange={(e) => onChange("phone", e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Website</span>
+            <input className="input" type="url" placeholder="https://..." value={form.website} onChange={(e) => onChange("website", e.target.value)} />
+          </label>
+        </div>
       </fieldset>
 
       <fieldset className="form-group">
         <legend>Social media</legend>
-        <label className="field">
-          <span className="field-label">Instagram</span>
-          <input
-            className="input"
-            type="url"
-            placeholder="https://instagram.com/..."
-            value={form.instagram}
-            onChange={(e) => onChange("instagram", e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">Facebook</span>
-          <input
-            className="input"
-            type="url"
-            placeholder="https://facebook.com/..."
-            value={form.facebook}
-            onChange={(e) => onChange("facebook", e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">LinkedIn</span>
-          <input
-            className="input"
-            type="url"
-            placeholder="https://linkedin.com/..."
-            value={form.linkedin}
-            onChange={(e) => onChange("linkedin", e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">YouTube</span>
-          <input
-            className="input"
-            type="url"
-            placeholder="https://youtube.com/..."
-            value={form.youtube}
-            onChange={(e) => onChange("youtube", e.target.value)}
-          />
-        </label>
+        <div className="field-grid">
+          <label className="field">
+            <span className="field-label">Instagram</span>
+            <input
+              className="input"
+              type="url"
+              placeholder="https://instagram.com/..."
+              value={form.instagram}
+              onChange={(e) => onChange("instagram", e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">Facebook</span>
+            <input
+              className="input"
+              type="url"
+              placeholder="https://facebook.com/..."
+              value={form.facebook}
+              onChange={(e) => onChange("facebook", e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">LinkedIn</span>
+            <input
+              className="input"
+              type="url"
+              placeholder="https://linkedin.com/..."
+              value={form.linkedin}
+              onChange={(e) => onChange("linkedin", e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">YouTube</span>
+            <input
+              className="input"
+              type="url"
+              placeholder="https://youtube.com/..."
+              value={form.youtube}
+              onChange={(e) => onChange("youtube", e.target.value)}
+            />
+          </label>
+        </div>
       </fieldset>
 
       <fieldset className="form-group">
