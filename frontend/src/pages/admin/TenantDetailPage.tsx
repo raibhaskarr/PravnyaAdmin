@@ -36,6 +36,59 @@ const KYC_SEVERITY: Record<TenantKycStatus, "success" | "warning" | "danger"> = 
 
 type KycFormState = { kycStatus: TenantKycStatus; kycNotes: string };
 
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: "0.6rem" }}>
+      <span className="field-label">{label}</span>
+      <p style={{ margin: "0.1rem 0 0" }}>{value || <span className="hint-text">—</span>}</p>
+    </div>
+  );
+}
+
+function LinkField({ label, href }: { label: string; href: string }) {
+  return <Field label={label} value={href ? <a href={href} target="_blank" rel="noreferrer">{href}</a> : null} />;
+}
+
+/** Read-only view of everything TenantBusinessFieldsSection can edit -- grouped the same way, so
+ * switching between this and the edit form (Edit button) doesn't reshuffle where anything is. */
+function BusinessProfileReadOnly({ form }: { form: BusinessFormState }) {
+  return (
+    <>
+      <fieldset className="form-group">
+        <legend>Lead owner</legend>
+        <Field label="Name" value={form.leadOwnerName} />
+        <Field label="Email" value={form.leadOwnerEmail} />
+        <Field label="Phone" value={form.leadOwnerPhone} />
+      </fieldset>
+      <fieldset className="form-group">
+        <legend>Address</legend>
+        <Field label="Address line 1" value={form.addressLine1} />
+        <Field label="Address line 2" value={form.addressLine2} />
+        <Field label="City" value={form.city} />
+        <Field label="State" value={form.state} />
+        <Field label="Country" value={form.country} />
+        <Field label="Pincode" value={form.pincode} />
+      </fieldset>
+      <fieldset className="form-group">
+        <legend>Contact &amp; web</legend>
+        <Field label="Contact phone" value={form.phone} />
+        <LinkField label="Website" href={form.website} />
+      </fieldset>
+      <fieldset className="form-group">
+        <legend>Social media</legend>
+        <LinkField label="Instagram" href={form.instagram} />
+        <LinkField label="Facebook" href={form.facebook} />
+        <LinkField label="LinkedIn" href={form.linkedin} />
+        <LinkField label="YouTube" href={form.youtube} />
+      </fieldset>
+      <fieldset className="form-group">
+        <legend>Logo</legend>
+        {form.logoUrl ? <img src={form.logoUrl} alt="Tenant logo" style={{ maxHeight: 60 }} /> : <p className="hint-text">—</p>}
+      </fieldset>
+    </>
+  );
+}
+
 export function TenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const { token } = useAuth();
@@ -45,10 +98,11 @@ export function TenantDetailPage() {
   const [kycForm, setKycForm] = useState<KycFormState>({ kycStatus: "PENDING", kycNotes: "" });
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [error, setError] = useState("");
+  const [editingBusiness, setEditingBusiness] = useState(false);
+  const [editingKyc, setEditingKyc] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
   const [savingKyc, setSavingKyc] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
-  const [saved, setSaved] = useState<"business" | "kyc" | null>(null);
 
   function load() {
     if (!tenantId) return;
@@ -65,7 +119,16 @@ export function TenantDetailPage() {
 
   function setBusinessField<K extends keyof BusinessFormState>(key: K, value: BusinessFormState[K]) {
     setBusinessForm((prev) => ({ ...prev, [key]: value }));
-    setSaved(null);
+  }
+
+  function cancelEditBusiness() {
+    if (tenant) setBusinessForm(businessFieldsFromTenant(tenant));
+    setEditingBusiness(false);
+  }
+
+  function cancelEditKyc() {
+    if (tenant) setKycForm({ kycStatus: tenant.kycStatus, kycNotes: tenant.kycNotes ?? "" });
+    setEditingKyc(false);
   }
 
   async function handleSaveBusiness() {
@@ -76,7 +139,7 @@ export function TenantDetailPage() {
       const updated = await api.updateTenantProfile(token!, tenantId, businessFieldsToUpdateInput(businessForm));
       setTenant(updated);
       setBusinessForm(businessFieldsFromTenant(updated));
-      setSaved("business");
+      setEditingBusiness(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save business profile");
     } finally {
@@ -92,7 +155,7 @@ export function TenantDetailPage() {
       const updated = await api.updateTenantProfile(token!, tenantId, { kycStatus: kycForm.kycStatus, kycNotes: kycForm.kycNotes || undefined });
       setTenant(updated);
       setKycForm({ kycStatus: updated.kycStatus, kycNotes: updated.kycNotes ?? "" });
-      setSaved("kyc");
+      setEditingKyc(false);
       api.listTenantAuditLog(token!, tenantId).then(setAuditLog);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save KYC status");
@@ -133,22 +196,12 @@ export function TenantDetailPage() {
       <TabView>
         <TabPanel header="Overview">
           <div className="form-panel" style={{ maxWidth: 480 }}>
-            <dl style={{ margin: 0 }}>
-              <div style={{ marginBottom: "0.6rem" }}>
-                <span className="field-label">Slug</span>
-                <p style={{ margin: "0.1rem 0 0" }}>{tenant.slug}</p>
-              </div>
-              <div style={{ marginBottom: "0.6rem" }}>
-                <span className="field-label">Created</span>
-                <p style={{ margin: "0.1rem 0 0" }}>{new Date(tenant.createdAt).toLocaleString()}</p>
-              </div>
-              <div style={{ marginBottom: "0.6rem" }}>
-                <span className="field-label">Kids / no goals / no activity (30d+)</span>
-                <p style={{ margin: "0.1rem 0 0" }}>
-                  {health ? `${health.totalKids} / ${health.kidsWithNoGoals} / ${health.kidsWithNoRecentActivity}` : "—"}
-                </p>
-              </div>
-            </dl>
+            <Field label="Slug" value={tenant.slug} />
+            <Field label="Created" value={new Date(tenant.createdAt).toLocaleString()} />
+            <Field
+              label="Kids / no goals / no activity (30d+)"
+              value={health ? `${health.totalKids} / ${health.kidsWithNoGoals} / ${health.kidsWithNoRecentActivity}` : null}
+            />
             <Button
               label={tenant.status === "ACTIVE" ? "Suspend tenant" : "Reactivate tenant"}
               className={`p-button-sm p-button-outlined ${tenant.status === "ACTIVE" ? "p-button-danger" : ""}`}
@@ -161,42 +214,72 @@ export function TenantDetailPage() {
 
         <TabPanel header="Business Profile">
           <div className="form-panel" style={{ maxWidth: 560 }}>
-            <TenantBusinessFieldsSection form={businessForm} onChange={setBusinessField} />
-            {saved === "business" ? <p className="hint-text">Saved.</p> : null}
-            <Button label={savingBusiness ? "Saving..." : "Save"} className="p-button-sm" onClick={handleSaveBusiness} disabled={savingBusiness} />
+            {editingBusiness ? (
+              <>
+                <TenantBusinessFieldsSection form={businessForm} onChange={setBusinessField} />
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <Button label={savingBusiness ? "Saving..." : "Save"} className="p-button-sm" onClick={handleSaveBusiness} disabled={savingBusiness} />
+                  <Button label="Cancel" className="p-button-sm p-button-text" onClick={cancelEditBusiness} disabled={savingBusiness} />
+                </div>
+              </>
+            ) : (
+              <>
+                <BusinessProfileReadOnly form={businessForm} />
+                <Button label="Edit" icon="pi pi-pencil" className="p-button-sm p-button-outlined" onClick={() => setEditingBusiness(true)} />
+              </>
+            )}
           </div>
         </TabPanel>
 
         <TabPanel header="KYC">
           <div className="form-panel" style={{ maxWidth: 480 }}>
-            <fieldset className="form-group">
-              <legend>KYC</legend>
-              <label className="field">
-                <span className="field-label">Status</span>
-                <select
-                  className="input"
-                  value={kycForm.kycStatus}
-                  onChange={(e) => setKycForm((prev) => ({ ...prev, kycStatus: e.target.value as TenantKycStatus }))}
-                >
-                  <option value="PENDING">Pending</option>
-                  <option value="VERIFIED">Verified</option>
-                  <option value="REJECTED">Rejected</option>
-                </select>
-                <Tag value={kycForm.kycStatus} severity={KYC_SEVERITY[kycForm.kycStatus]} style={{ marginTop: "0.4rem" }} />
-              </label>
-              <label className="field">
-                <span className="field-label">Notes</span>
-                <textarea
-                  className="input"
-                  rows={3}
-                  value={kycForm.kycNotes}
-                  onChange={(e) => setKycForm((prev) => ({ ...prev, kycNotes: e.target.value }))}
-                />
-              </label>
-              {tenant.kycReviewedAt ? <p className="hint-text">Last reviewed: {new Date(tenant.kycReviewedAt).toLocaleString()}</p> : null}
-            </fieldset>
-            {saved === "kyc" ? <p className="hint-text">Saved.</p> : null}
-            <Button label={savingKyc ? "Saving..." : "Save"} className="p-button-sm" onClick={handleSaveKyc} disabled={savingKyc} />
+            {editingKyc ? (
+              <>
+                <fieldset className="form-group">
+                  <legend>KYC</legend>
+                  <label className="field">
+                    <span className="field-label">Status</span>
+                    <select
+                      className="input"
+                      value={kycForm.kycStatus}
+                      onChange={(e) => setKycForm((prev) => ({ ...prev, kycStatus: e.target.value as TenantKycStatus }))}
+                    >
+                      <option value="PENDING">Pending</option>
+                      <option value="VERIFIED">Verified</option>
+                      <option value="REJECTED">Rejected</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Notes</span>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      value={kycForm.kycNotes}
+                      onChange={(e) => setKycForm((prev) => ({ ...prev, kycNotes: e.target.value }))}
+                    />
+                  </label>
+                </fieldset>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <Button label={savingKyc ? "Saving..." : "Save"} className="p-button-sm" onClick={handleSaveKyc} disabled={savingKyc} />
+                  <Button label="Cancel" className="p-button-sm p-button-text" onClick={cancelEditKyc} disabled={savingKyc} />
+                </div>
+              </>
+            ) : (
+              <>
+                <fieldset className="form-group">
+                  <legend>KYC</legend>
+                  <div style={{ marginBottom: "0.6rem" }}>
+                    <span className="field-label">Status</span>
+                    <p style={{ margin: "0.2rem 0 0" }}>
+                      <Tag value={kycForm.kycStatus} severity={KYC_SEVERITY[kycForm.kycStatus]} />
+                    </p>
+                  </div>
+                  <Field label="Notes" value={kycForm.kycNotes} />
+                  {tenant.kycReviewedAt ? <p className="hint-text">Last reviewed: {new Date(tenant.kycReviewedAt).toLocaleString()}</p> : null}
+                </fieldset>
+                <Button label="Edit" icon="pi pi-pencil" className="p-button-sm p-button-outlined" onClick={() => setEditingKyc(true)} />
+              </>
+            )}
           </div>
         </TabPanel>
 
