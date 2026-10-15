@@ -62,7 +62,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             </Route>
           </Route>
 
-          <Route element={<ProtectedRoute />}>
+          <Route element={<ProtectedRoute allow={["SUPERADMIN"]} />}>
             <Route element={<AdminLayout />}>
               <Route path="/manual" element={<ManualPage />} />
             </Route>

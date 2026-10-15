@@ -34,8 +34,7 @@ function navItemsForRole(role: AuthUser["role"]): NavItem[] {
     { to: "/tenant/disciplines", label: "Disciplines", icon: "pi pi-sitemap" },
     { to: "/tenant/therapists", label: "Therapists", icon: "pi pi-users" },
     { to: "/tenant/kids", label: "Kids", icon: "pi pi-id-card" },
-    ...(role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile", icon: "pi pi-briefcase" }] : []),
-    { to: "/manual", label: "Manual", icon: "pi pi-book" }
+    ...(role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile", icon: "pi pi-briefcase" }] : [])
   ];
 }
 
