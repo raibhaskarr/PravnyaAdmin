@@ -38,6 +38,15 @@ tenantsRoutes.get(
   })
 );
 
+// Registered before /:tenantId so "health" is never matched as a :tenantId param.
+tenantsRoutes.get(
+  "/health",
+  requireRole("SUPERADMIN"),
+  asyncHandler(async (_req, res) => {
+    res.json(await tenantsService.health());
+  })
+);
+
 tenantsRoutes.get(
   "/:tenantId",
   requireRole("SUPERADMIN"),

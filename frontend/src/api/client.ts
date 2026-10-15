@@ -22,6 +22,7 @@ import type {
   PocSupportLevel,
   Tenant,
   TenantDiscipline,
+  TenantHealth,
   TenantInvitation,
   TenantInvitationPreview,
   TenantKycFields,
@@ -69,6 +70,9 @@ export const api = {
   // Tenants (superadmin)
   listTenants(token: string) {
     return request<Tenant[]>("/tenants", { token });
+  },
+  listTenantHealth(token: string) {
+    return request<TenantHealth[]>("/tenants/health", { token });
   },
   updateTenant(token: string, tenantId: string, input: { name?: string; status?: "ACTIVE" | "SUSPENDED" }) {
     return request<Tenant>(`/tenants/${tenantId}`, { token, method: "PATCH", body: input });

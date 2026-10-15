@@ -2,7 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { Tenant, TenantInvitation } from "../../api/types";
+import type { Tenant, TenantHealth, TenantInvitation } from "../../api/types";
+import { Th } from "../tenant/goalEvidence";
 
 const STATUS_LABEL: Record<TenantInvitation["status"], string> = {
   PENDING: "Invited — waiting to set up",
@@ -14,6 +15,7 @@ const STATUS_LABEL: Record<TenantInvitation["status"], string> = {
 export function TenantsPage() {
   const { token } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [health, setHealth] = useState<Record<string, TenantHealth>>({});
   const [invitations, setInvitations] = useState<TenantInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -23,10 +25,11 @@ export function TenantsPage() {
 
   function load() {
     setLoading(true);
-    Promise.all([api.listTenants(token!), api.listTenantInvitations(token!)])
-      .then(([t, inv]) => {
+    Promise.all([api.listTenants(token!), api.listTenantInvitations(token!), api.listTenantHealth(token!)])
+      .then(([t, inv, h]) => {
         setTenants(t);
         setInvitations(inv);
+        setHealth(Object.fromEntries(h.map((row) => [row.tenantId, row])));
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load tenants"))
       .finally(() => setLoading(false));
@@ -130,24 +133,35 @@ export function TenantsPage() {
                 <th>Name</th>
                 <th>Slug</th>
                 <th>Status</th>
+                <Th tip="Total kids on this tenant's account.">Kids</Th>
+                <Th tip="Kids with no goals set up at all -- onboarded but never started.">No goals</Th>
+                <Th tip="Kids with no evidence logged in the last 30 days -- includes kids with no goals, since they trivially have no recent activity either.">
+                  No activity (30d+)
+                </Th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {tenants.map((t) => (
-                <tr key={t.id}>
-                  <td>
-                    <Link to={`/admin/tenants/${t.id}`}>{t.name}</Link>
-                  </td>
-                  <td>{t.slug}</td>
-                  <td>{t.status}</td>
-                  <td>
-                    <button type="button" className="btn btn-secondary" onClick={() => toggleStatus(t)}>
-                      {t.status === "ACTIVE" ? "Suspend" : "Reactivate"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {tenants.map((t) => {
+                const h = health[t.id];
+                return (
+                  <tr key={t.id}>
+                    <td>
+                      <Link to={`/admin/tenants/${t.id}`}>{t.name}</Link>
+                    </td>
+                    <td>{t.slug}</td>
+                    <td>{t.status}</td>
+                    <td>{h ? h.totalKids : "—"}</td>
+                    <td>{h ? h.kidsWithNoGoals : "—"}</td>
+                    <td>{h ? h.kidsWithNoRecentActivity : "—"}</td>
+                    <td>
+                      <button type="button" className="btn btn-secondary" onClick={() => toggleStatus(t)}>
+                        {t.status === "ACTIVE" ? "Suspend" : "Reactivate"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {tenants.length === 0 ? <p className="empty-state">No tenants yet.</p> : null}

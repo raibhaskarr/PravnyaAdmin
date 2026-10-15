@@ -20,9 +20,43 @@ const PROFILE_FIELD_KEYS = [
   "kycNotes"
 ] as const;
 
+const STALE_ACTIVITY_WINDOW_DAYS = 30;
+
 export const tenantsService = {
   list() {
     return prisma.tenant.findMany({ orderBy: { createdAt: "desc" } });
+  },
+
+  // Counts only, no kid-level identity -- a superadmin shouldn't need to see individual kids or
+  // their clinical data to tell whether a tenant looks healthy or has gone quiet. "No recent
+  // activity" means no GoalItemEvidence created in the last 30 days, not the evidence's own
+  // (sometimes backdated) logDate -- this is about whether the system is actually being used, not
+  // when a session clinically happened.
+  async health() {
+    const tenants = await prisma.tenant.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true } });
+    const recentCutoff = new Date(Date.now() - STALE_ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    return Promise.all(
+      tenants.map(async (tenant) => {
+        const [totalKids, kidsWithNoGoals, kidsWithRecentActivity] = await Promise.all([
+          prisma.kid.count({ where: { tenantId: tenant.id } }),
+          prisma.kid.count({ where: { tenantId: tenant.id, goals: { none: {} } } }),
+          prisma.kid.count({
+            where: {
+              tenantId: tenant.id,
+              goals: { some: { items: { some: { evidence: { some: { createdAt: { gte: recentCutoff } } } } } } }
+            }
+          })
+        ]);
+        return {
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          totalKids,
+          kidsWithNoGoals,
+          kidsWithNoRecentActivity: totalKids - kidsWithRecentActivity
+        };
+      })
+    );
   },
 
   async get(tenantId: string) {

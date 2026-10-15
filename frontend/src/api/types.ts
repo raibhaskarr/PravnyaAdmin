@@ -58,6 +58,14 @@ export type Tenant = {
   createdAt: string;
 };
 
+export type TenantHealth = {
+  tenantId: string;
+  tenantName: string;
+  totalKids: number;
+  kidsWithNoGoals: number;
+  kidsWithNoRecentActivity: number;
+};
+
 export type TenantProfileFields = Pick<
   Tenant,
   | "leadOwnerName"
