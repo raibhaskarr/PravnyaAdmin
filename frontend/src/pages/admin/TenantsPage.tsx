@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
+import { Button } from "primereact/button";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Tenant, TenantHealth, TenantInvitation } from "../../api/types";
-import { Th } from "../tenant/goalEvidence";
 
 const STATUS_LABEL: Record<TenantInvitation["status"], string> = {
   PENDING: "Invited — waiting to set up",
@@ -11,6 +13,12 @@ const STATUS_LABEL: Record<TenantInvitation["status"], string> = {
   EXPIRED: "Expired",
   REVOKED: "Revoked"
 };
+
+type TenantRow = Tenant & { health?: TenantHealth };
+
+function headerWithTip(label: string, tip: string) {
+  return <span title={tip}>{label}</span>;
+}
 
 export function TenantsPage() {
   const { token } = useAuth();
@@ -73,6 +81,7 @@ export function TenantsPage() {
   }
 
   const pendingInvitations = invitations.filter((inv) => inv.status === "PENDING");
+  const rows: TenantRow[] = tenants.map((t) => ({ ...t, health: health[t.id] }));
 
   return (
     <div>
@@ -123,87 +132,66 @@ export function TenantsPage() {
 
       {error ? <p className="error-text">{error}</p> : null}
 
-      {loading ? (
-        <p className="empty-state">Loading...</p>
-      ) : (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Slug</th>
-                <th>Status</th>
-                <Th tip="Total kids on this tenant's account.">Kids</Th>
-                <Th tip="Kids with no goals set up at all -- onboarded but never started.">No goals</Th>
-                <Th tip="Kids with no evidence logged in the last 30 days -- includes kids with no goals, since they trivially have no recent activity either.">
-                  No activity (30d+)
-                </Th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenants.map((t) => {
-                const h = health[t.id];
-                return (
-                  <tr key={t.id}>
-                    <td>
-                      <Link to={`/admin/tenants/${t.id}`}>{t.name}</Link>
-                    </td>
-                    <td>{t.slug}</td>
-                    <td>{t.status}</td>
-                    <td>{h ? h.totalKids : "—"}</td>
-                    <td>{h ? h.kidsWithNoGoals : "—"}</td>
-                    <td>{h ? h.kidsWithNoRecentActivity : "—"}</td>
-                    <td>
-                      <button type="button" className="btn btn-secondary" onClick={() => toggleStatus(t)}>
-                        {t.status === "ACTIVE" ? "Suspend" : "Reactivate"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {tenants.length === 0 ? <p className="empty-state">No tenants yet.</p> : null}
-        </div>
-      )}
+      <DataTable
+        value={rows}
+        loading={loading}
+        emptyMessage="No tenants yet."
+        sortMode="multiple"
+        removableSort
+        stripedRows
+        size="small"
+        className="mt-3"
+      >
+        <Column
+          field="name"
+          header="Name"
+          sortable
+          body={(row: TenantRow) => <Link to={`/admin/tenants/${row.id}`}>{row.name}</Link>}
+        />
+        <Column field="slug" header="Slug" sortable />
+        <Column field="status" header="Status" sortable />
+        <Column
+          header={headerWithTip("Kids", "Total kids on this tenant's account.")}
+          body={(row: TenantRow) => row.health?.totalKids ?? "—"}
+          sortable
+          sortFunction={(e) => [...e.data].sort((a: TenantRow, b: TenantRow) => ((a.health?.totalKids ?? -1) - (b.health?.totalKids ?? -1)) * (e.order ?? 1))}
+        />
+        <Column
+          header={headerWithTip("No goals", "Kids with no goals set up at all -- onboarded but never started.")}
+          body={(row: TenantRow) => row.health?.kidsWithNoGoals ?? "—"}
+        />
+        <Column
+          header={headerWithTip(
+            "No activity (30d+)",
+            "Kids with no evidence logged in the last 30 days -- includes kids with no goals, since they trivially have no recent activity either."
+          )}
+          body={(row: TenantRow) => row.health?.kidsWithNoRecentActivity ?? "—"}
+        />
+        <Column
+          body={(row: Tenant) => (
+            <Button
+              label={row.status === "ACTIVE" ? "Suspend" : "Reactivate"}
+              className="p-button-sm p-button-outlined"
+              onClick={() => toggleStatus(row)}
+            />
+          )}
+        />
+      </DataTable>
 
       {pendingInvitations.length > 0 ? (
         <>
           <h2 style={{ marginTop: "1.5rem" }}>Pending invitations</h2>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Slug</th>
-                  <th>Email</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingInvitations.map((inv) => (
-                  <tr key={inv.id}>
-                    <td>{inv.name}</td>
-                    <td>{inv.slug}</td>
-                    <td>{inv.email}</td>
-                    <td>{STATUS_LABEL[inv.status]}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => handleRevoke(inv.id)}
-                        style={{ padding: "0.15rem 0.6rem", fontSize: "0.8rem" }}
-                      >
-                        Revoke
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable value={pendingInvitations} size="small" stripedRows>
+            <Column field="name" header="Name" />
+            <Column field="slug" header="Slug" />
+            <Column field="email" header="Email" />
+            <Column header="Status" body={(inv: TenantInvitation) => STATUS_LABEL[inv.status]} />
+            <Column
+              body={(inv: TenantInvitation) => (
+                <Button label="Revoke" className="p-button-sm p-button-outlined p-button-danger" onClick={() => handleRevoke(inv.id)} />
+              )}
+            />
+          </DataTable>
         </>
       ) : null}
     </div>

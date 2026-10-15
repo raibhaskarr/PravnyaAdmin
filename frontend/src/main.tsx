@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
+import { AdminLayout } from "./components/AdminLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { AcceptTenantInvitePage } from "./pages/AcceptTenantInvitePage";
@@ -30,7 +31,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/tenant-signup/:token" element={<AcceptTenantInvitePage />} />
 
           <Route element={<ProtectedRoute allow={["SUPERADMIN"]} />}>
-            <Route element={<Layout />}>
+            <Route element={<AdminLayout />}>
               <Route path="/admin/tenants" element={<TenantsPage />} />
               <Route path="/admin/tenants/:tenantId" element={<TenantDetailPage />} />
               <Route path="/admin/taxonomy" element={<TaxonomyPage />} />

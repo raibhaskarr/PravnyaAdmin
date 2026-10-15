@@ -1,0 +1,89 @@
+/* PrimeReact's own component theme -- scoped to admin pages only (imported from AdminLayout.tsx,
+   not main.tsx) since this is a pilot, not a full-app migration yet. See docs/manual for why. */
+@import "primereact/resources/themes/lara-light-indigo/theme.css";
+@import "primereact/resources/primereact.min.css";
+@import "primeicons/primeicons.css";
+
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+  background: #f4f6fb;
+}
+
+.admin-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: #1e2235;
+  color: #e6e8f0;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.admin-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-sidebar-name {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.admin-sidebar-role {
+  margin: 0;
+  font-size: 0.72rem;
+  color: rgba(230, 232, 240, 0.6);
+}
+
+.admin-nav.p-menu {
+  background: transparent;
+  border: none;
+  width: 100%;
+  padding: 0;
+}
+
+.admin-nav .p-menuitem-link {
+  color: #c7cbe0;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+
+.admin-nav .p-menuitem-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.admin-nav .p-menuitem.admin-nav-active .p-menuitem-link {
+  background: #6366f1;
+  color: #ffffff;
+}
+
+.admin-logout.p-button {
+  margin-top: auto;
+  color: #c7cbe0;
+  justify-content: flex-start;
+}
+
+.admin-logout.p-button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.admin-content {
+  flex: 1;
+  padding: 1.5rem 2.5rem 2.5rem;
+  min-width: 0;
+}
+
+.admin-breadcrumb.p-breadcrumb {
+  background: transparent;
+  border: none;
+  padding: 0 0 1.25rem;
+}

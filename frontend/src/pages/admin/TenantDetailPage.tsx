@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { AuditLogEntry, Tenant, TenantKycStatus } from "../../api/types";
@@ -121,27 +123,11 @@ export function TenantDetailPage() {
       </div>
 
       <h2 style={{ marginTop: "1.5rem" }}>Activity</h2>
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Who</th>
-              <th>What changed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {auditLog.map((entry) => (
-              <tr key={entry.id}>
-                <td>{new Date(entry.createdAt).toLocaleString()}</td>
-                <td>{entry.actorEmail}</td>
-                <td>{auditLabel(entry)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {auditLog.length === 0 ? <p className="empty-state">No status or KYC changes recorded for this tenant yet.</p> : null}
-      </div>
+      <DataTable value={auditLog} size="small" stripedRows emptyMessage="No status or KYC changes recorded for this tenant yet.">
+        <Column header="When" body={(entry: AuditLogEntry) => new Date(entry.createdAt).toLocaleString()} />
+        <Column field="actorEmail" header="Who" />
+        <Column header="What changed" body={(entry: AuditLogEntry) => auditLabel(entry)} />
+      </DataTable>
     </div>
   );
 }
