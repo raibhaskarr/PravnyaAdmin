@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { AdminLayout } from "./components/AdminLayout";
+import { RoleAwareLayout } from "./components/RoleAwareLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { AcceptTenantInvitePage } from "./pages/AcceptTenantInvitePage";
@@ -62,7 +63,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </Route>
 
           <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
+            <Route element={<RoleAwareLayout />}>
               <Route path="/manual" element={<ManualPage />} />
             </Route>
           </Route>

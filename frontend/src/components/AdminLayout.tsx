@@ -7,14 +7,16 @@ import { BreadCrumb } from "primereact/breadcrumb";
 import { useAuth } from "../context/AuthContext";
 import "../adminLayout.css";
 
-// /manual is deliberately not here -- it's a shared, cross-role page routed under the existing
-// Layout (see main.tsx), not the superadmin-only block this pilot replaces. Including it would
-// mean clicking it jarringly swaps back to the old layout; out of scope for this pilot.
+// /manual is a shared, cross-role page -- RoleAwareLayout (see main.tsx) picks this layout for it
+// specifically when the current user is a superadmin, so it's safe to link to here without a
+// jarring layout swap on click, even though the route itself isn't nested under the
+// superadmin-only route block the rest of this nav lives in.
 const NAV_ITEMS = [
   { to: "/admin/tenants", label: "Tenants", icon: "pi pi-building" },
   { to: "/admin/taxonomy", label: "Taxonomy", icon: "pi pi-sitemap" },
   { to: "/admin/poc-review", label: "AI Tagging POC", icon: "pi pi-chart-line" },
-  { to: "/admin/superadmins", label: "Superadmins", icon: "pi pi-shield" }
+  { to: "/admin/superadmins", label: "Superadmins", icon: "pi pi-shield" },
+  { to: "/manual", label: "Manual", icon: "pi pi-book" }
 ];
 
 /** Pilot of PrimeReact for the superadmin section only -- see docs/manual/03-business-logic.md
