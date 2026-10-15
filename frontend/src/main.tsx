@@ -22,6 +22,7 @@ import { KidsPage } from "./pages/tenant/KidsPage";
 import { KidDetailPage } from "./pages/tenant/KidDetailPage";
 import { LogSessionPage } from "./pages/tenant/LogSessionPage";
 import { TenantProfilePage } from "./pages/tenant/TenantProfilePage";
+import { AccountPage as TenantAccountPage } from "./pages/tenant/AccountPage";
 import { ManualPage } from "./pages/ManualPage";
 import "./index.css";
 
@@ -59,6 +60,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/tenant/log" element={<LogSessionPage />} />
               <Route path="/tenant/kids" element={<KidsPage />} />
               <Route path="/tenant/kids/:kidId" element={<KidDetailPage />} />
+              <Route path="/tenant/account" element={<TenantAccountPage />} />
             </Route>
           </Route>
 

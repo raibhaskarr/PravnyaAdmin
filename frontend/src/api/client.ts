@@ -98,6 +98,12 @@ export const api = {
   updateOwnTenantProfile(token: string, input: Partial<TenantProfileFields>) {
     return request<Tenant>("/tenants/me/profile", { token, method: "PATCH", body: input });
   },
+  getOwnTenantHealth(token: string) {
+    return request<TenantHealth>("/tenants/me/health", { token });
+  },
+  listOwnTenantAuditLog(token: string) {
+    return request<AuditLogEntry[]>("/tenants/me/audit-log", { token });
+  },
 
   // Tenant invitations (superadmin invites, invitee sets their own password and later fills in
   // the business/KYC profile themselves via updateOwnTenantProfile)

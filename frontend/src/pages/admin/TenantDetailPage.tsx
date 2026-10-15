@@ -18,7 +18,10 @@ import {
 
 const ACTION_LABEL: Record<string, string> = {
   TENANT_STATUS_CHANGED: "Status changed",
-  TENANT_KYC_STATUS_CHANGED: "KYC status changed"
+  TENANT_KYC_STATUS_CHANGED: "KYC status changed",
+  THERAPIST_INVITED: "Therapist invited",
+  THERAPIST_INVITATION_REVOKED: "Therapist invitation revoked",
+  KID_ADDED: "Kid added"
 };
 
 function auditLabel(entry: AuditLogEntry): string {

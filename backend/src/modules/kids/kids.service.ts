@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { notFound } from "../../common/errors/AppError";
 import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid, kidVisibilityFilter } from "../../common/access/kidAccess";
+import { recordAuditLog } from "../../common/audit/auditLog.service";
 import { CreateKidInput, UpdateKidInput } from "./kids.schemas";
 
 // Shared across list/get -- includes each assigned therapist's own tenant so the frontend can
@@ -31,10 +32,10 @@ export const kidsService = {
     return kid;
   },
 
-  create(tenantId: string, input: CreateKidInput) {
-    return prisma.kid.create({
+  async create(actor: AuthUser, input: CreateKidInput) {
+    const kid = await prisma.kid.create({
       data: {
-        tenantId,
+        tenantId: actor.tenantId!,
         firstName: input.firstName,
         lastName: input.lastName,
         dob: input.dob ? new Date(input.dob) : undefined,
@@ -42,6 +43,12 @@ export const kidsService = {
       },
       include: { therapists: true }
     });
+    // No kid name here -- this AuditLog table is shared with the superadmin's per-tenant Activity
+    // view (tenants.service.ts's auditLog()), which is deliberately kept blind to individual kid
+    // identity (see health()'s own comment). The event itself is fine to surface; a child's name
+    // is not.
+    await recordAuditLog(actor, { tenantId: actor.tenantId!, action: "KID_ADDED", fromValue: null, toValue: null });
+    return kid;
   },
 
   async update(user: AuthUser, kidId: string, input: UpdateKidInput) {

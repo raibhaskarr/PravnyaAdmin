@@ -31,6 +31,24 @@ tenantsRoutes.patch(
 );
 
 tenantsRoutes.get(
+  "/me/health",
+  requireTenantScope,
+  requireRole("TENANT_ADMIN"),
+  asyncHandler(async (req, res) => {
+    res.json(await tenantsService.healthForOwnTenant(req.user!.tenantId!));
+  })
+);
+
+tenantsRoutes.get(
+  "/me/audit-log",
+  requireTenantScope,
+  requireRole("TENANT_ADMIN"),
+  asyncHandler(async (req, res) => {
+    res.json(await tenantsService.auditLog(req.user!.tenantId!));
+  })
+);
+
+tenantsRoutes.get(
   "/",
   requireRole("SUPERADMIN"),
   asyncHandler(async (_req, res) => {

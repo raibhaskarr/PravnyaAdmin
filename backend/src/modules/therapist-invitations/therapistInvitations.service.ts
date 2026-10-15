@@ -4,6 +4,7 @@ import { conflict, gone, notFound } from "../../common/errors/AppError";
 import { AuthUser, signToken } from "../../common/middleware/auth";
 import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { assertEmailNotTaken, devInviteUrl, expiryDate, hashToken, tokenValue } from "../../common/invitations/invitationToken";
+import { recordAuditLog } from "../../common/audit/auditLog.service";
 import { authService } from "../auth/auth.service";
 import { invitationEmailService, buildInviteUrl } from "./invitationEmail.service";
 import type { AcceptInvitationInput, InviteForKidInput, InviteGeneralInput } from "./therapistInvitations.schemas";
@@ -29,7 +30,9 @@ export const therapistInvitationsService = {
     const invitation = await prisma.therapistInvitation.findFirst({ where: { id: invitationId, tenantId: user.tenantId! } });
     if (!invitation) throw notFound("Invitation not found");
     if (invitation.status !== "PENDING") throw conflict("Only a pending invitation can be revoked.");
-    return prisma.therapistInvitation.update({ where: { id: invitationId }, data: { status: "REVOKED" } });
+    const revoked = await prisma.therapistInvitation.update({ where: { id: invitationId }, data: { status: "REVOKED" } });
+    await recordAuditLog(user, { tenantId: user.tenantId!, action: "THERAPIST_INVITATION_REVOKED", fromValue: invitation.email, toValue: null });
+    return revoked;
   },
 
   // Flow 1: the general "invite a therapist" form on the Therapists page. The admin already
@@ -56,6 +59,7 @@ export const therapistInvitationsService = {
 
     const inviteUrl = buildInviteUrl(raw);
     await invitationEmailService.sendTherapistInvitation({ to: input.email, tenantName: tenant.name, invitedByName: invitedBy.name, inviteUrl });
+    await recordAuditLog(user, { tenantId: user.tenantId!, action: "THERAPIST_INVITED", fromValue: null, toValue: input.email });
 
     return { invitation, inviteUrl: devInviteUrl(inviteUrl) };
   },

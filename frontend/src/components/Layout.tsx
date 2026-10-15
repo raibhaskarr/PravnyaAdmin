@@ -17,7 +17,8 @@ export function Layout() {
           { to: "/tenant/disciplines", label: "Disciplines" },
           { to: "/tenant/therapists", label: "Therapists" },
           { to: "/tenant/kids", label: "Kids" },
-          ...(user.role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile" }] : [])
+          ...(user.role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile" }] : []),
+          { to: "/tenant/account", label: "Account" }
         ];
   links.push({ to: "/manual", label: "Manual" });
 

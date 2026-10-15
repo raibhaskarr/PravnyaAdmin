@@ -30,7 +30,7 @@ kidsRoutes.post(
   requireRole("TENANT_ADMIN"),
   validateRequest({ body: createKidSchema }),
   asyncHandler(async (req, res) => {
-    res.status(201).json(await kidsService.create(req.user!.tenantId!, req.body));
+    res.status(201).json(await kidsService.create(req.user!, req.body));
   })
 );
 

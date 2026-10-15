@@ -24,6 +24,27 @@ const PROFILE_FIELD_KEYS = [
 
 const STALE_ACTIVITY_WINDOW_DAYS = 30;
 
+async function healthForTenant(tenantId: string, tenantName: string) {
+  const recentCutoff = new Date(Date.now() - STALE_ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const [totalKids, kidsWithNoGoals, kidsWithRecentActivity] = await Promise.all([
+    prisma.kid.count({ where: { tenantId } }),
+    prisma.kid.count({ where: { tenantId, goals: { none: {} } } }),
+    prisma.kid.count({
+      where: {
+        tenantId,
+        goals: { some: { items: { some: { evidence: { some: { createdAt: { gte: recentCutoff } } } } } } }
+      }
+    })
+  ]);
+  return {
+    tenantId,
+    tenantName,
+    totalKids,
+    kidsWithNoGoals,
+    kidsWithNoRecentActivity: totalKids - kidsWithRecentActivity
+  };
+}
+
 export const tenantsService = {
   list() {
     return prisma.tenant.findMany({ orderBy: { createdAt: "desc" } });
@@ -36,29 +57,14 @@ export const tenantsService = {
   // when a session clinically happened.
   async health() {
     const tenants = await prisma.tenant.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true } });
-    const recentCutoff = new Date(Date.now() - STALE_ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    return Promise.all(tenants.map((tenant) => healthForTenant(tenant.id, tenant.name)));
+  },
 
-    return Promise.all(
-      tenants.map(async (tenant) => {
-        const [totalKids, kidsWithNoGoals, kidsWithRecentActivity] = await Promise.all([
-          prisma.kid.count({ where: { tenantId: tenant.id } }),
-          prisma.kid.count({ where: { tenantId: tenant.id, goals: { none: {} } } }),
-          prisma.kid.count({
-            where: {
-              tenantId: tenant.id,
-              goals: { some: { items: { some: { evidence: { some: { createdAt: { gte: recentCutoff } } } } } } }
-            }
-          })
-        ]);
-        return {
-          tenantId: tenant.id,
-          tenantName: tenant.name,
-          totalKids,
-          kidsWithNoGoals,
-          kidsWithNoRecentActivity: totalKids - kidsWithRecentActivity
-        };
-      })
-    );
+  // Same computation, scoped to a single tenant -- used by the tenant admin's own self-service
+  // dashboard, where seeing every other tenant's name would be a cross-tenant leak.
+  async healthForOwnTenant(tenantId: string) {
+    const tenant = await this.get(tenantId);
+    return healthForTenant(tenant.id, tenant.name);
   },
 
   async get(tenantId: string) {
