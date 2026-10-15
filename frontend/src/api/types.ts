@@ -111,6 +111,25 @@ export type TenantInvitationPreview = {
   email: string;
 };
 
+export type SuperadminUser = {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+};
+
+export type SuperadminInvitation = {
+  id: string;
+  email: string;
+  status: TherapistInvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+};
+
+export type SuperadminInvitationPreview = {
+  email: string;
+};
+
 export type CanonicalDiscipline = {
   id: string;
   key: string;

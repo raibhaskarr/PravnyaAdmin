@@ -13,7 +13,8 @@ import "../adminLayout.css";
 const NAV_ITEMS = [
   { to: "/admin/tenants", label: "Tenants", icon: "pi pi-building" },
   { to: "/admin/taxonomy", label: "Taxonomy", icon: "pi pi-sitemap" },
-  { to: "/admin/poc-review", label: "AI Tagging POC", icon: "pi pi-chart-line" }
+  { to: "/admin/poc-review", label: "AI Tagging POC", icon: "pi pi-chart-line" },
+  { to: "/admin/superadmins", label: "Superadmins", icon: "pi pi-shield" }
 ];
 
 /** Pilot of PrimeReact for the superadmin section only -- see docs/manual/03-business-logic.md
@@ -37,13 +38,19 @@ export function AdminLayout() {
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <div className="admin-sidebar-brand">
+        <button
+          type="button"
+          className="admin-sidebar-brand"
+          onClick={() => navigate("/admin/account")}
+          title="Account settings"
+          style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", width: "100%" }}
+        >
           <Avatar label={user.name.charAt(0).toUpperCase()} shape="circle" style={{ backgroundColor: "#6366f1", color: "#ffffff" }} />
           <div>
             <p className="admin-sidebar-name">{user.name}</p>
             <p className="admin-sidebar-role">Superadmin</p>
           </div>
-        </div>
+        </button>
         <Menu model={menuItems} className="admin-nav" />
         <Button label="Log out" icon="pi pi-sign-out" onClick={logout} className="admin-logout p-button-text" />
       </aside>

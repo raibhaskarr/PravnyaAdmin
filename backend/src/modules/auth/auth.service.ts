@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../../config/prisma";
 import { env } from "../../config/env";
-import { signToken } from "../../common/middleware/auth";
+import { AuthUser, signToken } from "../../common/middleware/auth";
 import { AppError } from "../../common/errors/AppError";
-import { LoginInput } from "./auth.schemas";
+import { ChangePasswordInput, LoginInput } from "./auth.schemas";
 
 export const authService = {
   async login(input: LoginInput) {
@@ -22,5 +22,17 @@ export const authService = {
 
   hashPassword(password: string) {
     return bcrypt.hash(password, env.BCRYPT_SALT_ROUNDS);
+  },
+
+  // Always requires the current password, for every role -- there's no "admin resets someone
+  // else's password" path here, only self-service. A user who's lost their password needs a new
+  // invite/account-recovery flow, not this endpoint.
+  async changePassword(actor: AuthUser, input: ChangePasswordInput) {
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: actor.id } });
+    const valid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+    if (!valid) throw new AppError(401, "INVALID_CREDENTIALS", "Current password is incorrect");
+
+    const passwordHash = await this.hashPassword(input.newPassword);
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
   }
 };

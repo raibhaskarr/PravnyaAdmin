@@ -68,10 +68,29 @@ model User {
   therapist    Therapist?
   sentTherapistInvitations TherapistInvitation[] @relation("InvitationSentBy")
   sentTenantInvitations TenantInvitation[] @relation("TenantInvitationSentBy")
+  sentSuperadminInvitations SuperadminInvitation[] @relation("SuperadminInvitationSentBy")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([tenantId])
+}
+
+/// A pending/resolved offer for someone to become an additional SUPERADMIN -- mirrors
+/// TenantInvitation's shape (no real User row until accept, invitee sets their own password) but
+/// simpler: no tenant/kid/discipline fields, since a superadmin isn't scoped to any of those.
+model SuperadminInvitation {
+  id          String           @id @default(uuid()) @db.Uuid
+  email       String
+  tokenHash   String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String           @db.Uuid
+  invitedBy   User             @relation("SuperadminInvitationSentBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([email])
 }
 
 enum TenantKycStatus {

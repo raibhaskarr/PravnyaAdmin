@@ -18,6 +18,8 @@ import { therapistInvitationsRoutes } from "./modules/therapist-invitations/ther
 import { invitationAcceptRoutes } from "./modules/therapist-invitations/invitationAccept.routes";
 import { tenantInvitationsRoutes } from "./modules/tenant-invitations/tenantInvitations.routes";
 import { tenantInvitationAcceptRoutes } from "./modules/tenant-invitations/tenantInvitationAccept.routes";
+import { superadminInvitationsRoutes } from "./modules/superadmin-invitations/superadminInvitations.routes";
+import { superadminInvitationAcceptRoutes } from "./modules/superadmin-invitations/superadminInvitationAccept.routes";
 import { iepRoutes } from "./modules/iep/iep.routes";
 
 export function createApp() {
@@ -62,6 +64,8 @@ export function createApp() {
   app.use("/api/invitations", invitationAcceptRoutes);
   app.use("/api/tenant-invitations", tenantInvitationsRoutes);
   app.use("/api/tenant-signup", tenantInvitationAcceptRoutes);
+  app.use("/api/superadmin-invitations", superadminInvitationsRoutes);
+  app.use("/api/superadmin-signup", superadminInvitationAcceptRoutes);
   app.use("/api/iep", iepRoutes);
 
   app.use(errorMiddleware);

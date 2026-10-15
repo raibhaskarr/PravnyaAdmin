@@ -29,6 +29,10 @@ export function buildTenantSignupUrl(token: string) {
   return `${appBaseUrl().replace(/\/$/, "")}/tenant-signup/${encodeURIComponent(token)}`;
 }
 
+export function buildSuperadminSignupUrl(token: string) {
+  return `${appBaseUrl().replace(/\/$/, "")}/superadmin-signup/${encodeURIComponent(token)}`;
+}
+
 class LoggingEmailProvider implements EmailProvider {
   async send(input: EmailSendInput): Promise<EmailSendResult> {
     // In production this means the invite email is NOT actually delivered -- logged as a warning,
@@ -102,6 +106,12 @@ export const invitationEmailService = {
   async sendTenantInvitation(input: { to: string; tenantName: string; invitedByName: string; signupUrl: string }) {
     const subject = `You've been invited to set up ${input.tenantName} on Pravnya`;
     const body = `${input.invitedByName} invited you to set up ${input.tenantName} on Pravnya.\n\nSet up your account: ${input.signupUrl}\n\nThis link expires in 14 days.`;
+    return emailProvider.send({ to: input.to, subject, text: body });
+  },
+
+  async sendSuperadminInvitation(input: { to: string; invitedByName: string; signupUrl: string }) {
+    const subject = "You've been invited as a Pravnya superadmin";
+    const body = `${input.invitedByName} invited you to become a superadmin on Pravnya.\n\nSet up your account: ${input.signupUrl}\n\nThis link expires in 14 days.`;
     return emailProvider.send({ to: input.to, subject, text: body });
   }
 };

@@ -8,10 +8,13 @@ import { AdminLayout } from "./components/AdminLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { AcceptTenantInvitePage } from "./pages/AcceptTenantInvitePage";
+import { AcceptSuperadminInvitePage } from "./pages/AcceptSuperadminInvitePage";
 import { TenantsPage } from "./pages/admin/TenantsPage";
 import { TenantDetailPage } from "./pages/admin/TenantDetailPage";
 import { TaxonomyPage } from "./pages/admin/TaxonomyPage";
 import { PocReviewPage } from "./pages/admin/PocReviewPage";
+import { SuperadminsPage } from "./pages/admin/SuperadminsPage";
+import { AccountPage } from "./pages/admin/AccountPage";
 import { DisciplinesPage } from "./pages/tenant/DisciplinesPage";
 import { TherapistsPage } from "./pages/tenant/TherapistsPage";
 import { KidsPage } from "./pages/tenant/KidsPage";
@@ -29,6 +32,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/login" element={<LoginPage />} />
           <Route path="/invite/:token" element={<AcceptInvitePage />} />
           <Route path="/tenant-signup/:token" element={<AcceptTenantInvitePage />} />
+          <Route path="/superadmin-signup/:token" element={<AcceptSuperadminInvitePage />} />
 
           <Route element={<ProtectedRoute allow={["SUPERADMIN"]} />}>
             <Route element={<AdminLayout />}>
@@ -36,6 +40,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/admin/tenants/:tenantId" element={<TenantDetailPage />} />
               <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
               <Route path="/admin/poc-review" element={<PocReviewPage />} />
+              <Route path="/admin/superadmins" element={<SuperadminsPage />} />
+              <Route path="/admin/account" element={<AccountPage />} />
             </Route>
           </Route>
 

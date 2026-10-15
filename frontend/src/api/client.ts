@@ -21,6 +21,9 @@ import type {
   PocReviewChildDetail,
   PocReviewFlags,
   PocSupportLevel,
+  SuperadminInvitation,
+  SuperadminInvitationPreview,
+  SuperadminUser,
   Tenant,
   TenantDiscipline,
   TenantHealth,
@@ -112,6 +115,31 @@ export const api = {
   },
   acceptTenantSignup(inviteToken: string, input: { adminName: string; password: string }) {
     return request<{ token: string; user: AuthUser }>(`/tenant-signup/${inviteToken}/accept`, { method: "POST", body: input });
+  },
+
+  // Superadmin invitations (same pattern as tenant invitations: invitee sets their own password)
+  listSuperadmins(token: string) {
+    return request<SuperadminUser[]>("/superadmin-invitations/users", { token });
+  },
+  listSuperadminInvitations(token: string) {
+    return request<SuperadminInvitation[]>("/superadmin-invitations", { token });
+  },
+  inviteSuperadmin(token: string, input: { email: string }) {
+    return request<{ invitation: SuperadminInvitation; signupUrl?: string }>("/superadmin-invitations", { token, method: "POST", body: input });
+  },
+  revokeSuperadminInvitation(token: string, invitationId: string) {
+    return request(`/superadmin-invitations/${invitationId}`, { token, method: "DELETE" });
+  },
+  previewSuperadminSignup(inviteToken: string) {
+    return request<SuperadminInvitationPreview>(`/superadmin-signup/${inviteToken}`);
+  },
+  acceptSuperadminSignup(inviteToken: string, input: { name: string; password: string }) {
+    return request<{ token: string; user: AuthUser }>(`/superadmin-signup/${inviteToken}/accept`, { method: "POST", body: input });
+  },
+
+  // Account (any authenticated role)
+  changePassword(token: string, input: { currentPassword: string; newPassword: string }) {
+    return request<void>("/auth/password", { token, method: "PATCH", body: input });
   },
 
   // Taxonomy (read: any role; write: superadmin)
