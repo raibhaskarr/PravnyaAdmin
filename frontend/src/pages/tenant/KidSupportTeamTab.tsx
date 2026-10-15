@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { AutoComplete } from "primereact/autocomplete";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, TenantDiscipline, Therapist, TherapistInvitation } from "../../api/types";
@@ -13,6 +14,35 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
   const [error, setError] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  const [nameSearch, setNameSearch] = useState("");
+  const [nameSuggestions, setNameSuggestions] = useState<Therapist[]>([]);
+  const [adding, setAdding] = useState(false);
+
+  // Active home-tenant roster -- used both by the "search by name" quick-add below and by the
+  // edit-mode checkbox picker further down, so it's computed once up top.
+  const activeHomeTherapists = therapists.filter((t) => t.status === "ACTIVE");
+  const assignedTherapistIds = new Set(kid.therapists.map((t) => t.therapist.id));
+
+  function searchByName(query: string) {
+    const needle = query.trim().toLowerCase();
+    setNameSuggestions(
+      needle ? activeHomeTherapists.filter((t) => !assignedTherapistIds.has(t.id) && t.name.toLowerCase().includes(needle)) : []
+    );
+  }
+
+  async function handleAddExisting(therapist: Therapist) {
+    setError("");
+    setAdding(true);
+    try {
+      await api.updateKid(token!, kid.id, { therapistIds: [...assignedTherapistIds, therapist.id] });
+      setNameSearch("");
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to add therapist");
+    } finally {
+      setAdding(false);
+    }
+  }
 
   function loadInvitations() {
     api.listTherapistInvitations(token!).then((rows) => setPendingInvitations(rows.filter((inv) => inv.status === "PENDING" && inv.kid?.id === kid.id)));
@@ -97,6 +127,29 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
             <button type="button" className="btn btn-secondary" onClick={startEditing}>
               Edit support team
             </button>
+          </div>
+        ) : null}
+
+        {canEdit ? (
+          <div className="form-panel" style={{ maxWidth: 420, marginBottom: "1rem" }}>
+            <label className="field">
+              <span className="field-label">Add an existing therapist</span>
+              <AutoComplete
+                value={nameSearch}
+                suggestions={nameSuggestions}
+                completeMethod={(e) => searchByName(e.query)}
+                field="name"
+                placeholder="Search by name..."
+                disabled={adding}
+                onChange={(e) => setNameSearch(typeof e.value === "string" ? e.value : e.value?.name ?? "")}
+                onSelect={(e) => handleAddExisting(e.value as Therapist)}
+                inputClassName="input"
+                style={{ width: "100%" }}
+              />
+            </label>
+            <p className="hint-text" style={{ marginTop: "0.2rem" }}>
+              Only matches therapists already on this tenant's roster. For someone not listed, invite them by email below.
+            </p>
           </div>
         ) : null}
 
@@ -188,7 +241,6 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
   // email" flow, or a now-deactivated home therapist this kid was already assigned before they
   // were deactivated) -- otherwise an already-linked therapist has no checkbox at all and becomes
   // unmanageable here. Deactivated home therapists are excluded only from being newly *added*.
-  const activeHomeTherapists = therapists.filter((t) => t.status === "ACTIVE");
   const pickerOptions = [
     ...activeHomeTherapists.map((t) => ({ id: t.id, name: t.name, tenantId: t.tenantId, tenantName: t.tenant?.name ?? "", deactivated: false })),
     ...kid.therapists
