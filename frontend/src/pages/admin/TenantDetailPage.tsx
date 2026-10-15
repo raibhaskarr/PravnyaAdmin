@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { Tenant, TenantKycStatus } from "../../api/types";
+import type { AuditLogEntry, Tenant, TenantKycStatus } from "../../api/types";
 import {
   businessFieldsFromTenant,
   businessFieldsToUpdateInput,
@@ -10,6 +10,18 @@ import {
   TenantBusinessFieldsSection,
   type BusinessFormState
 } from "../../components/TenantBusinessFields";
+
+const ACTION_LABEL: Record<string, string> = {
+  TENANT_STATUS_CHANGED: "Status changed",
+  TENANT_KYC_STATUS_CHANGED: "KYC status changed"
+};
+
+function auditLabel(entry: AuditLogEntry): string {
+  const label = ACTION_LABEL[entry.action] ?? entry.action;
+  if (entry.fromValue && entry.toValue) return `${label}: ${entry.fromValue} → ${entry.toValue}`;
+  if (entry.toValue) return `${label}: ${entry.toValue}`;
+  return label;
+}
 
 type FormState = BusinessFormState & { kycStatus: TenantKycStatus; kycNotes: string };
 
@@ -24,6 +36,7 @@ export function TenantDetailPage() {
   const { token } = useAuth();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -34,6 +47,7 @@ export function TenantDetailPage() {
       setTenant(t);
       setForm(toFormState(t));
     });
+    api.listTenantAuditLog(token!, tenantId).then(setAuditLog);
   }
 
   useEffect(load, [token, tenantId]);
@@ -56,6 +70,7 @@ export function TenantDetailPage() {
       setTenant(updated);
       setForm(toFormState(updated));
       setSaved(true);
+      api.listTenantAuditLog(token!, tenantId).then(setAuditLog);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save tenant profile");
     } finally {
@@ -103,6 +118,29 @@ export function TenantDetailPage() {
         <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save"}
         </button>
+      </div>
+
+      <h2 style={{ marginTop: "1.5rem" }}>Activity</h2>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Who</th>
+              <th>What changed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {auditLog.map((entry) => (
+              <tr key={entry.id}>
+                <td>{new Date(entry.createdAt).toLocaleString()}</td>
+                <td>{entry.actorEmail}</td>
+                <td>{auditLabel(entry)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {auditLog.length === 0 ? <p className="empty-state">No status or KYC changes recorded for this tenant yet.</p> : null}
       </div>
     </div>
   );

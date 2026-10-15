@@ -26,7 +26,7 @@ tenantsRoutes.patch(
   requireRole("TENANT_ADMIN"),
   validateRequest({ body: updateOwnTenantProfileSchema }),
   asyncHandler(async (req, res) => {
-    res.json(await tenantsService.updateProfile(req.user!.tenantId!, req.body));
+    res.json(await tenantsService.updateProfile(req.user!, req.user!.tenantId!, req.body));
   })
 );
 
@@ -61,7 +61,7 @@ tenantsRoutes.patch(
   requireRole("SUPERADMIN"),
   validateRequest({ params: tenantParamsSchema, body: updateTenantSchema }),
   asyncHandler(async (req, res) => {
-    res.json(await tenantsService.update(req.params.tenantId, req.body));
+    res.json(await tenantsService.update(req.user!, req.params.tenantId, req.body));
   })
 );
 
@@ -70,6 +70,15 @@ tenantsRoutes.patch(
   requireRole("SUPERADMIN"),
   validateRequest({ params: tenantParamsSchema, body: updateTenantProfileSchema }),
   asyncHandler(async (req, res) => {
-    res.json(await tenantsService.updateProfile(req.params.tenantId, req.body));
+    res.json(await tenantsService.updateProfile(req.user!, req.params.tenantId, req.body));
+  })
+);
+
+tenantsRoutes.get(
+  "/:tenantId/audit-log",
+  requireRole("SUPERADMIN"),
+  validateRequest({ params: tenantParamsSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(await tenantsService.auditLog(req.params.tenantId));
   })
 );

@@ -58,6 +58,16 @@ export type Tenant = {
   createdAt: string;
 };
 
+export type AuditLogEntry = {
+  id: string;
+  tenantId: string;
+  actorEmail: string;
+  action: string;
+  fromValue: string | null;
+  toValue: string | null;
+  createdAt: string;
+};
+
 export type TenantHealth = {
   tenantId: string;
   tenantName: string;

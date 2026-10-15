@@ -1,5 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { notFound } from "../../common/errors/AppError";
+import { AuthUser } from "../../common/middleware/auth";
+import { listAuditLogForTenant, recordAuditLog } from "../../common/audit/auditLog.service";
 import { UpdateTenantInput, UpdateTenantProfileInput, UpdateOwnTenantProfileInput } from "./tenants.schemas";
 
 const PROFILE_FIELD_KEYS = [
@@ -65,22 +67,28 @@ export const tenantsService = {
     return tenant;
   },
 
-  async update(tenantId: string, input: UpdateTenantInput) {
-    await this.get(tenantId);
-    return prisma.tenant.update({
+  async update(actor: AuthUser, tenantId: string, input: UpdateTenantInput) {
+    const existing = await this.get(tenantId);
+    const updated = await prisma.tenant.update({
       where: { id: tenantId },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.status !== undefined ? { status: input.status } : {})
       }
     });
+    if (input.status !== undefined && input.status !== existing.status) {
+      await recordAuditLog(actor, { tenantId, action: "TENANT_STATUS_CHANGED", fromValue: existing.status, toValue: input.status });
+    }
+    return updated;
   },
 
   // Shared by the superadmin route (full profile + KYC) and the tenant-admin self-service route
   // (business fields only) -- which fields can actually arrive here is enforced by which zod
-  // schema validated the request body before it got here, not by this method.
-  async updateProfile(tenantId: string, input: UpdateTenantProfileInput | UpdateOwnTenantProfileInput) {
-    await this.get(tenantId);
+  // schema validated the request body before it got here, not by this method. Only the KYC change
+  // gets audited: it's the only field here a superadmin (as opposed to the tenant's own admin)
+  // ever sets, so it's the only one worth a "who approved/rejected this tenant and when" trail.
+  async updateProfile(actor: AuthUser, tenantId: string, input: UpdateTenantProfileInput | UpdateOwnTenantProfileInput) {
+    const existing = await this.get(tenantId);
     const data: Record<string, unknown> = {};
     for (const key of PROFILE_FIELD_KEYS) {
       if (key in input && (input as Record<string, unknown>)[key] !== undefined) {
@@ -89,6 +97,14 @@ export const tenantsService = {
     }
     // Derived, never client-set directly -- a KYC status change is always "reviewed now".
     if ("kycStatus" in input && input.kycStatus !== undefined) data.kycReviewedAt = new Date();
-    return prisma.tenant.update({ where: { id: tenantId }, data });
+    const updated = await prisma.tenant.update({ where: { id: tenantId }, data });
+    if ("kycStatus" in input && input.kycStatus !== undefined && input.kycStatus !== existing.kycStatus) {
+      await recordAuditLog(actor, { tenantId, action: "TENANT_KYC_STATUS_CHANGED", fromValue: existing.kycStatus, toValue: input.kycStatus });
+    }
+    return updated;
+  },
+
+  auditLog(tenantId: string) {
+    return listAuditLogForTenant(tenantId);
   }
 };

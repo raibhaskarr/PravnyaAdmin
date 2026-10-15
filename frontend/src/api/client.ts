@@ -1,4 +1,5 @@
 import type {
+  AuditLogEntry,
   AuthUser,
   CanonicalDomain,
   CanonicalSkill,
@@ -73,6 +74,9 @@ export const api = {
   },
   listTenantHealth(token: string) {
     return request<TenantHealth[]>("/tenants/health", { token });
+  },
+  listTenantAuditLog(token: string, tenantId: string) {
+    return request<AuditLogEntry[]>(`/tenants/${tenantId}/audit-log`, { token });
   },
   updateTenant(token: string, tenantId: string, input: { name?: string; status?: "ACTIVE" | "SUSPENDED" }) {
     return request<Tenant>(`/tenants/${tenantId}`, { token, method: "PATCH", body: input });

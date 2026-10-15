@@ -117,8 +117,34 @@ model Tenant {
   kids       Kid[]
   goals      Goal[]
   therapistInvitations TherapistInvitation[]
+  auditLog   AuditLog[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+}
+
+/// Who changed what on a tenant, when -- scoped to actions a superadmin takes that directly
+/// affect a tenant (status, KYC), not a platform-wide log of every mutation everywhere. Deliberately
+/// only covers actions on an ALREADY-EXISTING Tenant: inviting/revoking a tenant invitation happens
+/// before any real Tenant row exists, so those aren't logged here (see TenantInvitation's own
+/// invitedById/createdAt/status fields, which already self-document that lifecycle).
+/// actorUserId/actorEmail are plain fields, not a relation -- same convention as Goal's
+/// createdById/updatedById -- so this row stays correct and queryable even if the actor's own
+/// account is later changed or removed.
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actorUserId String   @db.Uuid
+  actorEmail  String
+  /// Plain string, not an enum -- the action set is expected to grow as more superadmin actions
+  /// get audited later, and a new value shouldn't need a migration. Currently used:
+  /// "TENANT_STATUS_CHANGED", "TENANT_KYC_STATUS_CHANGED".
+  action      String
+  fromValue   String?
+  toValue     String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
 }
 
 /// A pending/resolved offer for someone to set up a tenant, created by a superadmin with just
