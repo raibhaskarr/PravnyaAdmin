@@ -68,6 +68,11 @@ working unchanged. Not built yet because the free-text version already unblocks 
 (showing and correcting which clinic something came from) at a fraction of the schema/migration
 cost, and it's not yet clear the autocomplete/dedup/reporting value is worth that cost.
 
+A related, larger open question: today a `Kid` belongs to exactly one tenant, period. See
+`06-parent-kid-onboarding-spec.md` for a draft proposal (not yet built) that would let one kid be
+independently enrolled at multiple centres, which changes this single-owner model more
+fundamentally than the `Centre` directory idea above does.
+
 ## Cross-tenant support team: free today, not solved for billing yet
 
 A kid's support team (`KidTherapist`) can include a therapist from a different tenant than the
