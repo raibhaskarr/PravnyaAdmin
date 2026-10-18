@@ -3,6 +3,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
+import { Dialog } from "primereact/dialog";
+import { InputText } from "primereact/inputtext";
+import { Checkbox } from "primereact/checkbox";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, Parent, Therapist } from "../../api/types";
@@ -24,7 +27,10 @@ export function HouseholdDetailPage() {
   const [parent, setParent] = useState<Parent | null>(null);
   const [kids, setKids] = useState<Kid[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
-  const [showForm, setShowForm] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [selectedTherapistIds, setSelectedTherapistIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const canEdit = user?.role === "TENANT_ADMIN";
@@ -40,27 +46,40 @@ export function HouseholdDetailPage() {
 
   useEffect(load, [token, parentId]);
 
+  function openDialog() {
+    setFirstName("");
+    setLastName("");
+    setSelectedTherapistIds(new Set());
+    setError("");
+    setDialogOpen(true);
+  }
+
+  function toggleTherapist(therapistId: string) {
+    setSelectedTherapistIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(therapistId)) next.delete(therapistId);
+      else next.add(therapistId);
+      return next;
+    });
+  }
+
   async function handleAddKid(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!parent) return;
-    const formEl = event.currentTarget;
     setError("");
     setSaving(true);
-    const form = new FormData(formEl);
-    const therapistIds = therapists.filter((t) => form.get(`therapist_${t.id}`) === "on").map((t) => t.id);
     try {
       // parentEmail/parentMobile are this same household's existing values, not re-entered --
       // createKid's find-or-create-by-email reuses the existing Parent row rather than making a
       // new one.
       await api.createKid(token!, {
-        firstName: String(form.get("firstName")),
-        lastName: String(form.get("lastName")),
-        therapistIds,
+        firstName,
+        lastName,
+        therapistIds: [...selectedTherapistIds],
         parentEmail: parent.email,
         parentMobile: parent.mobile
       });
-      setShowForm(false);
-      formEl.reset();
+      setDialogOpen(false);
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to add kid");
@@ -71,6 +90,8 @@ export function HouseholdDetailPage() {
 
   if (!parentId) return null;
   if (!parent) return <p className="empty-state">Loading...</p>;
+
+  const activeTherapists = therapists.filter((t) => t.status === "ACTIVE");
 
   return (
     <div>
@@ -93,50 +114,17 @@ export function HouseholdDetailPage() {
       <h2>Kids</h2>
 
       {canEdit ? (
-        <>
-          <div className="page-toolbar">
-            <Button
-              label={showForm ? "Cancel" : "Add kid"}
-              icon={showForm ? "pi pi-times" : "pi pi-plus"}
-              className="p-button-sm p-button-outlined"
-              onClick={() => setShowForm((v) => !v)}
-            />
-          </div>
-          {showForm ? (
-            <form onSubmit={handleAddKid} className="form-panel" style={{ maxWidth: 420 }}>
-              <label className="field">
-                <span className="field-label">First name</span>
-                <input className="input" name="firstName" required />
-              </label>
-              <label className="field">
-                <span className="field-label">Last name</span>
-                <input className="input" name="lastName" required />
-              </label>
-              <fieldset className="form-group">
-                <legend>Assigned therapists</legend>
-                {therapists
-                  .filter((t) => t.status === "ACTIVE")
-                  .map((t) => (
-                    <label key={t.id} className="checkbox-row">
-                      <input type="checkbox" name={`therapist_${t.id}`} /> {t.name}
-                    </label>
-                  ))}
-              </fieldset>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? "Adding..." : "Add kid"}
-              </button>
-            </form>
-          ) : null}
-        </>
+        <div className="page-toolbar">
+          <Button label="Add kid" icon="pi pi-plus" className="p-button-sm" onClick={openDialog} />
+        </div>
       ) : null}
-
-      {error ? <p className="error-text">{error}</p> : null}
 
       <DataTable
         value={kids}
         emptyMessage="No kids at your centre under this household."
         size="small"
         stripedRows
+        className="mt-3"
         onRowClick={(e) => navigate(`/tenant/kids/${(e.data as Kid).id}`)}
         rowClassName={() => "clickable-row"}
       >
@@ -144,6 +132,39 @@ export function HouseholdDetailPage() {
         <Column field="status" header="Status" />
         <Column header="Therapists" body={(k: Kid) => k.therapists.map((t) => t.therapist.name).join(", ") || "—"} />
       </DataTable>
+
+      <Dialog header={`Add a kid to ${formatHouseholdName(parent)}`} visible={dialogOpen} onHide={() => setDialogOpen(false)} style={{ width: "min(480px, 94vw)" }} modal>
+        <form onSubmit={handleAddKid} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+          <div className="field-grid">
+            <label className="field">
+              <span className="field-label">First name</span>
+              <InputText value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+            </label>
+            <label className="field">
+              <span className="field-label">Last name</span>
+              <InputText value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+            </label>
+          </div>
+
+          <fieldset className="form-group">
+            <legend>Assigned therapists</legend>
+            {activeTherapists.map((t) => (
+              <div key={t.id} className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Checkbox inputId={`therapist_${t.id}`} checked={selectedTherapistIds.has(t.id)} onChange={() => toggleTherapist(t.id)} />
+                <label htmlFor={`therapist_${t.id}`}>{t.name}</label>
+              </div>
+            ))}
+            {activeTherapists.length === 0 ? <p className="hint-text">No active therapists yet.</p> : null}
+          </fieldset>
+
+          {error ? <p className="error-text">{error}</p> : null}
+
+          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+            <Button label="Cancel" type="button" className="p-button-sm p-button-text" onClick={() => setDialogOpen(false)} disabled={saving} />
+            <Button label={saving ? "Adding..." : "Add kid"} type="submit" className="p-button-sm" disabled={saving} />
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }
