@@ -9,12 +9,14 @@ import type {
   EvidenceCandidate,
   Goal,
   GoalItemEvidenceRow,
+  HouseholdSummary,
   GoalItemInput,
   GoalSkillSuggestionResponse,
   IepGoalCandidate,
   InvitationPreview,
   Kid,
   Modality,
+  Parent,
   PocEvidenceOutcome,
   PocModality,
   PocReviewChild,
@@ -240,6 +242,14 @@ export const api = {
   },
   updateKid(token: string, kidId: string, input: { therapistIds?: string[]; status?: "ACTIVE" | "ARCHIVED" }) {
     return request<Kid>(`/kids/${kidId}`, { token, method: "PATCH", body: input });
+  },
+
+  // Households -- creating/adding a kid under one still goes through createKid above
+  listHouseholds(token: string) {
+    return request<HouseholdSummary[]>("/parents", { token });
+  },
+  getHousehold(token: string, parentId: string) {
+    return request<{ parent: Parent; kids: Kid[] }>(`/parents/${parentId}`, { token });
   },
 
   // Goals

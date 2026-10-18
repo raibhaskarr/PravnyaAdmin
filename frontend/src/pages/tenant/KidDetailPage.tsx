@@ -68,6 +68,9 @@ export function KidDetailPage() {
                 <Field label="Address" value={kid.parent.addressLine1} />
                 <Field label="City" value={kid.parent.city} />
               </div>
+              <Link to={`/tenant/households/${kid.parent.id}`} className="hint-text">
+                View household (siblings, add a kid) →
+              </Link>
             </div>
           ) : (
             <p className="empty-state">No household info on file for this kid yet.</p>

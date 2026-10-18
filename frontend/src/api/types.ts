@@ -213,6 +213,8 @@ export type Parent = {
   city: string | null;
 };
 
+export type HouseholdSummary = Parent & { kidCount: number };
+
 export type Kid = {
   id: string;
   tenantId: string;

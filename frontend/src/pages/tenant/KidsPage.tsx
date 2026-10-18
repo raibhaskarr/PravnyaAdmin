@@ -1,11 +1,15 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, Therapist } from "../../api/types";
+import { formatHouseholdName } from "../../utils/household";
 
+/** For a brand new household, use the Households page -- it captures the parent info and this
+ * kid's info together in one step. This form is for a kid with no household yet, or (once
+ * supported here) one to be linked to an existing household by email later. */
 export function KidsPage() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -28,18 +32,11 @@ export function KidsPage() {
     setError("");
     const form = new FormData(formEl);
     const therapistIds = therapists.filter((t) => form.get(`therapist_${t.id}`) === "on").map((t) => t.id);
-    const parentEmail = String(form.get("parentEmail") || "");
     try {
       await api.createKid(token!, {
         firstName: String(form.get("firstName")),
         lastName: String(form.get("lastName")),
-        therapistIds,
-        parentEmail: parentEmail || undefined,
-        parentMobile: String(form.get("parentMobile") || "") || undefined,
-        fatherName: String(form.get("fatherName") || "") || undefined,
-        motherName: String(form.get("motherName") || "") || undefined,
-        addressLine1: String(form.get("addressLine1") || "") || undefined,
-        city: String(form.get("city") || "") || undefined
+        therapistIds
       });
       setShowForm(false);
       formEl.reset();
@@ -62,6 +59,10 @@ export function KidsPage() {
           </div>
           {showForm ? (
             <form onSubmit={handleCreate} className="form-panel">
+              <p className="hint-text" style={{ marginTop: 0 }}>
+                For a brand new household, use <Link to="/tenant/households">Households</Link> instead -- it captures the
+                parent's info and this kid together. This form is for a kid with no household on file.
+              </p>
               <label className="field">
                 <span className="field-label">First name</span>
                 <input className="input" name="firstName" required />
@@ -70,38 +71,6 @@ export function KidsPage() {
                 <span className="field-label">Last name</span>
                 <input className="input" name="lastName" required />
               </label>
-              <fieldset className="form-group">
-                <legend>Household</legend>
-                <p className="hint-text" style={{ marginTop: "-0.3rem", marginBottom: "0.5rem" }}>
-                  Optional -- leave blank if not known yet. If an email is entered, mobile number is required.
-                </p>
-                <div className="field-grid">
-                  <label className="field">
-                    <span className="field-label">Email</span>
-                    <input className="input" name="parentEmail" type="email" />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Mobile</span>
-                    <input className="input" name="parentMobile" type="tel" />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Father's name</span>
-                    <input className="input" name="fatherName" />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Mother's name</span>
-                    <input className="input" name="motherName" />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Address</span>
-                    <input className="input" name="addressLine1" />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">City</span>
-                    <input className="input" name="city" />
-                  </label>
-                </div>
-              </fieldset>
               <fieldset className="form-group">
                 <legend>Assigned therapists</legend>
                 {therapists
@@ -134,6 +103,7 @@ export function KidsPage() {
       >
         <Column header="Name" sortable sortField="firstName" body={(k: Kid) => `${k.firstName} ${k.lastName}`} />
         <Column field="status" header="Status" sortable />
+        <Column header="Household" body={(k: Kid) => (k.parent ? formatHouseholdName(k.parent) : "—")} />
         <Column header="Therapists" body={(k: Kid) => k.therapists.map((t) => t.therapist.name).join(", ") || "—"} />
       </DataTable>
     </div>

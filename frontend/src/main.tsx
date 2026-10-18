@@ -19,6 +19,8 @@ import { TherapistsPage } from "./pages/tenant/TherapistsPage";
 import { TherapistDetailPage } from "./pages/tenant/TherapistDetailPage";
 import { KidsPage } from "./pages/tenant/KidsPage";
 import { KidDetailPage } from "./pages/tenant/KidDetailPage";
+import { HouseholdsPage } from "./pages/tenant/HouseholdsPage";
+import { HouseholdDetailPage } from "./pages/tenant/HouseholdDetailPage";
 import { LogSessionPage } from "./pages/tenant/LogSessionPage";
 import { TenantProfilePage } from "./pages/tenant/TenantProfilePage";
 import { AccountPage as TenantAccountPage } from "./pages/tenant/AccountPage";
@@ -60,6 +62,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/tenant/log" element={<LogSessionPage />} />
               <Route path="/tenant/kids" element={<KidsPage />} />
               <Route path="/tenant/kids/:kidId" element={<KidDetailPage />} />
+              <Route path="/tenant/households" element={<HouseholdsPage />} />
+              <Route path="/tenant/households/:parentId" element={<HouseholdDetailPage />} />
               <Route path="/tenant/account" element={<TenantAccountPage />} />
             </Route>
           </Route>
