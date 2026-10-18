@@ -203,9 +203,21 @@ export type InvitationPreview = {
   kidName: string | null;
 };
 
+export type Parent = {
+  id: string;
+  email: string;
+  fatherName: string | null;
+  motherName: string | null;
+  mobile: string;
+  addressLine1: string | null;
+  city: string | null;
+};
+
 export type Kid = {
   id: string;
   tenantId: string;
+  parentId: string | null;
+  parent: Parent | null;
   firstName: string;
   lastName: string;
   dob: string | null;

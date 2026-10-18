@@ -28,11 +28,18 @@ export function KidsPage() {
     setError("");
     const form = new FormData(formEl);
     const therapistIds = therapists.filter((t) => form.get(`therapist_${t.id}`) === "on").map((t) => t.id);
+    const parentEmail = String(form.get("parentEmail") || "");
     try {
       await api.createKid(token!, {
         firstName: String(form.get("firstName")),
         lastName: String(form.get("lastName")),
-        therapistIds
+        therapistIds,
+        parentEmail: parentEmail || undefined,
+        parentMobile: String(form.get("parentMobile") || "") || undefined,
+        fatherName: String(form.get("fatherName") || "") || undefined,
+        motherName: String(form.get("motherName") || "") || undefined,
+        addressLine1: String(form.get("addressLine1") || "") || undefined,
+        city: String(form.get("city") || "") || undefined
       });
       setShowForm(false);
       formEl.reset();
@@ -63,6 +70,38 @@ export function KidsPage() {
                 <span className="field-label">Last name</span>
                 <input className="input" name="lastName" required />
               </label>
+              <fieldset className="form-group">
+                <legend>Household</legend>
+                <p className="hint-text" style={{ marginTop: "-0.3rem", marginBottom: "0.5rem" }}>
+                  Optional -- leave blank if not known yet. If an email is entered, mobile number is required.
+                </p>
+                <div className="field-grid">
+                  <label className="field">
+                    <span className="field-label">Email</span>
+                    <input className="input" name="parentEmail" type="email" />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Mobile</span>
+                    <input className="input" name="parentMobile" type="tel" />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Father's name</span>
+                    <input className="input" name="fatherName" />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Mother's name</span>
+                    <input className="input" name="motherName" />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Address</span>
+                    <input className="input" name="addressLine1" />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">City</span>
+                    <input className="input" name="city" />
+                  </label>
+                </div>
+              </fieldset>
               <fieldset className="form-group">
                 <legend>Assigned therapists</legend>
                 {therapists

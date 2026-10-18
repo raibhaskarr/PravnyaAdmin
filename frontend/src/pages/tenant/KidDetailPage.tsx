@@ -8,6 +8,15 @@ import { KidGoalsTab } from "./KidGoalsTab";
 import { KidGrowthTab } from "./KidGrowthTab";
 import { KidSupportTeamTab } from "./KidSupportTeamTab";
 
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: "0.6rem" }}>
+      <span className="field-label">{label}</span>
+      <p style={{ margin: "0.1rem 0 0" }}>{value ?? <span className="hint-text">—</span>}</p>
+    </div>
+  );
+}
+
 export function KidDetailPage() {
   const { kidId } = useParams<{ kidId: string }>();
   const { token, user } = useAuth();
@@ -47,6 +56,22 @@ export function KidDetailPage() {
         </TabPanel>
         <TabPanel header="Support Team">
           <KidSupportTeamTab kid={kid} canEdit={canManageTeam} onUpdated={load} />
+        </TabPanel>
+        <TabPanel header="Household">
+          {kid.parent ? (
+            <div className="form-panel" style={{ maxWidth: 480 }}>
+              <div className="field-grid">
+                <Field label="Father's name" value={kid.parent.fatherName} />
+                <Field label="Mother's name" value={kid.parent.motherName} />
+                <Field label="Email" value={kid.parent.email} />
+                <Field label="Mobile" value={kid.parent.mobile} />
+                <Field label="Address" value={kid.parent.addressLine1} />
+                <Field label="City" value={kid.parent.city} />
+              </div>
+            </div>
+          ) : (
+            <p className="empty-state">No household info on file for this kid yet.</p>
+          )}
         </TabPanel>
       </TabView>
     </div>

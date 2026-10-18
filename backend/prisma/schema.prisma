@@ -295,6 +295,12 @@ model Kid {
   id         String      @id @default(uuid()) @db.Uuid
   tenantId   String      @db.Uuid
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Household identity -- orthogonal to tenantId, which still fully determines ownership (see
+  /// Parent's own doc comment). Nullable: every kid created before this shipped has no household
+  /// attached, and a kid can still be created without one. onDelete: SetNull, not Cascade --
+  /// deleting a Parent record must never take a Kid (and its goals/evidence) down with it.
+  parentId   String?     @db.Uuid
+  parent     Parent?     @relation(fields: [parentId], references: [id], onDelete: SetNull)
   firstName  String
   lastName   String
   dob        DateTime?
@@ -306,6 +312,25 @@ model Kid {
   updatedAt  DateTime    @updatedAt
 
   @@index([tenantId])
+  @@index([parentId])
+}
+
+/// Household identity -- deliberately NOT tenant-scoped (a household's two kids can belong to
+/// different tenants, e.g. siblings at different centres) and NOT a row in User (User is
+/// unconditionally centre staff: every non-superadmin row requires a tenantId, which a parent
+/// structurally can't have). No passwordHash yet -- parent login is deferred until the
+/// parent-facing app itself gets planned; see docs/manual/06-parent-kid-onboarding-spec.md.
+model Parent {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  fatherName   String?
+  motherName   String?
+  mobile       String
+  addressLine1 String?
+  city         String?
+  kids         Kid[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 /// A pending/resolved offer for someone to join as a THERAPIST, created either from the general

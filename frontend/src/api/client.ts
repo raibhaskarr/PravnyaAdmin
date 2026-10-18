@@ -222,7 +222,20 @@ export const api = {
   listKids(token: string) {
     return request<Kid[]>("/kids", { token });
   },
-  createKid(token: string, input: { firstName: string; lastName: string; therapistIds: string[] }) {
+  createKid(
+    token: string,
+    input: {
+      firstName: string;
+      lastName: string;
+      therapistIds: string[];
+      parentEmail?: string;
+      parentMobile?: string;
+      fatherName?: string;
+      motherName?: string;
+      addressLine1?: string;
+      city?: string;
+    }
+  ) {
     return request<Kid>("/kids", { token, method: "POST", body: input });
   },
   updateKid(token: string, kidId: string, input: { therapistIds?: string[]; status?: "ACTIVE" | "ARCHIVED" }) {
