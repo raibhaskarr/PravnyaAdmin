@@ -4,28 +4,33 @@
 describes the live system; this one is the exception, included here so the plan ships alongside
 the code it will eventually sit next to, rather than living only in a chat transcript. If you're
 looking for how kids are actually created and managed today, see the "Tenant vs. Centre" section
-in `03-business-logic.md` — that describes the current, shipped `Kid.tenantId` model this page
-proposes changing.
+in `03-business-logic.md`.
 
 ## Goal
 
-Give PravnyaAdmin a household identity (`Parent`) and true multi-centre kid enrollment
-(`KidCentreEnrollment`), replacing today's single-owner `Kid.tenantId`. **Parent login is
-explicitly deferred** until the parent-facing app itself gets planned — this phase is the data
-model plus the centre-initiated (B2B) onboarding flow only.
+Give PravnyaAdmin a household identity (`Parent`) so one login can see multiple kids, and capture
+richer onboarding info (father/mother name, mobile, address, city) than exists today — without
+touching kid-tenant ownership at all. **Parent login is explicitly deferred** until the
+parent-facing app itself gets planned; this phase is the data model plus the centre-initiated
+(B2B) onboarding flow only.
 
-## Why this is bigger than it first looks
+## Kid ownership does not change
 
-Every feature built in PravnyaAdmin so far assumes **one kid = one owning tenant** —
-`Kid.tenantId` is a required, non-nullable foreign key. That assumption is baked into
-`kidVisibilityFilter`/`assertCanAccessKid` (today: "every kid where `tenantId` matches mine"), the
-Superadmin/Tenant Admin health-stats count (`prisma.kid.count({ where: { tenantId } })`),
-`Goal.tenantId`, and `POST /kids` (hard-codes the creating admin's own `tenantId`). True
-multi-centre enrollment means a kid is no longer owned by a tenant at all — ownership moves to the
-parent/household, and each centre relationship becomes its own row. This is an architecture change
-to the tenant-isolation model this whole app is built on, not an additive feature.
+**A kid belongs to exactly one tenant — `Kid.tenantId` stays required, non-nullable, unchanged.**
+An earlier draft of this spec proposed a `KidCentreEnrollment` join table so one kid could be
+independently enrolled at multiple centres. That's scrapped: "a kid can involve multiple centres"
+already means something that's fully built and shipped — a **guest therapist**. Example: Kid A is
+onboarded with ACE (`Kid.tenantId = ACE`, unchanged, forever, unless the kid is formally
+transferred). Kid A can *also* have a therapist from VListen on their support team — that's an
+ordinary `KidTherapist` row pointing at a therapist whose own `tenantId` is VListen, which
+`kidVisibilityFilter` already allows (see `03-business-logic.md`'s Access Control section). No
+schema or access-control change needed for this — it already works.
 
-## Core entities (new / changed)
+Because of this, `kidVisibilityFilter`, the Superadmin/Tenant Admin health-stats count, `Goal.tenantId`,
+and `POST /kids` are all **unaffected by this spec**. Everything below is additive: a new `Parent`
+table, and a new `parentId` column on `Kid` — nothing existing is removed or restructured.
+
+## Core entities (new)
 
 ### `Parent` — household identity, no login yet
 
@@ -48,87 +53,53 @@ Deliberately no `passwordHash` in this phase — login is deferred, so there's n
 authenticate yet. Captured by centre staff during B2B onboarding (below). A new top-level table,
 not a row in the existing `User` table: `User` is unconditionally centre staff (`role: SUPERADMIN
 | TENANT_ADMIN | THERAPIST | VIEWER`, every non-superadmin row requires a `tenantId`), and a
-parent is neither staff nor tenant-scoped.
+parent is neither staff nor tenant-scoped — a household can, in principle, have kids at different
+tenants (sibling A at ACE, sibling B at VListen), so `Parent` itself can't be tenant-scoped either.
 
-### `Kid` — ownership moves off `tenantId`
+### `Kid` — one new column, nothing removed
 
 ```prisma
 model Kid {
-  id          String                 @id @default(uuid()) @db.Uuid
-  parentId    String                 @db.Uuid
-  parent      Parent                 @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  firstName   String
-  lastName    String
-  dob         DateTime?
-  enrollments KidCentreEnrollment[]
-  therapists  KidTherapist[]
-  goals       Goal[]
-  // tenantId removed
+  id         String          @id @default(uuid()) @db.Uuid
+  tenantId   String          @db.Uuid     // unchanged -- still required, still single-owner
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parentId   String?         @db.Uuid     // new
+  parent     Parent?         @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  firstName  String
+  lastName   String
+  dob        DateTime?
+  therapists KidTherapist[]
+  goals      Goal[]
 }
 ```
 
-### `KidCentreEnrollment` — the actual multi-centre relationship
-
-```prisma
-model KidCentreEnrollment {
-  id            String           @id @default(uuid()) @db.Uuid
-  kidId         String           @db.Uuid
-  kid           Kid              @relation(fields: [kidId], references: [id], onDelete: Cascade)
-  tenantId      String           @db.Uuid
-  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  disciplineIds String[]         @default([])
-  status        EnrollmentStatus @default(ACTIVE) // ACTIVE | DISCONTINUED
-  startDate     DateTime?
-  endDate       DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  @@unique([kidId, tenantId])
-  @@index([tenantId])
-}
-```
-
-A kid with two active rows here is genuinely attending two centres independently — this is the
-join table PravnyaAdmin doesn't have today.
-
-## What this breaks / requires rework
-
-- **`kidVisibilityFilter`** — TENANT_ADMIN/VIEWER's "every kid in my tenant" becomes "every kid
-  with an ACTIVE `KidCentreEnrollment` at my tenant."
-- **Health stats** — "total kids" per tenant becomes "kids with an active enrollment at this
-  tenant," not a straight `Kid` count.
-- **`POST /kids`** — forks into the B2B flow below instead of one TENANT_ADMIN-only creation
-  route.
-- **`Goal.tenantId`** — probably stays (a goal is clinical work happening at one specific centre),
-  but should likely reference the specific `KidCentreEnrollment` rather than just `tenantId` +
-  `kidId` loosely, so goals from two different centres for the same kid aren't ambiguous.
-- **`Kid.status`** — not resolved by this spec: does kid-level archived mean the whole household
-  left Pravnya, or does that live entirely at the enrollment level with no kid-level status at
-  all?
-- **`KidTherapist`** — not resolved by this spec: should an assignment scope to "this kid at this
-  centre" rather than just "this kid," so a therapist at Centre A doesn't show up as assigned
-  against work happening at Centre B?
+`parentId` is nullable: every kid created before this ships has no household attached, and a kid
+created by this flow could in principle still be made without one (e.g. a centre that doesn't
+collect full household info today). `onDelete: SetNull`, not `Cascade` — deleting a `Parent` record
+should never take a `Kid` (and that kid's goals/evidence) down with it.
 
 ## This phase's flow: B2B, centre-initiated onboarding
 
-A Tenant Admin or Therapist, while enrolling a new kid at their centre, enters the household info
-(email, father name, mother name, mobile, address, city) alongside the kid's own details
-(first/last name, DOB) and which therapies/disciplines at this centre. Two sub-cases:
+A Tenant Admin, while onboarding a new kid at their centre, enters the household info (email,
+father name, mother name, mobile, address, city) alongside the kid's own details (first/last name,
+DOB) exactly as today — the only change is these new fields get captured and a `Parent` row gets
+created or reused. Two sub-cases:
 
-1. **New household** — no `Parent` row exists for that email yet. Creates the `Parent`, the `Kid`,
-   and one `KidCentreEnrollment` for this tenant, all in one step. No invite email, no password —
-   there's nothing to invite them to yet.
+1. **New household** — no `Parent` row exists for that email yet. Creates the `Parent` and the
+   `Kid` (with `tenantId` set to the creating admin's own tenant, same as today) in one step. No
+   invite email, no password — there's nothing to invite them to yet.
 2. **Existing household** — a `Parent` row with that email already exists (a sibling was onboarded
-   before, or this same kid is now also attending a second centre). Look up by email first; reuse
-   that `Parent` row rather than creating a duplicate, and either add a new `Kid` under it, or add
-   a new `KidCentreEnrollment` for this tenant against the existing `Kid`.
+   before, possibly at a *different* tenant). Look up by email first; reuse that `Parent` row
+   rather than creating a duplicate, and attach the new `Kid` to it (still with its own
+   `tenantId` — the new kid is NOT retroactively linked to the sibling's tenant).
 
-For sub-case 2, since there's no parent login yet, a centre can attach a new enrollment to an
-existing household purely from the email match, with no parent-side confirmation step — there's no
-mechanism for the parent to confirm or dispute it pre-login anyway. This is a known, accepted gap
-for this phase, not a solved problem: once parent login exists, add a confirmation step (the
-parent approves a new centre's enrollment request from their own account) rather than trusting the
-inviting centre's email lookup alone.
+Sub-case 2 raises a real cross-tenant data question worth flagging rather than deciding here: does
+a Tenant Admin at ACE, onboarding a new kid, get to find out that this parent's email already has
+a household record — possibly one created by VListen's staff, about a sibling ACE has no
+relationship with at all? A plain "email already exists, reuse it" lookup is the simplest
+implementation, but it means one tenant's onboarding flow can observe that *some* household exists
+at another tenant, even if it reveals nothing about which tenant or which kid. Worth a deliberate
+decision before building, not an accidental byproduct of the lookup.
 
 ## Deferred — parent-facing app
 
@@ -137,11 +108,13 @@ inviting centre's email lookup alone.
   existing, so it's deferred alongside it.
 - Where parents would eventually log in (new role/nav on this same frontend vs. a separate
   application) is a question for that future planning pass, not this one.
-- The existing-household consent gap noted above — revisit once login exists.
+- The cross-tenant household-lookup question above — revisit once login exists, since the parent
+  themself could be the one who confirms/links a new centre to their existing account instead of
+  staff doing an email lookup.
 
 ## Open items not decided by this spec
 
-- `Kid.status` vs. `KidCentreEnrollment.status` split.
-- `KidTherapist` scoping to a specific enrollment vs. staying kid-global.
 - Weekly schedule — not addressed at all yet. `PranTrackingSystem`'s `WeeklyScheduleEntry` is the
   closest analog, but nothing here proposes an equivalent for PravnyaAdmin.
+- What a Tenant Admin sees/can do when the email lookup in sub-case 2 above finds an existing
+  household (full reuse vs. a lighter "this email is already registered, contact support" path).
