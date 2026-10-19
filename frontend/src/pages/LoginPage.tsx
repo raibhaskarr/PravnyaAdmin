@@ -1,7 +1,14 @@
 import { FormEvent, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { InputText } from "primereact/inputtext";
+import { Password } from "primereact/password";
+import { Button } from "primereact/button";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/client";
+// This page is never wrapped by AdminLayout (it's the pre-auth entry point), which is otherwise
+// the only place PrimeReact's theme/primeicons CSS gets imported -- without this, Password/Button
+// below would render completely unstyled.
+import "../adminLayout.css";
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -33,15 +40,13 @@ export function LoginPage() {
         <form onSubmit={handleSubmit} className="login-form">
           <label className="field">
             <span className="field-label">Email</span>
-            <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <InputText type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
           </label>
           <label className="field">
             <span className="field-label">Password</span>
-            <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            <Password value={password} onChange={(e) => setPassword(e.target.value)} feedback={false} toggleMask required inputClassName="input" style={{ width: "100%" }} />
           </label>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? "Signing in..." : "Sign in"}
-          </button>
+          <Button label={submitting ? "Signing in..." : "Sign in"} type="submit" className="p-button-sm" disabled={submitting} />
           {error ? <p className="error-text">{error}</p> : null}
         </form>
       </div>

@@ -1,8 +1,14 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { InputText } from "primereact/inputtext";
+import { Password } from "primereact/password";
+import { Button } from "primereact/button";
 import { useAuth } from "../context/AuthContext";
 import { api, ApiError } from "../api/client";
 import type { InvitationPreview } from "../api/types";
+// Never wrapped by AdminLayout (pre-auth) -- see LoginPage.tsx's same import for why this is
+// needed directly here.
+import "../adminLayout.css";
 
 export function AcceptInvitePage() {
   const { token: inviteToken } = useParams<{ token: string }>();
@@ -70,27 +76,42 @@ export function AcceptInvitePage() {
             <form onSubmit={handleSubmit} className="login-form">
               <label className="field">
                 <span className="field-label">Your name</span>
-                <input className="input" required value={name} onChange={(e) => setName(e.target.value)} />
+                <InputText required value={name} onChange={(e) => setName(e.target.value)} autoFocus />
               </label>
               <label className="field">
                 <span className="field-label">Email</span>
-                <input className="input" value={preview.email} disabled />
+                <InputText value={preview.email} disabled />
               </label>
               <label className="field">
                 <span className="field-label">Phone</span>
-                <input className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <InputText type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
               </label>
               <label className="field">
                 <span className="field-label">Set a password</span>
-                <input className="input" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Password
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  toggleMask
+                  inputClassName="input"
+                  style={{ width: "100%" }}
+                />
               </label>
               <label className="field">
                 <span className="field-label">Confirm password</span>
-                <input className="input" type="password" required minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                <Password
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  feedback={false}
+                  toggleMask
+                  inputClassName="input"
+                  style={{ width: "100%" }}
+                />
               </label>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? "Setting up your account..." : "Accept and continue"}
-              </button>
+              <Button label={submitting ? "Setting up your account..." : "Accept and continue"} type="submit" className="p-button-sm" disabled={submitting} />
               {submitError ? <p className="error-text">{submitError}</p> : null}
             </form>
           </>
