@@ -5,11 +5,11 @@ import { Column } from "primereact/column";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, Therapist } from "../../api/types";
-import { formatHouseholdName } from "../../utils/household";
+import { formatParentName } from "../../utils/parent";
 
-/** For a brand new household, use the Households page -- it captures the parent info and this
- * kid's info together in one step. This form is for a kid with no household yet, or (once
- * supported here) one to be linked to an existing household by email later. */
+/** For a brand new parent, use the Parents page -- it captures the parent info and this
+ * kid's info together in one step. This form is for a kid with no parent on file yet, or (once
+ * supported here) one to be linked to an existing parent by email later. */
 export function KidsPage() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -60,8 +60,8 @@ export function KidsPage() {
           {showForm ? (
             <form onSubmit={handleCreate} className="form-panel">
               <p className="hint-text" style={{ marginTop: 0 }}>
-                For a brand new household, use <Link to="/tenant/households">Households</Link> instead -- it captures the
-                parent's info and this kid together. This form is for a kid with no household on file.
+                For a brand new parent, use <Link to="/tenant/parents">Parents</Link> instead -- it captures the
+                parent's info and this kid together. This form is for a kid with no parent on file.
               </p>
               <label className="field">
                 <span className="field-label">First name</span>
@@ -103,7 +103,7 @@ export function KidsPage() {
       >
         <Column header="Name" sortable sortField="firstName" body={(k: Kid) => `${k.firstName} ${k.lastName}`} />
         <Column field="status" header="Status" sortable />
-        <Column header="Household" body={(k: Kid) => (k.parent ? formatHouseholdName(k.parent) : "—")} />
+        <Column header="Parent" body={(k: Kid) => (k.parent ? formatParentName(k.parent) : "—")} />
         <Column header="Therapists" body={(k: Kid) => k.therapists.map((t) => t.therapist.name).join(", ") || "—"} />
       </DataTable>
     </div>

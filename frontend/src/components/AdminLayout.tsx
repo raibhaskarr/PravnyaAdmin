@@ -33,7 +33,7 @@ function navItemsForRole(role: AuthUser["role"]): NavItem[] {
     ...(role !== "VIEWER" ? [{ to: "/tenant/log", label: "Log a session", icon: "pi pi-pencil" }] : []),
     { to: "/tenant/disciplines", label: "Disciplines", icon: "pi pi-sitemap" },
     { to: "/tenant/therapists", label: "Therapists", icon: "pi pi-users" },
-    { to: "/tenant/households", label: "Households", icon: "pi pi-home" },
+    { to: "/tenant/parents", label: "Parents", icon: "pi pi-home" },
     { to: "/tenant/kids", label: "Kids", icon: "pi pi-id-card" },
     ...(role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile", icon: "pi pi-briefcase" }] : [])
   ];

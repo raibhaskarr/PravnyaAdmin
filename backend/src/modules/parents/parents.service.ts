@@ -42,7 +42,7 @@ export const parentsService = {
       where: { ...filter, parentId },
       orderBy: { firstName: "asc" }
     });
-    if (kids.length === 0) throw notFound("Household not found");
+    if (kids.length === 0) throw notFound("Parent not found");
 
     const parent = await prisma.parent.findUniqueOrThrow({ where: { id: parentId } });
     return { parent, kids };

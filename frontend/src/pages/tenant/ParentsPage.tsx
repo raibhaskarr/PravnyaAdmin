@@ -8,8 +8,8 @@ import { InputText } from "primereact/inputtext";
 import { Checkbox } from "primereact/checkbox";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { HouseholdSummary, Therapist } from "../../api/types";
-import { formatHouseholdName } from "../../utils/household";
+import type { ParentSummary, Therapist } from "../../api/types";
+import { formatParentName } from "../../utils/parent";
 
 const EMPTY_FORM = {
   parentEmail: "",
@@ -24,14 +24,14 @@ const EMPTY_FORM = {
 
 type FormState = typeof EMPTY_FORM;
 
-/** The primary onboarding entry point: a household and its first kid are created together (see
- * docs/manual/06-parent-kid-onboarding-spec.md -- a household is never created with zero kids, so
- * "which households can I see" stays exactly "which kids can I see", one level up). Adding a
- * further kid to an existing household happens from HouseholdDetailPage, not here. */
-export function HouseholdsPage() {
+/** The primary onboarding entry point: a parent (household) and its first kid are created
+ * together (see docs/manual/06-parent-kid-onboarding-spec.md -- a parent record is never created
+ * with zero kids, so "which parents can I see" stays exactly "which kids can I see", one level
+ * up). Adding a further kid to an existing parent happens from ParentDetailPage, not here. */
+export function ParentsPage() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
-  const [households, setHouseholds] = useState<HouseholdSummary[]>([]);
+  const [parents, setParents] = useState<ParentSummary[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -43,9 +43,9 @@ export function HouseholdsPage() {
 
   function load() {
     setLoading(true);
-    Promise.all([api.listHouseholds(token!), api.listTherapists(token!)])
-      .then(([h, t]) => {
-        setHouseholds(h);
+    Promise.all([api.listParents(token!), api.listTherapists(token!)])
+      .then(([p, t]) => {
+        setParents(p);
         setTherapists(t);
       })
       .finally(() => setLoading(false));
@@ -92,7 +92,7 @@ export function HouseholdsPage() {
       setDialogOpen(false);
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create household");
+      setError(err instanceof ApiError ? err.message : "Failed to create parent");
     } finally {
       setSaving(false);
     }
@@ -100,35 +100,35 @@ export function HouseholdsPage() {
 
   return (
     <div>
-      <h1>Households</h1>
+      <h1>Parents</h1>
 
       {canEdit ? (
         <div className="page-toolbar">
-          <Button label="New household" icon="pi pi-plus" className="p-button-sm" onClick={openDialog} />
+          <Button label="New parent" icon="pi pi-plus" className="p-button-sm" onClick={openDialog} />
         </div>
       ) : null}
 
       <DataTable
-        value={households}
+        value={parents}
         loading={loading}
-        emptyMessage="No households yet."
+        emptyMessage="No parents yet."
         sortMode="multiple"
         removableSort
         stripedRows
         size="small"
         className="mt-3"
-        onRowClick={(e) => navigate(`/tenant/households/${(e.data as HouseholdSummary).id}`)}
+        onRowClick={(e) => navigate(`/tenant/parents/${(e.data as ParentSummary).id}`)}
         rowClassName={() => "clickable-row"}
       >
-        <Column header="Household" sortable sortField="fatherName" body={(h: HouseholdSummary) => formatHouseholdName(h)} />
+        <Column header="Parent" sortable sortField="fatherName" body={(p: ParentSummary) => formatParentName(p)} />
         <Column field="email" header="Email" sortable />
         <Column field="mobile" header="Mobile" />
-        <Column field="city" header="City" sortable body={(h: HouseholdSummary) => h.city ?? "—"} />
-        <Column header="Kids" sortable sortField="kidCount" body={(h: HouseholdSummary) => h.kidCount} />
+        <Column field="city" header="City" sortable body={(p: ParentSummary) => p.city ?? "—"} />
+        <Column header="Kids" sortable sortField="kidCount" body={(p: ParentSummary) => p.kidCount} />
       </DataTable>
 
       <Dialog
-        header="New household"
+        header="New parent"
         visible={dialogOpen}
         onHide={() => setDialogOpen(false)}
         style={{ width: "min(640px, 94vw)" }}
@@ -136,7 +136,7 @@ export function HouseholdsPage() {
       >
         <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
           <fieldset className="form-group">
-            <legend>Household</legend>
+            <legend>Parent</legend>
             <div className="field-grid">
               <label className="field">
                 <span className="field-label">Email</span>
@@ -196,7 +196,7 @@ export function HouseholdsPage() {
 
           <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
             <Button label="Cancel" type="button" className="p-button-sm p-button-text" onClick={() => setDialogOpen(false)} disabled={saving} />
-            <Button label={saving ? "Creating..." : "Create household"} type="submit" className="p-button-sm" disabled={saving} />
+            <Button label={saving ? "Creating..." : "Create parent"} type="submit" className="p-button-sm" disabled={saving} />
           </div>
         </form>
       </Dialog>

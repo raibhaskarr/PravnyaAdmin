@@ -9,7 +9,7 @@ import { Checkbox } from "primereact/checkbox";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, Parent, Therapist } from "../../api/types";
-import { formatHouseholdName } from "../../utils/household";
+import { formatParentName } from "../../utils/parent";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -20,7 +20,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function HouseholdDetailPage() {
+export function ParentDetailPage() {
   const { parentId } = useParams<{ parentId: string }>();
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ export function HouseholdDetailPage() {
 
   function load() {
     if (!parentId) return;
-    api.getHousehold(token!, parentId).then((data) => {
+    api.getParent(token!, parentId).then((data) => {
       setParent(data.parent);
       setKids(data.kids);
     });
@@ -69,7 +69,7 @@ export function HouseholdDetailPage() {
     setError("");
     setSaving(true);
     try {
-      // parentEmail/parentMobile are this same household's existing values, not re-entered --
+      // parentEmail/parentMobile are this same parent's existing values, not re-entered --
       // createKid's find-or-create-by-email reuses the existing Parent row rather than making a
       // new one.
       await api.createKid(token!, {
@@ -95,10 +95,10 @@ export function HouseholdDetailPage() {
 
   return (
     <div>
-      <Link to="/tenant/households" className="hint-text" style={{ display: "inline-block", marginBottom: "0.75rem" }}>
-        ← Back to Households
+      <Link to="/tenant/parents" className="hint-text" style={{ display: "inline-block", marginBottom: "0.75rem" }}>
+        ← Back to Parents
       </Link>
-      <h1>{formatHouseholdName(parent)}</h1>
+      <h1>{formatParentName(parent)}</h1>
 
       <div className="form-panel" style={{ maxWidth: 480, marginBottom: "1.25rem" }}>
         <div className="field-grid">
@@ -121,7 +121,7 @@ export function HouseholdDetailPage() {
 
       <DataTable
         value={kids}
-        emptyMessage="No kids at your centre under this household."
+        emptyMessage="No kids at your centre for this parent."
         size="small"
         stripedRows
         className="mt-3"
@@ -133,7 +133,7 @@ export function HouseholdDetailPage() {
         <Column header="Therapists" body={(k: Kid) => k.therapists.map((t) => t.therapist.name).join(", ") || "—"} />
       </DataTable>
 
-      <Dialog header={`Add a kid to ${formatHouseholdName(parent)}`} visible={dialogOpen} onHide={() => setDialogOpen(false)} style={{ width: "min(480px, 94vw)" }} modal>
+      <Dialog header={`Add a kid to ${formatParentName(parent)}`} visible={dialogOpen} onHide={() => setDialogOpen(false)} style={{ width: "min(480px, 94vw)" }} modal>
         <form onSubmit={handleAddKid} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
           <div className="field-grid">
             <label className="field">

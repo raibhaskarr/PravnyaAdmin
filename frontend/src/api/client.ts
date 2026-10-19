@@ -9,7 +9,7 @@ import type {
   EvidenceCandidate,
   Goal,
   GoalItemEvidenceRow,
-  HouseholdSummary,
+  ParentSummary,
   GoalItemInput,
   GoalSkillSuggestionResponse,
   IepGoalCandidate,
@@ -244,11 +244,11 @@ export const api = {
     return request<Kid>(`/kids/${kidId}`, { token, method: "PATCH", body: input });
   },
 
-  // Households -- creating/adding a kid under one still goes through createKid above
-  listHouseholds(token: string) {
-    return request<HouseholdSummary[]>("/parents", { token });
+  // Parents -- creating/adding a kid under one still goes through createKid above
+  listParents(token: string) {
+    return request<ParentSummary[]>("/parents", { token });
   },
-  getHousehold(token: string, parentId: string) {
+  getParent(token: string, parentId: string) {
     return request<{ parent: Parent; kids: Kid[] }>(`/parents/${parentId}`, { token });
   },
 
