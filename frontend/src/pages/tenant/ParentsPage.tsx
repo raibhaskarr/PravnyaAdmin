@@ -24,10 +24,11 @@ const EMPTY_FORM = {
 
 type FormState = typeof EMPTY_FORM;
 
-/** The primary onboarding entry point: a parent (household) and its first kid are created
- * together (see docs/manual/06-parent-kid-onboarding-spec.md -- a parent record is never created
- * with zero kids, so "which parents can I see" stays exactly "which kids can I see", one level
- * up). Adding a further kid to an existing parent happens from ParentDetailPage, not here. */
+/** The primary onboarding entry point: create a parent, optionally with a first kid in the same
+ * step. A parent with no kid yet stays visible here (and on its own detail page) because the
+ * backend tracks which tenant created it -- see parents.service.ts's canSeeEveryKidInTenant and
+ * docs/manual/06-parent-kid-onboarding-spec.md. Adding a further kid to an existing parent happens
+ * from ParentDetailPage, not here. */
 export function ParentsPage() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -76,19 +77,30 @@ export function ParentsPage() {
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+
+    const hasFirstName = form.firstName.trim().length > 0;
+    const hasLastName = form.lastName.trim().length > 0;
+    if (hasFirstName !== hasLastName) {
+      setError("Enter both first and last name for the first kid, or leave both blank.");
+      return;
+    }
+    const addingKid = hasFirstName && hasLastName;
+
     setSaving(true);
     try {
-      await api.createKid(token!, {
-        firstName: form.firstName,
-        lastName: form.lastName,
-        therapistIds: [...selectedTherapistIds],
+      const parentFields = {
         parentEmail: form.parentEmail,
         parentMobile: form.parentMobile,
         fatherName: form.fatherName || undefined,
         motherName: form.motherName || undefined,
         addressLine1: form.addressLine1 || undefined,
         city: form.city || undefined
-      });
+      };
+      if (addingKid) {
+        await api.createKid(token!, { firstName: form.firstName, lastName: form.lastName, therapistIds: [...selectedTherapistIds], ...parentFields });
+      } else {
+        await api.createParent(token!, parentFields);
+      }
       setDialogOpen(false);
       load();
     } catch (err) {
@@ -166,31 +178,36 @@ export function ParentsPage() {
           </fieldset>
 
           <fieldset className="form-group">
-            <legend>First kid</legend>
+            <legend>First kid (optional)</legend>
+            <p className="hint-text" style={{ marginTop: "-0.3rem", marginBottom: "0.5rem" }}>
+              Leave blank to add just the parent -- a kid can be added to them later.
+            </p>
             <div className="field-grid">
               <label className="field">
                 <span className="field-label">First name</span>
-                <InputText value={form.firstName} onChange={(e) => set("firstName", e.target.value)} required />
+                <InputText value={form.firstName} onChange={(e) => set("firstName", e.target.value)} />
               </label>
               <label className="field">
                 <span className="field-label">Last name</span>
-                <InputText value={form.lastName} onChange={(e) => set("lastName", e.target.value)} required />
+                <InputText value={form.lastName} onChange={(e) => set("lastName", e.target.value)} />
               </label>
             </div>
           </fieldset>
 
-          <fieldset className="form-group">
-            <legend>Assigned therapists</legend>
-            {therapists
-              .filter((t) => t.status === "ACTIVE")
-              .map((t) => (
-                <div key={t.id} className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <Checkbox inputId={`therapist_${t.id}`} checked={selectedTherapistIds.has(t.id)} onChange={() => toggleTherapist(t.id)} />
-                  <label htmlFor={`therapist_${t.id}`}>{t.name}</label>
-                </div>
-              ))}
-            {therapists.filter((t) => t.status === "ACTIVE").length === 0 ? <p className="hint-text">No active therapists yet.</p> : null}
-          </fieldset>
+          {form.firstName.trim() || form.lastName.trim() ? (
+            <fieldset className="form-group">
+              <legend>Assigned therapists</legend>
+              {therapists
+                .filter((t) => t.status === "ACTIVE")
+                .map((t) => (
+                  <div key={t.id} className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <Checkbox inputId={`therapist_${t.id}`} checked={selectedTherapistIds.has(t.id)} onChange={() => toggleTherapist(t.id)} />
+                    <label htmlFor={`therapist_${t.id}`}>{t.name}</label>
+                  </div>
+                ))}
+              {therapists.filter((t) => t.status === "ACTIVE").length === 0 ? <p className="hint-text">No active therapists yet.</p> : null}
+            </fieldset>
+          ) : null}
 
           {error ? <p className="error-text">{error}</p> : null}
 

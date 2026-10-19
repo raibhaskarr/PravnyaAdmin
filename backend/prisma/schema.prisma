@@ -142,6 +142,7 @@ model Tenant {
   goals      Goal[]
   therapistInvitations TherapistInvitation[]
   auditLog   AuditLog[]
+  createdParents Parent[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -329,8 +330,18 @@ model Parent {
   addressLine1 String?
   city         String?
   kids         Kid[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  /// The tenant whose admin first created this parent record -- never changes on reuse (see
+  /// findOrCreateParent). Exists purely for visibility: a parent with zero kids yet (created via
+  /// the standalone "Add parent" flow, no first kid) isn't discoverable through kidVisibilityFilter
+  /// at all, so a TENANT_ADMIN/VIEWER's "every parent at my tenant" view falls back to this field
+  /// instead. onDelete: SetNull, not Cascade -- deleting a Tenant must never take a Parent record
+  /// down with it (it may still be linked to kids at other tenants).
+  createdByTenantId String?  @db.Uuid
+  createdByTenant   Tenant?  @relation(fields: [createdByTenantId], references: [id], onDelete: SetNull)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([createdByTenantId])
 }
 
 /// A pending/resolved offer for someone to join as a THERAPIST, created either from the general

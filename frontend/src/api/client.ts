@@ -257,12 +257,19 @@ export const api = {
     return request<Kid>(`/kids/${kidId}`, { token, method: "PATCH", body: input });
   },
 
-  // Parents -- creating/adding a kid under one still goes through createKid above
+  // Parents -- adding a kid under one (with or without a first kid attached) still goes through
+  // createKid above; createParent below is for "Add parent" with no kid at all.
   listParents(token: string) {
     return request<ParentSummary[]>("/parents", { token });
   },
   getParent(token: string, parentId: string) {
     return request<{ parent: Parent; kids: Kid[] }>(`/parents/${parentId}`, { token });
+  },
+  createParent(
+    token: string,
+    input: { parentEmail: string; parentMobile: string; fatherName?: string; motherName?: string; addressLine1?: string; city?: string }
+  ) {
+    return request<Parent>("/parents", { token, method: "POST", body: input });
   },
 
   // Goals
