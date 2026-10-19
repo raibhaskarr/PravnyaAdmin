@@ -1,5 +1,5 @@
 import { prisma } from "../../config/prisma";
-import { notFound } from "../../common/errors/AppError";
+import { conflict, notFound } from "../../common/errors/AppError";
 import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid, kidVisibilityFilter } from "../../common/access/kidAccess";
 import { recordAuditLog } from "../../common/audit/auditLog.service";
@@ -10,13 +10,43 @@ import { CreateKidInput, UpdateKidInput } from "./kids.schemas";
 // all share the kid's own tenant, plus disciplineIds/status so the support team table can render
 // a discipline and an active/deactivated role without a second lookup against the home roster
 // (which wouldn't even cover a cross-tenant guest). See kidAccess.ts. Also includes the kid's
-// household (parent), which may be null -- not every kid has one.
+// parent, which may be null -- not every kid has one.
 const kidDetailInclude = {
   therapists: {
     include: { therapist: { select: { id: true, name: true, disciplineIds: true, status: true, tenant: { select: { id: true, name: true } } } } }
   },
   parent: true
 };
+
+type ParentFieldsInput = {
+  parentEmail: string;
+  parentMobile: string;
+  fatherName?: string;
+  motherName?: string;
+  addressLine1?: string;
+  city?: string;
+};
+
+// Find-or-create by email, silently -- shared by create() (onboarding) and update() (linking a
+// parent to a kid that was added without one). Never overwrites an existing parent's info with
+// whatever this request happened to send, and the response is identical whether the email was
+// brand new or already existed -- this tenant's admin shouldn't be able to tell, from this call
+// alone, whether a parent record already existed elsewhere (see
+// docs/manual/06-parent-kid-onboarding-spec.md).
+function findOrCreateParent(input: ParentFieldsInput) {
+  return prisma.parent.upsert({
+    where: { email: input.parentEmail },
+    update: {},
+    create: {
+      email: input.parentEmail,
+      mobile: input.parentMobile,
+      fatherName: input.fatherName,
+      motherName: input.motherName,
+      addressLine1: input.addressLine1,
+      city: input.city
+    }
+  });
+}
 
 export const kidsService = {
   async list(user: AuthUser) {
@@ -39,26 +69,10 @@ export const kidsService = {
   },
 
   async create(actor: AuthUser, input: CreateKidInput) {
-    // Find-or-create by email, silently -- never overwrites an existing household's info (e.g.
-    // from a different tenant's onboarding) with whatever this request happened to send, and the
-    // response shape is identical whether the email was brand new or already existed. That's
-    // deliberate: this tenant's admin shouldn't be able to tell, from this call alone, whether a
-    // household record already existed elsewhere (see docs/manual/06-parent-kid-onboarding-spec.md).
     let parentId: string | undefined;
     if (input.parentEmail) {
-      const parent = await prisma.parent.upsert({
-        where: { email: input.parentEmail },
-        update: {},
-        create: {
-          email: input.parentEmail,
-          // Schema-guaranteed non-null whenever parentEmail is set (see createKidSchema's refine).
-          mobile: input.parentMobile!,
-          fatherName: input.fatherName,
-          motherName: input.motherName,
-          addressLine1: input.addressLine1,
-          city: input.city
-        }
-      });
+      // Schema-guaranteed non-null whenever parentEmail is set (see createKidSchema's refine).
+      const parent = await findOrCreateParent({ ...input, parentEmail: input.parentEmail, parentMobile: input.parentMobile! });
       parentId = parent.id;
     }
 
@@ -82,7 +96,19 @@ export const kidsService = {
   },
 
   async update(user: AuthUser, kidId: string, input: UpdateKidInput) {
-    await assertCanAccessKid(user, kidId);
+    const existing = await assertCanAccessKid(user, kidId);
+
+    let parentId: string | undefined;
+    if (input.parentEmail) {
+      // Linking a parent is for a kid that doesn't have one yet -- reassigning a kid that already
+      // has a parent on file to a *different* parent is a more sensitive operation (could be a
+      // typo'd email silently repointing clinical history at the wrong family) and isn't what this
+      // path is for.
+      if (existing.parentId) throw conflict("This kid already has a parent on file");
+      const parent = await findOrCreateParent({ ...input, parentEmail: input.parentEmail, parentMobile: input.parentMobile! });
+      parentId = parent.id;
+      await recordAuditLog(user, { tenantId: user.tenantId!, action: "PARENT_LINKED", fromValue: null, toValue: null });
+    }
 
     if (input.therapistIds !== undefined) {
       // Therapist ids are intentionally not tenant-scoped here -- a kid's support team can
@@ -103,8 +129,10 @@ export const kidsService = {
         ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
         ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
         ...(input.dob !== undefined ? { dob: input.dob ? new Date(input.dob) : null } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {})
-      }
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(parentId !== undefined ? { parentId } : {})
+      },
+      include: kidDetailInclude
     });
   }
 };

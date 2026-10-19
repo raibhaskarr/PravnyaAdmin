@@ -240,7 +240,20 @@ export const api = {
   ) {
     return request<Kid>("/kids", { token, method: "POST", body: input });
   },
-  updateKid(token: string, kidId: string, input: { therapistIds?: string[]; status?: "ACTIVE" | "ARCHIVED" }) {
+  updateKid(
+    token: string,
+    kidId: string,
+    input: {
+      therapistIds?: string[];
+      status?: "ACTIVE" | "ARCHIVED";
+      parentEmail?: string;
+      parentMobile?: string;
+      fatherName?: string;
+      motherName?: string;
+      addressLine1?: string;
+      city?: string;
+    }
+  ) {
     return request<Kid>(`/kids/${kidId}`, { token, method: "PATCH", body: input });
   },
 

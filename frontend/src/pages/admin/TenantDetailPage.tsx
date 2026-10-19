@@ -21,7 +21,8 @@ const ACTION_LABEL: Record<string, string> = {
   TENANT_KYC_STATUS_CHANGED: "KYC status changed",
   THERAPIST_INVITED: "Therapist invited",
   THERAPIST_INVITATION_REVOKED: "Therapist invitation revoked",
-  KID_ADDED: "Kid added"
+  KID_ADDED: "Kid added",
+  PARENT_LINKED: "Parent linked to a kid"
 };
 
 function auditLabel(entry: AuditLogEntry): string {
