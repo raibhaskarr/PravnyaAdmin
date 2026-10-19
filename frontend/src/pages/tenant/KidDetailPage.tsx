@@ -4,9 +4,11 @@ import { TabView, TabPanel } from "primereact/tabview";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
+import { AutoComplete } from "primereact/autocomplete";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { Kid } from "../../api/types";
+import type { Kid, ParentSummary } from "../../api/types";
+import { formatParentName } from "../../utils/parent";
 import { KidGoalsTab } from "./KidGoalsTab";
 import { KidGrowthTab } from "./KidGrowthTab";
 import { KidSupportTeamTab } from "./KidSupportTeamTab";
@@ -20,11 +22,16 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+type ParentSuggestion = ParentSummary & { displayName: string };
+
 export function KidDetailPage() {
   const { kidId } = useParams<{ kidId: string }>();
   const { token, user } = useAuth();
   const [kid, setKid] = useState<Kid | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [parents, setParents] = useState<ParentSummary[]>([]);
+  const [nameSearch, setNameSearch] = useState("");
+  const [nameSuggestions, setNameSuggestions] = useState<ParentSuggestion[]>([]);
   const [parentEmail, setParentEmail] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -41,18 +48,32 @@ export function KidDetailPage() {
   useEffect(load, [token, kidId]);
 
   function openDialog() {
+    setNameSearch("");
     setParentEmail("");
     setError("");
     setDialogOpen(true);
+    api.listParents(token!).then(setParents);
   }
 
-  async function handleLinkParent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function searchByName(query: string) {
+    const needle = query.trim().toLowerCase();
+    if (!needle) {
+      setNameSuggestions([]);
+      return;
+    }
+    setNameSuggestions(
+      parents
+        .filter((p) => p.fatherName?.toLowerCase().includes(needle) || p.motherName?.toLowerCase().includes(needle))
+        .map((p) => ({ ...p, displayName: formatParentName(p) }))
+    );
+  }
+
+  async function linkParent(email: string) {
     if (!kid) return;
     setError("");
     setSaving(true);
     try {
-      await api.updateKid(token!, kid.id, { parentEmail });
+      await api.updateKid(token!, kid.id, { parentEmail: email });
       setDialogOpen(false);
       load();
     } catch (err) {
@@ -60,6 +81,11 @@ export function KidDetailPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleLinkByEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    linkParent(parentEmail);
   }
 
   if (!kidId) return null;
@@ -111,24 +137,45 @@ export function KidDetailPage() {
         </TabPanel>
       </TabView>
 
-      <Dialog header={`Link a parent to ${kidLabel}`} visible={dialogOpen} onHide={() => setDialogOpen(false)} style={{ width: "min(420px, 94vw)" }} modal>
-        <form onSubmit={handleLinkParent} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
-          <p className="hint-text" style={{ margin: 0 }}>
-            Links this kid to the parent already registered with this email. No parent found with that email?{" "}
-            <Link to="/tenant/parents">Add them from Parents</Link> first.
-          </p>
-          <label className="field">
-            <span className="field-label">Email</span>
-            <InputText value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} type="email" required autoFocus />
-          </label>
+      <Dialog header={`Link a parent to ${kidLabel}`} visible={dialogOpen} onHide={() => setDialogOpen(false)} style={{ width: "min(460px, 94vw)" }} modal>
+        <TabView>
+          <TabPanel header="Search by name">
+            <label className="field">
+              <span className="field-label">Parent name</span>
+              <AutoComplete
+                value={nameSearch}
+                suggestions={nameSuggestions}
+                completeMethod={(e) => searchByName(e.query)}
+                field="displayName"
+                placeholder="Search by father's or mother's name..."
+                disabled={saving}
+                onChange={(e) => setNameSearch(typeof e.value === "string" ? e.value : e.value?.displayName ?? "")}
+                onSelect={(e) => linkParent((e.value as ParentSuggestion).email)}
+                inputClassName="input"
+                style={{ width: "100%" }}
+              />
+            </label>
+            <p className="hint-text" style={{ marginTop: "0.4rem" }}>
+              Only matches parents already visible to you. For someone not listed, use the By email tab.
+            </p>
+          </TabPanel>
 
-          {error ? <p className="error-text">{error}</p> : null}
+          <TabPanel header="By email">
+            <form onSubmit={handleLinkByEmail} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+              <p className="hint-text" style={{ margin: 0 }}>
+                Links this kid to the parent already registered with this email. No parent found with that email?{" "}
+                <Link to="/tenant/parents">Add them from Parents</Link> first.
+              </p>
+              <label className="field">
+                <span className="field-label">Email</span>
+                <InputText value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} type="email" required />
+              </label>
+              <Button label={saving ? "Linking..." : "Link parent"} type="submit" className="p-button-sm" disabled={saving} />
+            </form>
+          </TabPanel>
+        </TabView>
 
-          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-            <Button label="Cancel" type="button" className="p-button-sm p-button-text" onClick={() => setDialogOpen(false)} disabled={saving} />
-            <Button label={saving ? "Linking..." : "Link parent"} type="submit" className="p-button-sm" disabled={saving} />
-          </div>
-        </form>
+        {error ? <p className="error-text">{error}</p> : null}
       </Dialog>
     </div>
   );
