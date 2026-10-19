@@ -81,12 +81,12 @@ export const kidsService = {
       // typo'd email silently repointing clinical history at the wrong family) and isn't what this
       // path is for.
       if (existing.parentId) throw conflict("This kid already has a parent on file");
-      const parent = await findOrCreateParent({
-        ...input,
-        parentEmail: input.parentEmail,
-        parentMobile: input.parentMobile!,
-        actorTenantId: user.tenantId!
-      });
+      // Deliberately find-only, never find-or-create: the Parents page is the place to create a
+      // new parent (with or without a kid) -- this action exists only to attach a kid to a parent
+      // that's already in the system, so a non-matching email is a real error, not a shortcut to
+      // a sparse new record with no name/address on file.
+      const parent = await prisma.parent.findUnique({ where: { email: input.parentEmail } });
+      if (!parent) throw notFound("No parent found with that email. Add them from the Parents page first.");
       parentId = parent.id;
       await recordAuditLog(user, { tenantId: user.tenantId!, action: "PARENT_LINKED", fromValue: null, toValue: null });
     }

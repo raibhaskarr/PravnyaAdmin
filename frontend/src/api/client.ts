@@ -243,16 +243,7 @@ export const api = {
   updateKid(
     token: string,
     kidId: string,
-    input: {
-      therapistIds?: string[];
-      status?: "ACTIVE" | "ARCHIVED";
-      parentEmail?: string;
-      parentMobile?: string;
-      fatherName?: string;
-      motherName?: string;
-      addressLine1?: string;
-      city?: string;
-    }
+    input: { therapistIds?: string[]; status?: "ACTIVE" | "ARCHIVED"; parentEmail?: string }
   ) {
     return request<Kid>(`/kids/${kidId}`, { token, method: "PATCH", body: input });
   },
