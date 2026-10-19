@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
+import { Dialog } from "primereact/dialog";
+import { InputText } from "primereact/inputtext";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Tenant, TenantHealth, TenantInvitation } from "../../api/types";
@@ -20,6 +22,9 @@ function headerWithTip(label: string, tip: string) {
   return <span title={tip}>{label}</span>;
 }
 
+const EMPTY_FORM = { name: "", slug: "", email: "" };
+type FormState = typeof EMPTY_FORM;
+
 export function TenantsPage() {
   const { token } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -27,7 +32,10 @@ export function TenantsPage() {
   const [invitations, setInvitations] = useState<TenantInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [inviteError, setInviteError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [devSignupUrl, setDevSignupUrl] = useState<string | null>(null);
 
@@ -45,24 +53,30 @@ export function TenantsPage() {
 
   useEffect(load, [token]);
 
+  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function openDialog() {
+    setForm(EMPTY_FORM);
+    setInviteError("");
+    setDialogOpen(true);
+  }
+
   async function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    setError("");
+    setInviteError("");
+    setSaving(true);
     try {
-      const result = await api.inviteTenant(token!, {
-        name: String(form.get("name")),
-        slug: String(form.get("slug")),
-        email: String(form.get("email"))
-      });
+      const result = await api.inviteTenant(token!, { name: form.name, slug: form.slug, email: form.email });
       setSentTo(result.invitation.email);
       setDevSignupUrl(result.signupUrl ?? null);
-      setShowForm(false);
-      formEl.reset();
+      setDialogOpen(false);
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to send invitation");
+      setInviteError(err instanceof ApiError ? err.message : "Failed to send invitation");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -98,37 +112,13 @@ export function TenantsPage() {
               Signup link (also emailed): <code>{devSignupUrl}</code>
             </p>
           ) : null}
-          <button type="button" className="btn btn-secondary" onClick={() => setSentTo(null)}>
-            Dismiss
-          </button>
+          <Button label="Dismiss" className="p-button-sm p-button-text" onClick={() => setSentTo(null)} />
         </div>
       ) : null}
 
       <div className="page-toolbar">
-        <button type="button" className="btn btn-secondary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "Invite a tenant"}
-        </button>
+        <Button label="Invite a tenant" icon="pi pi-plus" className="p-button-sm" onClick={openDialog} />
       </div>
-
-      {showForm ? (
-        <form onSubmit={handleInvite} className="form-panel">
-          <label className="field">
-            <span className="field-label">Business name</span>
-            <input className="input" name="name" required />
-          </label>
-          <label className="field">
-            <span className="field-label">Slug (lowercase, hyphens)</span>
-            <input className="input" name="slug" required pattern="[a-z0-9-]+" />
-          </label>
-          <label className="field">
-            <span className="field-label">Email to invite</span>
-            <input className="input" name="email" type="email" required />
-          </label>
-          <button type="submit" className="btn btn-primary">
-            Send invite
-          </button>
-        </form>
-      ) : null}
 
       {error ? <p className="error-text">{error}</p> : null}
 
@@ -194,6 +184,30 @@ export function TenantsPage() {
           </DataTable>
         </>
       ) : null}
+
+      <Dialog header="Invite a tenant" visible={dialogOpen} onHide={() => setDialogOpen(false)} style={{ width: "min(480px, 94vw)" }} modal>
+        <form onSubmit={handleInvite} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+          <label className="field">
+            <span className="field-label">Business name</span>
+            <InputText value={form.name} onChange={(e) => set("name", e.target.value)} required />
+          </label>
+          <label className="field">
+            <span className="field-label">Slug (lowercase, hyphens)</span>
+            <InputText value={form.slug} onChange={(e) => set("slug", e.target.value)} required pattern="[a-z0-9-]+" />
+          </label>
+          <label className="field">
+            <span className="field-label">Email to invite</span>
+            <InputText value={form.email} onChange={(e) => set("email", e.target.value)} type="email" required />
+          </label>
+
+          {inviteError ? <p className="error-text">{inviteError}</p> : null}
+
+          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+            <Button label="Cancel" type="button" className="p-button-sm p-button-text" onClick={() => setDialogOpen(false)} disabled={saving} />
+            <Button label={saving ? "Sending..." : "Send invite"} type="submit" className="p-button-sm" disabled={saving} />
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { Column } from "primereact/column";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
 import { AutoComplete } from "primereact/autocomplete";
+import { InputText } from "primereact/inputtext";
+import { Checkbox } from "primereact/checkbox";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, TenantDiscipline, Therapist, TherapistInvitation } from "../../api/types";
@@ -24,6 +26,8 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
   const [nameSuggestions, setNameSuggestions] = useState<Therapist[]>([]);
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteDisciplineIds, setInviteDisciplineIds] = useState<Set<string>>(new Set());
 
   const assignedTherapistIds = new Set(kid.therapists.map((t) => t.therapist.id));
   const activeHomeTherapists = therapists.filter((t) => t.status === "ACTIVE" && !assignedTherapistIds.has(t.id));
@@ -88,23 +92,29 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
     }
   }
 
+  function toggleInviteDiscipline(disciplineId: string) {
+    setInviteDisciplineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(disciplineId)) next.delete(disciplineId);
+      else next.add(disciplineId);
+      return next;
+    });
+  }
+
   async function handleInviteByEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
     setError("");
     setInviteNotice(null);
-    const formData = new FormData(form);
-    const email = String(formData.get("email"));
-    const disciplineIds = disciplines.filter((d) => formData.get(`discipline_${d.id}`) === "on").map((d) => d.id);
     setInviting(true);
     try {
-      const result = await api.inviteTherapistForKid(token!, kid.id, email, disciplineIds);
+      const result = await api.inviteTherapistForKid(token!, kid.id, inviteEmail, [...inviteDisciplineIds]);
       if (result.linked) {
         setInviteNotice(`${result.therapist.name} is already a therapist here -- added to the support team.`);
       } else {
-        setInviteNotice(`Invited ${email} -- they'll show up here once they accept and set their password.${result.inviteUrl ? ` Invite link (also emailed): ${result.inviteUrl}` : ""}`);
+        setInviteNotice(`Invited ${inviteEmail} -- they'll show up here once they accept and set their password.${result.inviteUrl ? ` Invite link (also emailed): ${result.inviteUrl}` : ""}`);
       }
-      form.reset();
+      setInviteEmail("");
+      setInviteDisciplineIds(new Set());
       onUpdated();
       loadInvitations();
     } catch (err) {
@@ -155,16 +165,17 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
               <form onSubmit={handleInviteByEmail} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 <label className="field">
                   <span className="field-label">Email</span>
-                  <input className="input" name="email" type="email" required placeholder="therapist@example.com" />
+                  <InputText value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} type="email" required placeholder="therapist@example.com" />
                 </label>
                 <fieldset className="form-group">
                   <legend>Disciplines (if inviting someone new)</legend>
                   {disciplines
                     .filter((d) => d.enabled)
                     .map((d) => (
-                      <label key={d.id} className="checkbox-row">
-                        <input type="checkbox" name={`discipline_${d.id}`} /> {d.name}
-                      </label>
+                      <div key={d.id} className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Checkbox inputId={`invite_discipline_${d.id}`} checked={inviteDisciplineIds.has(d.id)} onChange={() => toggleInviteDiscipline(d.id)} />
+                        <label htmlFor={`invite_discipline_${d.id}`}>{d.name}</label>
+                      </div>
                     ))}
                 </fieldset>
                 <Button label={inviting ? "Adding..." : "Add"} className="p-button-sm" type="submit" disabled={inviting} />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Checkbox } from "primereact/checkbox";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { TenantDiscipline } from "../../api/types";
@@ -31,10 +32,10 @@ export function DisciplinesPage() {
       <h1>Disciplines offered</h1>
       <div className="card" style={{ maxWidth: 420 }}>
         {disciplines.map((d) => (
-          <label key={d.id} className="checkbox-row">
-            <input type="checkbox" checked={d.enabled} disabled={!canEdit} onChange={() => toggle(d)} />
-            {d.name}
-          </label>
+          <div key={d.id} className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Checkbox inputId={`discipline_${d.id}`} checked={d.enabled} disabled={!canEdit} onChange={() => toggle(d)} />
+            <label htmlFor={`discipline_${d.id}`}>{d.name}</label>
+          </div>
         ))}
       </div>
       {!canEdit ? <p className="hint-text" style={{ marginTop: "0.75rem" }}>Only a Tenant Admin can change offered disciplines.</p> : null}

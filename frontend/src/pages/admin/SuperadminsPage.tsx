@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
+import { Dialog } from "primereact/dialog";
+import { InputText } from "primereact/inputtext";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { SuperadminInvitation, SuperadminUser } from "../../api/types";
@@ -19,7 +21,10 @@ export function SuperadminsPage() {
   const [invitations, setInvitations] = useState<SuperadminInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [inviteError, setInviteError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [devSignupUrl, setDevSignupUrl] = useState<string | null>(null);
 
@@ -36,20 +41,26 @@ export function SuperadminsPage() {
 
   useEffect(load, [token]);
 
+  function openDialog() {
+    setEmail("");
+    setInviteError("");
+    setDialogOpen(true);
+  }
+
   async function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    setError("");
+    setInviteError("");
+    setSaving(true);
     try {
-      const result = await api.inviteSuperadmin(token!, { email: String(form.get("email")) });
+      const result = await api.inviteSuperadmin(token!, { email });
       setSentTo(result.invitation.email);
       setDevSignupUrl(result.signupUrl ?? null);
-      setShowForm(false);
-      formEl.reset();
+      setDialogOpen(false);
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to send invitation");
+      setInviteError(err instanceof ApiError ? err.message : "Failed to send invitation");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -78,29 +89,13 @@ export function SuperadminsPage() {
               Signup link (also emailed): <code>{devSignupUrl}</code>
             </p>
           ) : null}
-          <button type="button" className="btn btn-secondary" onClick={() => setSentTo(null)}>
-            Dismiss
-          </button>
+          <Button label="Dismiss" className="p-button-sm p-button-text" onClick={() => setSentTo(null)} />
         </div>
       ) : null}
 
       <div className="page-toolbar">
-        <button type="button" className="btn btn-secondary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "Invite a superadmin"}
-        </button>
+        <Button label="Invite a superadmin" icon="pi pi-plus" className="p-button-sm" onClick={openDialog} />
       </div>
-
-      {showForm ? (
-        <form onSubmit={handleInvite} className="form-panel">
-          <label className="field">
-            <span className="field-label">Email to invite</span>
-            <input className="input" name="email" type="email" required />
-          </label>
-          <button type="submit" className="btn btn-primary">
-            Send invite
-          </button>
-        </form>
-      ) : null}
 
       {error ? <p className="error-text">{error}</p> : null}
 
@@ -124,6 +119,22 @@ export function SuperadminsPage() {
           </DataTable>
         </>
       ) : null}
+
+      <Dialog header="Invite a superadmin" visible={dialogOpen} onHide={() => setDialogOpen(false)} style={{ width: "min(420px, 94vw)" }} modal>
+        <form onSubmit={handleInvite} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+          <label className="field">
+            <span className="field-label">Email to invite</span>
+            <InputText value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoFocus />
+          </label>
+
+          {inviteError ? <p className="error-text">{inviteError}</p> : null}
+
+          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+            <Button label="Cancel" type="button" className="p-button-sm p-button-text" onClick={() => setDialogOpen(false)} disabled={saving} />
+            <Button label={saving ? "Sending..." : "Send invite"} type="submit" className="p-button-sm" disabled={saving} />
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
+import { Dropdown } from "primereact/dropdown";
+import { InputTextarea } from "primereact/inputtextarea";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { AuditLogEntry, Tenant, TenantHealth, TenantKycStatus } from "../../api/types";
@@ -251,23 +253,25 @@ export function TenantDetailPage() {
                   <legend>KYC</legend>
                   <label className="field">
                     <span className="field-label">Status</span>
-                    <select
+                    <Dropdown
                       className="input"
                       value={kycForm.kycStatus}
-                      onChange={(e) => setKycForm((prev) => ({ ...prev, kycStatus: e.target.value as TenantKycStatus }))}
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="VERIFIED">Verified</option>
-                      <option value="REJECTED">Rejected</option>
-                    </select>
+                      onChange={(e) => setKycForm((prev) => ({ ...prev, kycStatus: e.value as TenantKycStatus }))}
+                      options={[
+                        { label: "Pending", value: "PENDING" },
+                        { label: "Verified", value: "VERIFIED" },
+                        { label: "Rejected", value: "REJECTED" }
+                      ]}
+                    />
                   </label>
                   <label className="field">
                     <span className="field-label">Notes</span>
-                    <textarea
+                    <InputTextarea
                       className="input"
                       rows={3}
                       value={kycForm.kycNotes}
                       onChange={(e) => setKycForm((prev) => ({ ...prev, kycNotes: e.target.value }))}
+                      autoResize
                     />
                   </label>
                 </fieldset>

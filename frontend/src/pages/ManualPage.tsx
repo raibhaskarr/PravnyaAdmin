@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { marked } from "marked";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
-import type { DbModel, DocSection } from "../api/types";
+import type { DbField, DbModel, DocSection } from "../api/types";
 
 const DB_STRUCTURE_SLUG = "__db-structure__";
 
@@ -78,36 +80,18 @@ function DbStructureView({ models }: { models: DbModel[] }) {
         <div key={m.name} className="card">
           <h2 style={{ fontSize: "1rem", textTransform: "none", letterSpacing: "normal", color: "var(--color-text)" }}>{m.name}</h2>
           {m.documentation ? <p className="hint-text" style={{ marginBottom: "0.75rem" }}>{m.documentation}</p> : null}
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Type</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {m.fields.map((f) => (
-                  <tr key={f.name}>
-                    <td>{f.name}</td>
-                    <td>{f.type}</td>
-                    <td>
-                      {[
-                        f.isId ? "id" : null,
-                        f.isRequired ? null : "optional",
-                        f.isUnique ? "unique" : null,
-                        f.isRelation ? "relation" : null,
-                        f.documentation
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable value={m.fields} size="small" stripedRows>
+            <Column field="name" header="Field" />
+            <Column field="type" header="Type" />
+            <Column
+              header="Notes"
+              body={(f: DbField) =>
+                [f.isId ? "id" : null, f.isRequired ? null : "optional", f.isUnique ? "unique" : null, f.isRelation ? "relation" : null, f.documentation]
+                  .filter(Boolean)
+                  .join(" · ") || "—"
+              }
+            />
+          </DataTable>
         </div>
       ))}
     </div>
