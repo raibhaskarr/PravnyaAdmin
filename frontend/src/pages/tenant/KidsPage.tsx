@@ -2,10 +2,17 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
+import { Button } from "primereact/button";
+import { InputText } from "primereact/inputtext";
+import { Calendar } from "primereact/calendar";
+import { Checkbox } from "primereact/checkbox";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, Therapist } from "../../api/types";
 import { formatParentName } from "../../utils/parent";
+
+const EMPTY_FORM = { firstName: "", lastName: "", gender: "" };
+type FormState = typeof EMPTY_FORM;
 
 /** For a brand new parent, use the Parents page -- it captures the parent info and this
  * kid's info together in one step. This form is for a kid with no parent on file yet, or (once
@@ -16,7 +23,11 @@ export function KidsPage() {
   const [kids, setKids] = useState<Kid[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [dob, setDob] = useState<Date | null>(null);
+  const [selectedTherapistIds, setSelectedTherapistIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const canEdit = user?.role === "TENANT_ADMIN";
 
   function load() {
@@ -26,23 +37,47 @@ export function KidsPage() {
 
   useEffect(load, [token]);
 
+  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleShowForm() {
+    if (!showForm) {
+      setForm(EMPTY_FORM);
+      setDob(null);
+      setSelectedTherapistIds(new Set());
+      setError("");
+    }
+    setShowForm((v) => !v);
+  }
+
+  function toggleTherapist(therapistId: string) {
+    setSelectedTherapistIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(therapistId)) next.delete(therapistId);
+      else next.add(therapistId);
+      return next;
+    });
+  }
+
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formEl = event.currentTarget;
     setError("");
-    const form = new FormData(formEl);
-    const therapistIds = therapists.filter((t) => form.get(`therapist_${t.id}`) === "on").map((t) => t.id);
+    setSaving(true);
     try {
       await api.createKid(token!, {
-        firstName: String(form.get("firstName")),
-        lastName: String(form.get("lastName")),
-        therapistIds
+        firstName: form.firstName,
+        lastName: form.lastName,
+        dob: dob ? dob.toISOString() : undefined,
+        gender: form.gender || undefined,
+        therapistIds: [...selectedTherapistIds]
       });
       setShowForm(false);
-      formEl.reset();
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create kid");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -53,7 +88,7 @@ export function KidsPage() {
       {canEdit ? (
         <>
           <div className="page-toolbar">
-            <button type="button" className="btn btn-secondary" onClick={() => setShowForm((v) => !v)}>
+            <button type="button" className="btn btn-secondary" onClick={toggleShowForm}>
               {showForm ? "Cancel" : "New kid"}
             </button>
           </div>
@@ -63,33 +98,43 @@ export function KidsPage() {
                 For a brand new parent, use <Link to="/tenant/parents">Parents</Link> instead -- it captures the
                 parent's info and this kid together. This form is for a kid with no parent on file.
               </p>
-              <label className="field">
-                <span className="field-label">First name</span>
-                <input className="input" name="firstName" required />
-              </label>
-              <label className="field">
-                <span className="field-label">Last name</span>
-                <input className="input" name="lastName" required />
-              </label>
+              <div className="field-grid">
+                <label className="field">
+                  <span className="field-label">First name</span>
+                  <InputText value={form.firstName} onChange={(e) => set("firstName", e.target.value)} required />
+                </label>
+                <label className="field">
+                  <span className="field-label">Last name</span>
+                  <InputText value={form.lastName} onChange={(e) => set("lastName", e.target.value)} required />
+                </label>
+                <label className="field">
+                  <span className="field-label">Date of birth</span>
+                  <Calendar value={dob} onChange={(e) => setDob((e.value as Date) ?? null)} dateFormat="dd/mm/yy" showIcon maxDate={new Date()} inputClassName="input" />
+                </label>
+                <label className="field">
+                  <span className="field-label">Gender</span>
+                  <InputText value={form.gender} onChange={(e) => set("gender", e.target.value)} />
+                </label>
+              </div>
               <fieldset className="form-group">
                 <legend>Assigned therapists</legend>
                 {therapists
                   .filter((t) => t.status === "ACTIVE")
                   .map((t) => (
-                    <label key={t.id} className="checkbox-row">
-                      <input type="checkbox" name={`therapist_${t.id}`} /> {t.name}
-                    </label>
+                    <div key={t.id} className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <Checkbox inputId={`therapist_${t.id}`} checked={selectedTherapistIds.has(t.id)} onChange={() => toggleTherapist(t.id)} />
+                      <label htmlFor={`therapist_${t.id}`}>{t.name}</label>
+                    </div>
                   ))}
               </fieldset>
-              <button type="submit" className="btn btn-primary">
-                Create kid
-              </button>
+              {error ? <p className="error-text">{error}</p> : null}
+              <Button label={saving ? "Creating..." : "Create kid"} type="submit" className="p-button-sm" disabled={saving} />
             </form>
           ) : null}
         </>
       ) : null}
 
-      {error ? <p className="error-text">{error}</p> : null}
+      {!showForm && error ? <p className="error-text">{error}</p> : null}
 
       <DataTable
         value={kids}

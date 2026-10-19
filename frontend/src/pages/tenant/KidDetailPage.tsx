@@ -4,6 +4,7 @@ import { TabView, TabPanel } from "primereact/tabview";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
+import { Calendar } from "primereact/calendar";
 import { AutoComplete } from "primereact/autocomplete";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
@@ -24,6 +25,10 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 type ParentSuggestion = ParentSummary & { displayName: string };
 
+function formatDob(dob: string | null): string | null {
+  return dob ? new Date(dob).toLocaleDateString() : null;
+}
+
 export function KidDetailPage() {
   const { kidId } = useParams<{ kidId: string }>();
   const { token, user } = useAuth();
@@ -35,6 +40,11 @@ export function KidDetailPage() {
   const [parentEmail, setParentEmail] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingOverview, setEditingOverview] = useState(false);
+  const [overviewDob, setOverviewDob] = useState<Date | null>(null);
+  const [overviewGender, setOverviewGender] = useState("");
+  const [savingOverview, setSavingOverview] = useState(false);
+  const [overviewError, setOverviewError] = useState("");
   const canEdit = user?.role !== "VIEWER";
   // Inviting or reassigning a kid's support team is a Tenant Admin call, not a therapist's --
   // even a therapist already assigned to this kid can't bring on another therapist for it.
@@ -88,11 +98,38 @@ export function KidDetailPage() {
     linkParent(parentEmail);
   }
 
+  function startEditingOverview() {
+    if (!kid) return;
+    setOverviewDob(kid.dob ? new Date(kid.dob) : null);
+    setOverviewGender(kid.gender ?? "");
+    setOverviewError("");
+    setEditingOverview(true);
+  }
+
+  async function saveOverview() {
+    if (!kid) return;
+    setOverviewError("");
+    setSavingOverview(true);
+    try {
+      await api.updateKid(token!, kid.id, {
+        dob: overviewDob ? overviewDob.toISOString() : null,
+        gender: overviewGender || null
+      });
+      setEditingOverview(false);
+      load();
+    } catch (err) {
+      setOverviewError(err instanceof ApiError ? err.message : "Failed to save");
+    } finally {
+      setSavingOverview(false);
+    }
+  }
+
   if (!kidId) return null;
   if (!kid) return <p className="empty-state">Loading...</p>;
 
   const kidLabel = `${kid.firstName} ${kid.lastName}`;
   const canLinkParent = user?.role === "TENANT_ADMIN";
+  const canEditOverview = user?.role === "TENANT_ADMIN";
 
   return (
     <div>
@@ -104,6 +141,45 @@ export function KidDetailPage() {
       </h1>
 
       <TabView renderActiveOnly>
+        <TabPanel header="Overview">
+          {editingOverview ? (
+            <div className="form-panel" style={{ maxWidth: 480 }}>
+              <div className="field-grid">
+                <label className="field">
+                  <span className="field-label">Date of birth</span>
+                  <Calendar
+                    value={overviewDob}
+                    onChange={(e) => setOverviewDob((e.value as Date) ?? null)}
+                    dateFormat="dd/mm/yy"
+                    showIcon
+                    maxDate={new Date()}
+                    inputClassName="input"
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">Gender</span>
+                  <InputText value={overviewGender} onChange={(e) => setOverviewGender(e.target.value)} />
+                </label>
+              </div>
+              {overviewError ? <p className="error-text">{overviewError}</p> : null}
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <Button label={savingOverview ? "Saving..." : "Save"} className="p-button-sm" onClick={saveOverview} disabled={savingOverview} />
+                <Button label="Cancel" className="p-button-sm p-button-text" onClick={() => setEditingOverview(false)} disabled={savingOverview} />
+              </div>
+            </div>
+          ) : (
+            <div className="form-panel" style={{ maxWidth: 480 }}>
+              <div className="field-grid">
+                <Field label="Status" value={kid.status} />
+                <Field label="Date of birth" value={formatDob(kid.dob)} />
+                <Field label="Gender" value={kid.gender} />
+              </div>
+              {canEditOverview ? (
+                <Button label="Edit" icon="pi pi-pencil" className="p-button-sm p-button-outlined" onClick={startEditingOverview} />
+              ) : null}
+            </div>
+          )}
+        </TabPanel>
         <TabPanel header="Goals">
           <KidGoalsTab kidId={kid.id} canEdit={canEdit} />
         </TabPanel>

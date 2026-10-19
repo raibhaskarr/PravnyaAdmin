@@ -5,6 +5,7 @@ import { Column } from "primereact/column";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
+import { Calendar } from "primereact/calendar";
 import { Checkbox } from "primereact/checkbox";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
@@ -30,6 +31,8 @@ export function ParentDetailPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [gender, setGender] = useState("");
+  const [dob, setDob] = useState<Date | null>(null);
   const [selectedTherapistIds, setSelectedTherapistIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -49,6 +52,8 @@ export function ParentDetailPage() {
   function openDialog() {
     setFirstName("");
     setLastName("");
+    setGender("");
+    setDob(null);
     setSelectedTherapistIds(new Set());
     setError("");
     setDialogOpen(true);
@@ -75,6 +80,8 @@ export function ParentDetailPage() {
       await api.createKid(token!, {
         firstName,
         lastName,
+        dob: dob ? dob.toISOString() : undefined,
+        gender: gender || undefined,
         therapistIds: [...selectedTherapistIds],
         parentEmail: parent.email,
         parentMobile: parent.mobile
@@ -143,6 +150,14 @@ export function ParentDetailPage() {
             <label className="field">
               <span className="field-label">Last name</span>
               <InputText value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+            </label>
+            <label className="field">
+              <span className="field-label">Date of birth</span>
+              <Calendar value={dob} onChange={(e) => setDob((e.value as Date) ?? null)} dateFormat="dd/mm/yy" showIcon maxDate={new Date()} inputClassName="input" />
+            </label>
+            <label className="field">
+              <span className="field-label">Gender</span>
+              <InputText value={gender} onChange={(e) => setGender(e.target.value)} />
             </label>
           </div>
 

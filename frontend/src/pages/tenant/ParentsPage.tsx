@@ -5,6 +5,7 @@ import { Column } from "primereact/column";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
+import { Calendar } from "primereact/calendar";
 import { Checkbox } from "primereact/checkbox";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
@@ -19,7 +20,8 @@ const EMPTY_FORM = {
   addressLine1: "",
   city: "",
   firstName: "",
-  lastName: ""
+  lastName: "",
+  gender: ""
 };
 
 type FormState = typeof EMPTY_FORM;
@@ -37,6 +39,7 @@ export function ParentsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [dob, setDob] = useState<Date | null>(null);
   const [selectedTherapistIds, setSelectedTherapistIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -60,6 +63,7 @@ export function ParentsPage() {
 
   function openDialog() {
     setForm(EMPTY_FORM);
+    setDob(null);
     setSelectedTherapistIds(new Set());
     setError("");
     setDialogOpen(true);
@@ -97,7 +101,14 @@ export function ParentsPage() {
         city: form.city || undefined
       };
       if (addingKid) {
-        await api.createKid(token!, { firstName: form.firstName, lastName: form.lastName, therapistIds: [...selectedTherapistIds], ...parentFields });
+        await api.createKid(token!, {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          dob: dob ? dob.toISOString() : undefined,
+          gender: form.gender || undefined,
+          therapistIds: [...selectedTherapistIds],
+          ...parentFields
+        });
       } else {
         await api.createParent(token!, parentFields);
       }
@@ -190,6 +201,14 @@ export function ParentsPage() {
               <label className="field">
                 <span className="field-label">Last name</span>
                 <InputText value={form.lastName} onChange={(e) => set("lastName", e.target.value)} />
+              </label>
+              <label className="field">
+                <span className="field-label">Date of birth</span>
+                <Calendar value={dob} onChange={(e) => setDob((e.value as Date) ?? null)} dateFormat="dd/mm/yy" showIcon maxDate={new Date()} inputClassName="input" />
+              </label>
+              <label className="field">
+                <span className="field-label">Gender</span>
+                <InputText value={form.gender} onChange={(e) => set("gender", e.target.value)} />
               </label>
             </div>
           </fieldset>

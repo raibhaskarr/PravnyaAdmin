@@ -1,8 +1,8 @@
 import { prisma } from "../../config/prisma";
-import { notFound } from "../../common/errors/AppError";
+import { forbidden, notFound } from "../../common/errors/AppError";
 import { AuthUser } from "../../common/middleware/auth";
 import { recordAuditLog } from "../../common/audit/auditLog.service";
-import { SetAssignedKidsInput, UpdateTherapistInput } from "./therapists.schemas";
+import { SetAssignedKidsInput, UpdateOwnTherapistInput, UpdateTherapistInput } from "./therapists.schemas";
 
 export const therapistsService = {
   list(tenantId: string) {
@@ -67,5 +67,27 @@ export const therapistsService = {
         })
       )
     ]);
+  },
+
+  async getOwn(userId: string) {
+    const therapist = await prisma.therapist.findUnique({ where: { userId }, include: { user: { select: { email: true, name: true } } } });
+    if (!therapist) throw forbidden("No therapist profile found for this account");
+    return therapist;
+  },
+
+  async updateOwn(user: AuthUser, input: UpdateOwnTherapistInput) {
+    const therapist = await prisma.therapist.findUnique({ where: { userId: user.id } });
+    if (!therapist) throw forbidden("No therapist profile found for this account");
+    return prisma.therapist.update({
+      where: { id: therapist.id },
+      data: {
+        ...(input.dob !== undefined ? { dob: input.dob ? new Date(input.dob) : null } : {}),
+        ...(input.gender !== undefined ? { gender: input.gender } : {}),
+        ...(input.bio !== undefined ? { bio: input.bio } : {}),
+        ...(input.yearsOfExperience !== undefined ? { yearsOfExperience: input.yearsOfExperience } : {}),
+        ...(input.qualifiedDisciplineIds !== undefined ? { qualifiedDisciplineIds: input.qualifiedDisciplineIds } : {})
+      },
+      include: { user: { select: { email: true, name: true } } }
+    });
   }
 };

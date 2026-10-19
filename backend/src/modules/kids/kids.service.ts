@@ -59,6 +59,7 @@ export const kidsService = {
         firstName: input.firstName,
         lastName: input.lastName,
         dob: input.dob ? new Date(input.dob) : undefined,
+        gender: input.gender,
         therapists: { create: input.therapistIds.map((therapistId) => ({ therapistId })) }
       },
       include: { therapists: true }
@@ -110,6 +111,7 @@ export const kidsService = {
         ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
         ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
         ...(input.dob !== undefined ? { dob: input.dob ? new Date(input.dob) : null } : {}),
+        ...(input.gender !== undefined ? { gender: input.gender } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(parentId !== undefined ? { parentId } : {})
       },

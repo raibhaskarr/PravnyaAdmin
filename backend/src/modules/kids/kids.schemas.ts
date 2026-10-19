@@ -9,6 +9,7 @@ export const createKidSchema = z
     firstName: z.string().min(1).max(100),
     lastName: z.string().min(1).max(100),
     dob: z.string().datetime().optional(),
+    gender: z.string().min(1).max(60).optional(),
     therapistIds: z.array(z.string().uuid()).default([]),
     parentEmail: z.string().email().optional(),
     parentMobile: z.string().min(1).max(30).optional(),
@@ -26,6 +27,7 @@ export const updateKidSchema = z.object({
   firstName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
   dob: z.string().datetime().nullable().optional(),
+  gender: z.string().min(1).max(60).nullable().optional(),
   status: z.enum(["ACTIVE", "ARCHIVED"]).optional(),
   therapistIds: z.array(z.string().uuid()).optional(),
   // Links a kid to an ALREADY-EXISTING parent by email -- see kids.service.ts's update(). Unlike

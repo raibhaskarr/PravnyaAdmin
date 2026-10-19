@@ -1,6 +1,7 @@
 import type {
   AuditLogEntry,
   AuthUser,
+  CanonicalDiscipline,
   CanonicalDomain,
   CanonicalSkill,
   CanonicalSkillDetail,
@@ -176,6 +177,11 @@ export const api = {
   listTenantDisciplines(token: string, kidId?: string) {
     return request<TenantDiscipline[]>(`/tenant-disciplines${kidId ? `?kidId=${kidId}` : ""}`, { token });
   },
+  // Full canonical discipline list, tenant-independent -- used for a therapist's own "qualified
+  // in" picker (what they're credentialed in, not what this tenant happens to have enabled).
+  listCanonicalDisciplines(token: string) {
+    return request<CanonicalDiscipline[]>("/taxonomy/disciplines", { token });
+  },
   enableDiscipline(token: string, disciplineId: string) {
     return request(`/tenant-disciplines/${disciplineId}/enable`, { token, method: "POST" });
   },
@@ -195,6 +201,17 @@ export const api = {
   },
   setTherapistKids(token: string, therapistId: string, kidIds: string[]) {
     return request<void>(`/therapists/${therapistId}/kids`, { token, method: "PATCH", body: { kidIds } });
+  },
+
+  // Self-service professional profile -- the therapist's own, not the Tenant Admin's edit above.
+  getOwnTherapist(token: string) {
+    return request<Therapist>("/therapists/me", { token });
+  },
+  updateOwnTherapist(
+    token: string,
+    input: { dob?: string | null; gender?: string | null; bio?: string | null; yearsOfExperience?: number | null; qualifiedDisciplineIds?: string[] }
+  ) {
+    return request<Therapist>("/therapists/me", { token, method: "PATCH", body: input });
   },
 
   // Therapist invitations
@@ -229,6 +246,8 @@ export const api = {
     input: {
       firstName: string;
       lastName: string;
+      dob?: string;
+      gender?: string;
       therapistIds: string[];
       parentEmail?: string;
       parentMobile?: string;
@@ -243,7 +262,15 @@ export const api = {
   updateKid(
     token: string,
     kidId: string,
-    input: { therapistIds?: string[]; status?: "ACTIVE" | "ARCHIVED"; parentEmail?: string }
+    input: {
+      firstName?: string;
+      lastName?: string;
+      dob?: string | null;
+      gender?: string | null;
+      therapistIds?: string[];
+      status?: "ACTIVE" | "ARCHIVED";
+      parentEmail?: string;
+    }
   ) {
     return request<Kid>(`/kids/${kidId}`, { token, method: "PATCH", body: input });
   },

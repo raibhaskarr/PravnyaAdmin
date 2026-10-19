@@ -283,8 +283,25 @@ model Therapist {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
   phone         String?
+  /// Disciplines this therapist practices AT THIS TENANT -- a subset (not necessarily strictly
+  /// enforced) of qualifiedDisciplineIds, scoped to what this centre actually has them doing.
+  /// Entered by the Tenant Admin at invite/edit time. See qualifiedDisciplineIds for the broader,
+  /// person-level credential.
   disciplineIds String[] @default([])
   status        TherapistStatus @default(ACTIVE)
+  /// Self-service professional profile (dob/gender/bio/yearsOfExperience/qualifiedDisciplineIds)
+  /// -- filled in by the therapist themselves after accepting their invite, not by the Tenant
+  /// Admin (see docs/manual/06-parent-kid-onboarding-spec.md's sibling pattern: operational facts
+  /// captured by staff, personal/professional facts filled in by the person themselves).
+  dob    DateTime?
+  gender String?
+  bio    String?
+  yearsOfExperience Int?
+  /// What this therapist is actually credentialed/trained in -- a durable fact about the person,
+  /// independent of any one tenant, referencing the same CanonicalDiscipline list TenantDiscipline
+  /// draws from (not a tenant-scoped list of its own). Contrast with disciplineIds above, which is
+  /// "what this tenant has them doing" and may be a narrower subset.
+  qualifiedDisciplineIds String[] @default([])
   kids          KidTherapist[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -305,6 +322,8 @@ model Kid {
   firstName  String
   lastName   String
   dob        DateTime?
+  /// Plain text, not a fixed enum -- matches PranTrackingSystem's Child.gender precedent.
+  gender     String?
   status     KidStatus   @default(ACTIVE)
   therapists KidTherapist[]
   goals      Goal[]

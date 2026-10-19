@@ -179,6 +179,11 @@ export type Therapist = {
   phone: string | null;
   disciplineIds: string[];
   status: TherapistStatus;
+  dob: string | null;
+  gender: string | null;
+  bio: string | null;
+  yearsOfExperience: number | null;
+  qualifiedDisciplineIds: string[];
   user: { email: string; name: string };
   tenant?: { id: string; name: string };
 };
@@ -223,6 +228,7 @@ export type Kid = {
   firstName: string;
   lastName: string;
   dob: string | null;
+  gender: string | null;
   status: "ACTIVE" | "ARCHIVED";
   therapists: {
     therapist: { id: string; name: string; disciplineIds: string[]; status: TherapistStatus; tenant: { id: string; name: string } };
