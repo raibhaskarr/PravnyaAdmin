@@ -55,15 +55,22 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             </Route>
           </Route>
 
+          {/* Staff/roster management -- Therapist is deliberately excluded (can't add another
+              therapist or manage households), Viewer keeps read-only access. */}
+          <Route element={<ProtectedRoute allow={["TENANT_ADMIN", "VIEWER"]} />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/tenant/therapists" element={<TherapistsPage />} />
+              <Route path="/tenant/parents" element={<ParentsPage />} />
+              <Route path="/tenant/parents/:parentId" element={<ParentDetailPage />} />
+            </Route>
+          </Route>
+
           <Route element={<ProtectedRoute allow={["TENANT_ADMIN", "THERAPIST", "VIEWER"]} />}>
             <Route element={<AdminLayout />}>
               <Route path="/tenant/disciplines" element={<DisciplinesPage />} />
-              <Route path="/tenant/therapists" element={<TherapistsPage />} />
               <Route path="/tenant/log" element={<LogSessionPage />} />
               <Route path="/tenant/kids" element={<KidsPage />} />
               <Route path="/tenant/kids/:kidId" element={<KidDetailPage />} />
-              <Route path="/tenant/parents" element={<ParentsPage />} />
-              <Route path="/tenant/parents/:parentId" element={<ParentDetailPage />} />
               <Route path="/tenant/account" element={<TenantAccountPage />} />
             </Route>
           </Route>

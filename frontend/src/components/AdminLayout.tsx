@@ -29,11 +29,15 @@ function navItemsForRole(role: AuthUser["role"]): NavItem[] {
       { to: "/manual", label: "Manual", icon: "pi pi-book" }
     ];
   }
+  // Therapists and Parents are staff/roster-management pages -- a Therapist can't add another
+  // therapist or manage households, so there's nothing for them to do there (see the matching
+  // route restriction in main.tsx). Viewer keeps both: read-only oversight is exactly what that
+  // role exists for.
   return [
     ...(role !== "VIEWER" ? [{ to: "/tenant/log", label: "Log a session", icon: "pi pi-pencil" }] : []),
     { to: "/tenant/disciplines", label: "Disciplines", icon: "pi pi-sitemap" },
-    { to: "/tenant/therapists", label: "Therapists", icon: "pi pi-users" },
-    { to: "/tenant/parents", label: "Parents", icon: "pi pi-home" },
+    ...(role !== "THERAPIST" ? [{ to: "/tenant/therapists", label: "Therapists", icon: "pi pi-users" }] : []),
+    ...(role !== "THERAPIST" ? [{ to: "/tenant/parents", label: "Parents", icon: "pi pi-home" }] : []),
     { to: "/tenant/kids", label: "Kids", icon: "pi pi-id-card" },
     ...(role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile", icon: "pi pi-briefcase" }] : [])
   ];

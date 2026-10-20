@@ -37,10 +37,12 @@ export function KidSupportTeamTab({ kid, canEdit, onUpdated }: { kid: Kid; canEd
   }
 
   useEffect(() => {
-    api.listTherapists(token!).then(setTherapists);
+    // The fetched roster is only ever used inside the canEdit-gated "Add therapist" panel below
+    // -- a non-admin (therapist/viewer) viewing this tab has no use for it.
+    if (canEdit) api.listTherapists(token!).then(setTherapists);
     api.listTenantDisciplines(token!).then(setDisciplines);
     loadInvitations();
-  }, [token, kid.id]);
+  }, [token, kid.id, canEdit]);
 
   const disciplineName = (id: string) => disciplines.find((d) => d.id === id)?.name ?? id;
 
