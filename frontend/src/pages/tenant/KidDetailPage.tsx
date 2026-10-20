@@ -12,6 +12,7 @@ import type { Kid, ParentSummary } from "../../api/types";
 import { formatParentName } from "../../utils/parent";
 import { KidGoalsTab } from "./KidGoalsTab";
 import { KidGrowthTab } from "./KidGrowthTab";
+import { KidActivitiesTab } from "./KidActivitiesTab";
 import { KidSupportTeamTab } from "./KidSupportTeamTab";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -185,6 +186,9 @@ export function KidDetailPage() {
         </TabPanel>
         <TabPanel header="Growth">
           <KidGrowthTab kidId={kid.id} kidLabel={kidLabel} />
+        </TabPanel>
+        <TabPanel header="Activities">
+          <KidActivitiesTab kidId={kid.id} kidLabel={kidLabel} />
         </TabPanel>
         <TabPanel header="Support Team">
           <KidSupportTeamTab kid={kid} canEdit={canManageTeam} onUpdated={load} />

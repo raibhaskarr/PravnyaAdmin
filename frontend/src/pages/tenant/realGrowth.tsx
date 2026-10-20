@@ -22,7 +22,9 @@ function levelFor(outcome: string): number {
   return OUTCOME_LEVEL[outcome] ?? 1;
 }
 
-function environmentLabel(centreName: string | null): string {
+// Exported for realActivities.tsx -- same home-vs-centre split Growth already uses, kept as one
+// definition so the two views can't silently drift on what counts as "home".
+export function environmentLabel(centreName: string | null): string {
   return centreName ?? "Home";
 }
 
@@ -441,7 +443,10 @@ export function RealGrowthView({ kidLabel, goals }: { kidLabel: string; goals: G
   );
 }
 
-const REAL_GROWTH_CSS = `
+// Exported so realActivities.tsx (same visual language, same `gp-` prefixed theme) doesn't have to
+// redefine or diverge from these tokens/classes -- Activities is a sibling derived view over the
+// exact same Goal/evidence data, not a separate design.
+export const REAL_GROWTH_CSS = `
 .gp-root { --gpf: -apple-system, "Segoe UI Variable", "Segoe UI", ui-rounded, "Plus Jakarta Sans", sans-serif;
   --gp-bg: #F4F7F4; --gp-panel: #FFFFFF; --gp-ink: #1C2B22; --gp-ink-soft: #5B6B61; --gp-ink-faint: #8B998F;
   --gp-border: #E3EBE4; --gp-green-700: #1F5A42; --gp-green-600: #256B4E; --gp-green-500: #2E7D5B;
