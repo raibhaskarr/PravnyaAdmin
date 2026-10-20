@@ -39,7 +39,12 @@ function navItemsForRole(role: AuthUser["role"]): NavItem[] {
     ...(role !== "THERAPIST" ? [{ to: "/tenant/therapists", label: "Therapists", icon: "pi pi-users" }] : []),
     ...(role !== "THERAPIST" ? [{ to: "/tenant/parents", label: "Parents", icon: "pi pi-home" }] : []),
     { to: "/tenant/kids", label: "Kids", icon: "pi pi-id-card" },
-    ...(role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile", icon: "pi pi-briefcase" }] : [])
+    ...(role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile", icon: "pi pi-briefcase" }] : []),
+    // A Therapist's "Account" page is mostly their own professional profile (DOB, bio, qualified
+    // disciplines), not just password settings -- unlike other roles, that's worth a real nav
+    // entry rather than relying on the small avatar-click-only "Account settings" affordance every
+    // role otherwise shares.
+    ...(role === "THERAPIST" ? [{ to: "/tenant/account", label: "My Profile", icon: "pi pi-user" }] : [])
   ];
 }
 

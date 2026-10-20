@@ -112,7 +112,7 @@ export function AccountPage() {
 
   return (
     <div>
-      <h1>Account</h1>
+      <h1>{isTherapist ? "My Profile" : "Account"}</h1>
 
       {isTherapist ? (
         <div className="form-panel" style={{ maxWidth: 560, marginBottom: "1.25rem" }}>
