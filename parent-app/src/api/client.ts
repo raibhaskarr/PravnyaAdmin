@@ -5,11 +5,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
 
 export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string
-  ) {
+  status: number;
+  constructor(status: number, message: string) {
     super(message);
+    this.status = status;
   }
 }
 
@@ -56,6 +55,13 @@ export const api = {
     return request<{ id: string; firstName: string; lastName: string; dob: string | null; gender: string | null }>("/parent-kids", {
       token,
       method: "POST",
+      body: input
+    });
+  },
+  updateKid(token: string, kidId: string, input: { selfReportedTherapies?: string[]; selfReportedScheduleDays?: string[] }) {
+    return request<{ id: string; selfReportedTherapies: string[]; selfReportedScheduleDays: string[] }>(`/parent-kids/${kidId}`, {
+      token,
+      method: "PATCH",
       body: input
     });
   }

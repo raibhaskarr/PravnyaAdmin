@@ -7,11 +7,10 @@ import { ChoiceChip, PrimaryButton, SkipLink, StepHeading } from "../components"
 const OPTIONS = ["Male", "Female", "Non-binary", "Prefer not to say"];
 
 // The actual "create the kid" call happens here, not at the child-dob step -- gender is the last
-// adjacent field before the heavier optional screens (therapies/schedule/IEP, none wired to the
-// backend yet), so waiting one screen gets the most complete record in a single create call
-// instead of create-then-patch (no kid-update endpoint exists for parents yet).
+// field the create endpoint itself accepts; Therapies/Schedule right after this both PATCH the
+// kid this step creates (that's why kidId gets stored here, not just the create confirmation).
 export function ChildGender() {
-  const { draft, patchDraft, goNext, skipStep, token } = useOnboarding();
+  const { draft, patchDraft, goNext, skipStep, token, setKidId } = useOnboarding();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const firstName = draft.childName.trim().split(" ")[0] || "your child";
@@ -20,11 +19,12 @@ export function ChildGender() {
     setError("");
     setSubmitting(true);
     try {
-      await api.createFirstKid(token!, {
+      const kid = await api.createFirstKid(token!, {
         name: draft.childName,
         dob: new Date(draft.childDob).toISOString(),
         ...(gender ? { gender } : {})
       });
+      setKidId(kid.id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't save that. Try again.");
       setSubmitting(false);

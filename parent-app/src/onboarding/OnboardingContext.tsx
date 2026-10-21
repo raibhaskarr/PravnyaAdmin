@@ -27,6 +27,10 @@ interface OnboardingContextValue {
    * starts over, same as every other piece of draft state. */
   token: string | null;
   setToken: (token: string) => void;
+  /** Set once createFirstKid() succeeds (ChildGender step) -- needed by Therapies/Schedule to
+   * PATCH the right kid. */
+  kidId: string | null;
+  setKidId: (kidId: string) => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -35,6 +39,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<OnboardingDraft>(emptyDraft);
   const [stepIndex, setStepIndex] = useState(0);
   const [token, setToken] = useState<string | null>(null);
+  const [kidId, setKidId] = useState<string | null>(null);
   const [optionalStatus, setOptionalStatus] = useState<Record<OptionalStepId, OptionalStepStatus>>({
     "child-gender": "pending",
     "child-therapies": "pending",
@@ -83,6 +88,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     requiredStepCount,
     token,
     setToken,
+    kidId,
+    setKidId,
   };
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;

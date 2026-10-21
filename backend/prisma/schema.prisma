@@ -325,6 +325,14 @@ model Kid {
   /// Plain text, not a fixed enum -- matches PranTrackingSystem's Child.gender precedent.
   gender     String?
   status     KidStatus   @default(ACTIVE)
+  /// Self-reported during parent onboarding ("what kind of support does your child get right
+  /// now?" / "which days"), deliberately NOT the same as the real `therapists`/future-schedule
+  /// relations below -- those require an actual Therapist/centre, which the parent hasn't chosen
+  /// yet at this point in onboarding (centre selection stays optional/deferred). These are plain
+  /// informational tags, free to disagree with the real data once a centre is added -- not
+  /// reconciled automatically.
+  selfReportedTherapies    String[] @default([])
+  selfReportedScheduleDays String[] @default([])
   therapists KidTherapist[]
   goals      Goal[]
   therapistInvitations TherapistInvitation[]

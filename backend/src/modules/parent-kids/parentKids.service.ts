@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { env } from "../../config/env";
-import { AppError } from "../../common/errors/AppError";
-import { CreateParentKidInput } from "./parentKids.schemas";
+import { AppError, notFound } from "../../common/errors/AppError";
+import { CreateParentKidInput, UpdateParentKidInput } from "./parentKids.schemas";
 
 // Splits a single "child's name" field into firstName/lastName -- Kid.lastName is a required,
 // non-nullable column (shared with the staff-facing kids module, not changed here), so a
@@ -39,6 +39,33 @@ export const parentKidsService = {
       where: { parentId },
       select: { id: true, firstName: true, lastName: true, dob: true, gender: true, status: true },
       orderBy: { createdAt: "asc" }
+    });
+  },
+
+  async updateMyKid(parentId: string, kidId: string, input: UpdateParentKidInput) {
+    // parentId in the where clause, not a separate ownership check after the fact -- a parent
+    // patching a kidId that isn't theirs gets the same 404 as one that doesn't exist at all,
+    // never a 403 that would confirm the id is real.
+    const result = await prisma.kid.updateMany({
+      where: { id: kidId, parentId },
+      data: {
+        ...(input.selfReportedTherapies !== undefined ? { selfReportedTherapies: input.selfReportedTherapies } : {}),
+        ...(input.selfReportedScheduleDays !== undefined ? { selfReportedScheduleDays: input.selfReportedScheduleDays } : {})
+      }
+    });
+    if (result.count === 0) throw notFound("Kid not found");
+
+    return prisma.kid.findUniqueOrThrow({
+      where: { id: kidId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        dob: true,
+        gender: true,
+        selfReportedTherapies: true,
+        selfReportedScheduleDays: true
+      }
     });
   }
 };
