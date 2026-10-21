@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@import "@fontsource/plus-jakarta-sans/400.css";
+@import "@fontsource/plus-jakarta-sans/500.css";
+@import "@fontsource/plus-jakarta-sans/600.css";
+@import "@fontsource/plus-jakarta-sans/700.css";
+
+/*
+  Brand tokens, pulled from Pravnya's logo artwork (deep forest green + bright green accent) --
+  same palette family as PravnyaAdmin's own Growth/Activities tabs, kept consistent across the
+  whole product rather than inventing a second brand for this app.
+
+  Typography is chosen for the "calming" onboarding goal, not just brand: a rounded humanist sans,
+  generously sized, loose line-height -- locked in during onboarding planning.
+*/
+:root {
+  --pv-green-900: #0d4834;
+  --pv-green-700: #136b4d;
+  --pv-green-500: #2acb87;
+  --pv-green-100: #dff5ea;
+  --pv-orange-500: #f39c4a;
+  --pv-orange-100: #fde9d3;
+  --pv-ink: #1c2b22;
+  --pv-ink-soft: #5b6b61;
+  --pv-ink-faint: #8b998f;
+  --pv-bg: #f7faf8;
+  --pv-surface: #ffffff;
+  --pv-border: #e3ebe4;
+
+  --pv-font: "Plus Jakarta Sans", ui-rounded, -apple-system, "Segoe UI Variable", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--pv-font);
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--pv-ink);
+  background: var(--pv-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Calm, legible by default -- no thin weights at body size, no all-caps anywhere in this app. */
+p,
+label,
+button,
+input {
+  font-family: inherit;
+}

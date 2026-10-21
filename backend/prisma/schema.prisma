@@ -338,17 +338,29 @@ model Kid {
 /// Household identity -- deliberately NOT tenant-scoped (a household's two kids can belong to
 /// different tenants, e.g. siblings at different centres) and NOT a row in User (User is
 /// unconditionally centre staff: every non-superadmin row requires a tenantId, which a parent
-/// structurally can't have). No passwordHash yet -- parent login is deferred until the
-/// parent-facing app itself gets planned; see docs/manual/06-parent-kid-onboarding-spec.md.
+/// structurally can't have). Self-service login (passwordHash/emailVerifiedAt below) shipped for
+/// the parent-facing app; see docs/manual/06-parent-kid-onboarding-spec.md and parentAuth.service.ts.
 model Parent {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   fatherName   String?
   motherName   String?
-  mobile       String
+  /// Was required; loosened for self-registration, where phone verification is deliberately
+  /// deferred/optional (see parent-app onboarding) -- a centre admin's "Add parent" form can
+  /// still require it client-side, the column itself no longer enforces it.
+  mobile       String?
   addressLine1 String?
   city         String?
   kids         Kid[]
+  /// Self-service login fields. All three null until this Parent record is "claimed" -- either a
+  /// brand new registration, or a parent registering with an email a tenant admin already added
+  /// them under (see parentAuth.service.ts's register()). Never set by an admin-side form.
+  /// displayName is deliberately separate from fatherName/motherName above: onboarding collects
+  /// one generic "your name" field with no father/mother distinction, and writing it into either
+  /// of those would misrepresent who the account holder actually is.
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+  displayName     String?
   /// The tenant whose admin first created this parent record -- never changes on reuse (see
   /// findOrCreateParent). Exists purely for visibility: a parent with zero kids yet (created via
   /// the standalone "Add parent" flow, no first kid) isn't discoverable through kidVisibilityFilter
@@ -712,4 +724,16 @@ model PocLogEvidence {
 
   @@index([childId])
   @@index([predictedSkillId])
+}
+
+/// Ephemeral email-verification codes for parent self-registration -- deliberately not tied to a
+/// Parent row (one may not exist yet for a brand-new email). One row per outstanding code; a new
+/// send for the same email invalidates the previous one by deleting it first (see
+/// parentAuth.service.ts's sendVerificationCode()).
+model ParentVerificationCode {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  codeHash  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }

@@ -22,6 +22,8 @@ import { tenantInvitationAcceptRoutes } from "./modules/tenant-invitations/tenan
 import { superadminInvitationsRoutes } from "./modules/superadmin-invitations/superadminInvitations.routes";
 import { superadminInvitationAcceptRoutes } from "./modules/superadmin-invitations/superadminInvitationAccept.routes";
 import { iepRoutes } from "./modules/iep/iep.routes";
+import { parentAuthRoutes } from "./modules/parent-auth/parentAuth.routes";
+import { parentKidsRoutes } from "./modules/parent-kids/parentKids.routes";
 
 export function createApp() {
   const app = express();
@@ -69,6 +71,8 @@ export function createApp() {
   app.use("/api/superadmin-invitations", superadminInvitationsRoutes);
   app.use("/api/superadmin-signup", superadminInvitationAcceptRoutes);
   app.use("/api/iep", iepRoutes);
+  app.use("/api/parent-auth", parentAuthRoutes);
+  app.use("/api/parent-kids", parentKidsRoutes);
 
   app.use(errorMiddleware);
 

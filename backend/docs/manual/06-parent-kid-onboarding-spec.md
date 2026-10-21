@@ -101,16 +101,37 @@ implementation, but it means one tenant's onboarding flow can observe that *some
 at another tenant, even if it reveals nothing about which tenant or which kid. Worth a deliberate
 decision before building, not an accidental byproduct of the lookup.
 
-## Deferred — parent-facing app
+## Update: parent login has shipped
 
-- **Parent login** — no `passwordHash`, no JWT issuance, no invite-acceptance flow for parents.
-- **B2C self-registration** — a parent creating their own account directly depends on login
-  existing, so it's deferred alongside it.
-- Where parents would eventually log in (new role/nav on this same frontend vs. a separate
-  application) is a question for that future planning pass, not this one.
-- The cross-tenant household-lookup question above — revisit once login exists, since the parent
-  themself could be the one who confirms/links a new centre to their existing account instead of
-  staff doing an email lookup.
+The "deferred" items below described this phase's intentional scope cut. They're no longer
+deferred — the parent-facing app (a separate `parent-app/` frontend, not this admin frontend)
+now has self-service email/password registration, email verification, and login, built in
+`modules/parent-auth/`. `Parent.passwordHash`/`emailVerifiedAt` are real columns.
+
+This resolved the cross-tenant household-lookup question flagged below exactly the way this spec
+predicted: registration is **parent-initiated**, not staff-initiated. A parent registering with an
+email that already has a `Parent` row (created earlier by some tenant's admin) proves ownership via
+the emailed verification code, then claims that existing row -- no tenant staff ever performs this
+lookup, so the cross-tenant leakage concern doesn't apply to this flow. The B2B lookup (a Tenant
+Admin's own "Add parent" form doing the same `findOrCreateParent`-style reuse) still has the
+original concern and remains unresolved, unchanged from below.
+
+A self-registered parent's kids are created under a fixed retail/direct tenant
+(`RETAIL_TENANT_ID` env var, "Pravnix Labs Pvt Ltd" in production) rather than a tenant they
+choose -- centre selection stays optional/deferred in onboarding, consistent with "Kid ownership
+does not change" above. If they later add a real centre, that's a guest-therapist link
+(`KidTherapist`), same mechanism as any cross-tenant guest therapist -- the kid's home tenant never
+changes.
+
+## Deferred — parent-facing app (original scope cut, see update above)
+
+- ~~**Parent login** — no `passwordHash`, no JWT issuance, no invite-acceptance flow for parents.~~
+- ~~**B2C self-registration** — a parent creating their own account directly depends on login
+  existing, so it's deferred alongside it.~~
+- Where parents log in: a separate `parent-app/` frontend (Capacitor + web), not this admin
+  frontend -- decided when that app was planned.
+- The cross-tenant household-lookup question above — resolved for the B2C path (see update above);
+  still open for the B2B (Tenant Admin) path.
 
 ## Open items not decided by this spec
 

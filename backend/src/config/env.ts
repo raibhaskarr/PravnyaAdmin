@@ -37,7 +37,13 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM_NAME: z.string().default("PravnyaAdmin"),
   EMAIL_FROM_ADDRESS: z.string().default("no-reply@pravnya.com"),
-  APP_BASE_URL: z.string().optional()
+  APP_BASE_URL: z.string().optional(),
+  // Home tenant for every self-registered (B2C/retail) parent's kids -- "Pravnix Labs Pvt Ltd" in
+  // production. Optional here so existing environments/CI without it configured still boot; the
+  // parent-kids endpoint itself throws a clear error if a kid-creation call arrives and this is
+  // unset, rather than failing silently or guessing a tenant. See
+  // docs/manual/06-parent-kid-onboarding-spec.md.
+  RETAIL_TENANT_ID: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);
