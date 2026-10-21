@@ -24,6 +24,7 @@ import { superadminInvitationAcceptRoutes } from "./modules/superadmin-invitatio
 import { iepRoutes } from "./modules/iep/iep.routes";
 import { parentAuthRoutes } from "./modules/parent-auth/parentAuth.routes";
 import { parentKidsRoutes } from "./modules/parent-kids/parentKids.routes";
+import { parentIepRoutes } from "./modules/parent-iep/parentIep.routes";
 
 export function createApp() {
   const app = express();
@@ -37,6 +38,8 @@ export function createApp() {
   // A multi-page IEP PDF or a full-resolution photo of one can run several MB -- same scoped-limit
   // approach as extract-evidence above, not a global bump.
   app.use("/api/iep/extract", express.json({ limit: "20mb" }));
+  // Same reasoning, parent-facing equivalent -- the onboarding IEP screen uploads a PDF/photo too.
+  app.use("/api/parent-kids/:kidId/iep/extract", express.json({ limit: "20mb" }));
   // Default 100kb is too small for the poc-review bulk-import endpoint (hundreds of rows per
   // child); every other route's payloads are small CRUD bodies well under this.
   app.use(express.json({ limit: "2mb" }));
@@ -73,6 +76,7 @@ export function createApp() {
   app.use("/api/iep", iepRoutes);
   app.use("/api/parent-auth", parentAuthRoutes);
   app.use("/api/parent-kids", parentKidsRoutes);
+  app.use("/api/parent-kids", parentIepRoutes);
 
   app.use(errorMiddleware);
 

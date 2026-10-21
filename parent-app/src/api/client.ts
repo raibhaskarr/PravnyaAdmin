@@ -38,6 +38,20 @@ export type ParentProfile = {
   kids?: { id: string; firstName: string; lastName: string; dob: string | null; gender: string | null }[];
 };
 
+export type IepGoalCandidate = {
+  canonicalSkillId: string;
+  skillName: string;
+  domainName: string;
+  measurementType: string | null;
+  disciplineId: string | null;
+  modality: string | null;
+  title: string;
+  confidence: number;
+  sourceExcerpt: string;
+};
+
+export type IepSource = { kind: "pdf"; base64: string } | { kind: "image"; base64: string; mimeType: string };
+
 export const api = {
   sendVerificationCode(email: string) {
     return request<{ sent: boolean }>("/parent-auth/send-verification-code", { method: "POST", body: { email } });
@@ -63,6 +77,20 @@ export const api = {
       token,
       method: "PATCH",
       body: input
+    });
+  },
+  extractIep(token: string, kidId: string, source: IepSource) {
+    return request<{ statusUpdates: unknown[]; newGoals: IepGoalCandidate[] } | { error: string }>(`/parent-kids/${kidId}/iep/extract`, {
+      token,
+      method: "POST",
+      body: { source }
+    });
+  },
+  acceptIepGoals(token: string, kidId: string, candidates: IepGoalCandidate[]) {
+    return request<{ created: number; skipped: number }>(`/parent-kids/${kidId}/iep/accept-goals`, {
+      token,
+      method: "POST",
+      body: { candidates }
     });
   }
 };

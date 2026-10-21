@@ -5,8 +5,6 @@ import { parse as parseCsv } from "csv-parse/sync";
 import { PDFParse } from "pdf-parse";
 import { Modality, PocMeasurementType } from "@prisma/client";
 import { prisma } from "../../config/prisma";
-import { AuthUser } from "../../common/middleware/auth";
-import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { deriveDisciplineAndModality } from "../ai/goalSkillSuggestion.service";
 import { orchestrator } from "../ai/ai.platform";
 import { EVIDENCE_FIELD_INSTRUCTIONS, MODALITIES, OUTCOMES, SUPPORT_LEVELS, evidenceItemSchema, type EvidenceCandidate } from "../ai/evidenceFields.shared";
@@ -183,9 +181,12 @@ export const iepExtractionService = {
   // once per approved candidate. The uploaded PDF/photo itself is only ever forwarded to the AI
   // provider for this one request (or, for PDF, parsed locally for its text) -- never written to
   // disk or kept anywhere after the response.
-  async extract(user: AuthUser, kidId: string, source: IepSource): Promise<{ statusUpdates: EvidenceCandidate[]; newGoals: IepGoalCandidate[] } | { error: string }> {
-    const kid = await assertCanAccessKid(user, kidId);
-
+  // Ownership/access check happens at the caller -- staff via assertCanAccessKid (iep.routes.ts),
+  // parents via their own parentId check (parent-iep.routes.ts). This function only needs the
+  // already-verified kid's id/tenantId, not who's allowed to see it, so it works unchanged for
+  // either caller.
+  async extract(kid: { id: string; tenantId: string }, source: IepSource): Promise<{ statusUpdates: EvidenceCandidate[]; newGoals: IepGoalCandidate[] } | { error: string }> {
+    const kidId = kid.id;
     const skills = await prisma.canonicalSkill.findMany({
       select: {
         id: true,
