@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../../common/middleware/asyncHandler";
 import { validateRequest } from "../../common/middleware/validateRequest";
 import { requireParentAuth } from "../../common/middleware/parentAuth";
-import { loginSchema, registerSchema, sendVerificationCodeSchema } from "./parentAuth.schemas";
+import { loginSchema, registerSchema, resetPasswordSchema, sendVerificationCodeSchema } from "./parentAuth.schemas";
 import { parentAuthService } from "./parentAuth.service";
 
 export const parentAuthRoutes = Router();
@@ -31,6 +31,14 @@ parentAuthRoutes.post(
   validateRequest({ body: loginSchema }),
   asyncHandler(async (req, res) => {
     res.json(await parentAuthService.login(req.body));
+  })
+);
+
+parentAuthRoutes.post(
+  "/reset-password",
+  validateRequest({ body: resetPasswordSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(await parentAuthService.resetPassword(req.body));
   })
 );
 

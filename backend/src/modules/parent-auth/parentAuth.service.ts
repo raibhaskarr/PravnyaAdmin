@@ -4,7 +4,7 @@ import { env } from "../../config/env";
 import { signParentToken } from "../../common/middleware/parentAuth";
 import { AppError } from "../../common/errors/AppError";
 import { invitationEmailService } from "../therapist-invitations/invitationEmail.service";
-import { LoginInput, RegisterInput, SendVerificationCodeInput } from "./parentAuth.schemas";
+import { LoginInput, RegisterInput, ResetPasswordInput, SendVerificationCodeInput } from "./parentAuth.schemas";
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -17,6 +17,20 @@ function generateCode(): string {
 
 function parentPublicShape(parent: { id: string; email: string; displayName: string | null }) {
   return { id: parent.id, email: parent.email, name: parent.displayName };
+}
+
+// Shared by register() and resetPassword() -- both need "prove you own this inbox" as a
+// prerequisite, just with a different action afterward. Single-use: deletes the row on success,
+// so a caller never needs to remember to do it separately (and can't accidentally redeem the same
+// code twice across the two different flows).
+async function verifyAndConsumeCode(email: string, code: string): Promise<void> {
+  const verification = await prisma.parentVerificationCode.findUnique({ where: { email } });
+  if (!verification || verification.expiresAt < new Date()) {
+    throw new AppError(400, "INVALID_CODE", "This code has expired. Request a new one.");
+  }
+  const codeValid = await bcrypt.compare(code, verification.codeHash);
+  if (!codeValid) throw new AppError(400, "INVALID_CODE", "Incorrect verification code.");
+  await prisma.parentVerificationCode.delete({ where: { email } });
 }
 
 export const parentAuthService = {
@@ -38,12 +52,7 @@ export const parentAuthService = {
   },
 
   async register(input: RegisterInput) {
-    const verification = await prisma.parentVerificationCode.findUnique({ where: { email: input.email } });
-    if (!verification || verification.expiresAt < new Date()) {
-      throw new AppError(400, "INVALID_CODE", "This code has expired. Request a new one.");
-    }
-    const codeValid = await bcrypt.compare(input.verificationCode, verification.codeHash);
-    if (!codeValid) throw new AppError(400, "INVALID_CODE", "Incorrect verification code.");
+    await verifyAndConsumeCode(input.email, input.verificationCode);
 
     const passwordHash = await bcrypt.hash(input.password, env.BCRYPT_SALT_ROUNDS);
 
@@ -52,7 +61,7 @@ export const parentAuthService = {
     if (existing) {
       if (existing.passwordHash) {
         // Already claimed by a previous registration -- don't silently reset their password via
-        // the register flow (that's what forgot-password is for, not built this pass).
+        // the register flow, that's resetPassword()'s job, with its own explicit intent.
         throw new AppError(409, "ALREADY_REGISTERED", "An account with this email already exists. Try signing in instead.");
       }
       parent = await prisma.parent.update({
@@ -65,11 +74,27 @@ export const parentAuthService = {
       });
     }
 
-    // Single-use -- delete now that it's been consumed, not just left to expire.
-    await prisma.parentVerificationCode.delete({ where: { email: input.email } });
-
     const token = signParentToken(parent.id);
     return { token, parent: parentPublicShape(parent) };
+  },
+
+  async resetPassword(input: ResetPasswordInput) {
+    await verifyAndConsumeCode(input.email, input.verificationCode);
+
+    const parent = await prisma.parent.findUnique({ where: { email: input.email } });
+    // Unlike login()'s deliberately generic message, this can be specific: redeeming the code
+    // already proved they own this inbox, so "no account here" isn't leaking anything they didn't
+    // already have the means to find out -- and they genuinely need to know, to go register
+    // instead rather than being stuck on a reset flow that can never work.
+    if (!parent || !parent.passwordHash) {
+      throw new AppError(404, "NO_ACCOUNT", "No account found for this email. Try creating one instead.");
+    }
+
+    const passwordHash = await bcrypt.hash(input.newPassword, env.BCRYPT_SALT_ROUNDS);
+    const updated = await prisma.parent.update({ where: { id: parent.id }, data: { passwordHash } });
+
+    const token = signParentToken(updated.id);
+    return { token, parent: parentPublicShape(updated) };
   },
 
   async login(input: LoginInput) {

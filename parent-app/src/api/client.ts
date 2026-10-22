@@ -92,5 +92,8 @@ export const api = {
       method: "POST",
       body: { candidates }
     });
+  },
+  resetPassword(input: { email: string; verificationCode: string; newPassword: string }) {
+    return request<{ token: string; parent: ParentProfile }>("/parent-auth/reset-password", { method: "POST", body: input });
   }
 };
