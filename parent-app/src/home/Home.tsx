@@ -28,7 +28,7 @@ function NavLabel({ tab }: { tab: (typeof TABS)[number] }) {
   );
 }
 
-export function Home({ token, onSessionExpired }: { token: string; onSessionExpired: () => void }) {
+export function Home({ token, onSessionExpired, onSignOut }: { token: string; onSessionExpired: () => void; onSignOut: () => void }) {
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [error, setError] = useState("");
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -92,6 +92,20 @@ export function Home({ token, onSessionExpired }: { token: string; onSessionExpi
             <p className="text-[1.05rem] font-semibold text-[var(--pv-ink)]">{kidName}</p>
             <p className="text-xs text-[var(--pv-ink-faint)]">{profile.name ? `Signed in as ${profile.name}` : profile.email}</p>
           </div>
+          <button
+            type="button"
+            onClick={onSignOut}
+            aria-label="Sign out"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--pv-ink-soft)] transition hover:bg-[var(--pv-border)]"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path
+                d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </header>
 
         <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-5 py-6">

@@ -44,7 +44,7 @@ export function App() {
   }
 
   if (phase === "home") {
-    return <Home token={token!} onSessionExpired={signOut} />;
+    return <Home token={token!} onSessionExpired={signOut} onSignOut={signOut} />;
   }
 
   return (
