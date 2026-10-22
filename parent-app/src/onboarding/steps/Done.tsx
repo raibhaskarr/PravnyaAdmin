@@ -2,8 +2,8 @@ import mark from "../../brand/mark.svg";
 import { useOnboarding } from "../OnboardingContext";
 import { PrimaryButton } from "../components";
 
-export function Done({ onFinish }: { onFinish: () => void }) {
-  const { draft } = useOnboarding();
+export function Done({ onFinish }: { onFinish: (token: string) => void }) {
+  const { draft, token } = useOnboarding();
   const firstName = draft.childName.trim().split(" ")[0] || "your child";
 
   return (
@@ -16,7 +16,7 @@ export function Done({ onFinish }: { onFinish: () => void }) {
         </p>
       </div>
       <div className="w-full max-w-xs">
-        <PrimaryButton type="button" onClick={onFinish}>
+        <PrimaryButton type="button" onClick={() => onFinish(token!)}>
           Go to Home
         </PrimaryButton>
       </div>

@@ -4,45 +4,52 @@ import { OnboardingFlow } from "./onboarding/OnboardingFlow";
 import { Welcome } from "./onboarding/Welcome";
 import { Login } from "./auth/Login";
 import { ForgotPassword } from "./auth/ForgotPassword";
+import { Home } from "./home/Home";
+import { clearStoredToken, getStoredToken, setStoredToken } from "./session";
 
-type Phase = "welcome" | "login" | "forgotPassword" | "onboarding" | "finished";
+type Phase = "welcome" | "login" | "forgotPassword" | "onboarding" | "home";
 
-// Onboarding is the only thing built so far -- Home/Growth/Goals and real routing land once
-// onboarding itself is signed off. "finished" covers both a completed signup and a successful
-// sign-in/reset -- there's nowhere else to send either of them yet.
+// A stored token resumes straight to Home -- Home itself re-validates it against /me and bounces
+// back to Welcome (clearing the stale token) if it's expired/invalid, rather than trusting it blind.
+function initialPhase(): Phase {
+  return getStoredToken() ? "home" : "welcome";
+}
+
 export function App() {
-  const [phase, setPhase] = useState<Phase>("welcome");
+  const [phase, setPhase] = useState<Phase>(initialPhase);
+  const [token, setToken] = useState<string | null>(getStoredToken);
+
+  function enterHome(newToken: string) {
+    setStoredToken(newToken);
+    setToken(newToken);
+    setPhase("home");
+  }
+
+  function signOut() {
+    clearStoredToken();
+    setToken(null);
+    setPhase("welcome");
+  }
 
   if (phase === "welcome") {
     return <Welcome onStart={() => setPhase("onboarding")} onSignIn={() => setPhase("login")} />;
   }
 
   if (phase === "login") {
-    return (
-      <Login
-        onBack={() => setPhase("welcome")}
-        onLoggedIn={() => setPhase("finished")}
-        onForgotPassword={() => setPhase("forgotPassword")}
-        onCreateAccount={() => setPhase("onboarding")}
-      />
-    );
+    return <Login onBack={() => setPhase("welcome")} onLoggedIn={enterHome} onForgotPassword={() => setPhase("forgotPassword")} onCreateAccount={() => setPhase("onboarding")} />;
   }
 
   if (phase === "forgotPassword") {
-    return <ForgotPassword onBack={() => setPhase("login")} onReset={() => setPhase("finished")} />;
+    return <ForgotPassword onBack={() => setPhase("login")} onReset={enterHome} />;
   }
 
-  if (phase === "finished") {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[var(--pv-bg)] px-6 text-center">
-        <p className="text-[1.05rem] text-[var(--pv-ink-soft)]">Home isn't built yet.</p>
-      </div>
-    );
+  if (phase === "home") {
+    return <Home token={token!} onSessionExpired={signOut} />;
   }
 
   return (
     <OnboardingProvider>
-      <OnboardingFlow onFinish={() => setPhase("finished")} />
+      <OnboardingFlow onFinish={enterHome} />
     </OnboardingProvider>
   );
 }

@@ -35,7 +35,15 @@ export type ParentProfile = {
   id: string;
   email: string;
   name: string | null;
-  kids?: { id: string; firstName: string; lastName: string; dob: string | null; gender: string | null }[];
+  kids?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    dob: string | null;
+    gender: string | null;
+    selfReportedTherapies: string[];
+    selfReportedScheduleDays: string[];
+  }[];
 };
 
 export type IepGoalCandidate = {
@@ -72,12 +80,11 @@ export const api = {
       body: input
     });
   },
-  updateKid(token: string, kidId: string, input: { selfReportedTherapies?: string[]; selfReportedScheduleDays?: string[] }) {
-    return request<{ id: string; selfReportedTherapies: string[]; selfReportedScheduleDays: string[] }>(`/parent-kids/${kidId}`, {
-      token,
-      method: "PATCH",
-      body: input
-    });
+  updateKid(token: string, kidId: string, input: { selfReportedTherapies?: string[]; selfReportedScheduleDays?: string[]; gender?: string }) {
+    return request<{ id: string; gender: string | null; selfReportedTherapies: string[]; selfReportedScheduleDays: string[] }>(
+      `/parent-kids/${kidId}`,
+      { token, method: "PATCH", body: input }
+    );
   },
   extractIep(token: string, kidId: string, source: IepSource) {
     return request<{ statusUpdates: unknown[]; newGoals: IepGoalCandidate[] } | { error: string }>(`/parent-kids/${kidId}/iep/extract`, {

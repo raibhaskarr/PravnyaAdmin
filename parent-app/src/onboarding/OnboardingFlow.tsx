@@ -11,7 +11,7 @@ import { ChildSchedule } from "./steps/ChildSchedule";
 import { ChildIep } from "./steps/ChildIep";
 import { Done } from "./steps/Done";
 
-export function OnboardingFlow({ onFinish }: { onFinish: () => void }) {
+export function OnboardingFlow({ onFinish }: { onFinish: (token: string) => void }) {
   const { stepId } = useOnboarding();
 
   switch (stepId) {

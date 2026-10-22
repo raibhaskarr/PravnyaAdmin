@@ -50,7 +50,8 @@ export const parentKidsService = {
       where: { id: kidId, parentId },
       data: {
         ...(input.selfReportedTherapies !== undefined ? { selfReportedTherapies: input.selfReportedTherapies } : {}),
-        ...(input.selfReportedScheduleDays !== undefined ? { selfReportedScheduleDays: input.selfReportedScheduleDays } : {})
+        ...(input.selfReportedScheduleDays !== undefined ? { selfReportedScheduleDays: input.selfReportedScheduleDays } : {}),
+        ...(input.gender !== undefined ? { gender: input.gender } : {})
       }
     });
     if (result.count === 0) throw notFound("Kid not found");

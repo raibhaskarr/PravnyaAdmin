@@ -113,7 +113,21 @@ export const parentAuthService = {
   async me(parentId: string) {
     const parent = await prisma.parent.findUniqueOrThrow({
       where: { id: parentId },
-      include: { kids: { select: { id: true, firstName: true, lastName: true, dob: true, gender: true } } }
+      // selfReportedTherapies/selfReportedScheduleDays added for Home's "what's still missing"
+      // nudge -- it needs to know what's already on file without a second round-trip per kid.
+      include: {
+        kids: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            dob: true,
+            gender: true,
+            selfReportedTherapies: true,
+            selfReportedScheduleDays: true
+          }
+        }
+      }
     });
     return { ...parentPublicShape(parent), kids: parent.kids };
   }
