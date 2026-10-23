@@ -31,11 +31,67 @@ function NavLabel({ tab }: { tab: (typeof TABS)[number] }) {
   );
 }
 
+// Only rendered when there's more than one kid -- the common case (one kid) keeps the header
+// exactly as it was, a plain name with no affordance implying there's anything to switch between.
+function KidSwitcher({
+  kids,
+  selectedKidId,
+  onSelect
+}: {
+  kids: { id: string; firstName: string }[];
+  selectedKidId: string;
+  onSelect: (kidId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = kids.find((k) => k.id === selectedKidId) ?? kids[0];
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1 text-[1.05rem] font-semibold text-[var(--pv-ink)]"
+      >
+        {selected.firstName}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={`transition ${open ? "rotate-180" : ""}`}>
+          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden="true" tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
+          <div className="absolute left-0 top-full z-20 mt-1.5 min-w-[9rem] overflow-hidden rounded-xl border border-[var(--pv-border)] bg-[var(--pv-surface)] py-1 shadow-md">
+            {kids.map((k) => (
+              <button
+                key={k.id}
+                type="button"
+                onClick={() => {
+                  onSelect(k.id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between px-3.5 py-2 text-left text-[0.92rem] ${
+                  k.id === selected.id ? "font-semibold text-[var(--pv-green-700)]" : "text-[var(--pv-ink)] hover:bg-[var(--pv-bg)]"
+                }`}
+              >
+                {k.firstName}
+                {k.id === selected.id ? <span aria-hidden="true">✓</span> : null}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function Home({ token, onSessionExpired, onSignOut }: { token: string; onSessionExpired: () => void; onSignOut: () => void }) {
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [error, setError] = useState("");
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [view, setView] = useState<View>("home");
+  // Null until the parent actively picks one -- falls back to the first kid below, same as before
+  // a switcher existed, so a one-kid account (the common case) behaves exactly as it always did.
+  const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
 
   function refetch() {
     return api
@@ -67,7 +123,8 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     );
   }
 
-  const kid: Kid | undefined = profile.kids?.[0];
+  const kids = profile.kids ?? [];
+  const kid: Kid | undefined = kids.find((k) => k.id === selectedKidId) ?? kids[0];
   const kidName = kid?.firstName || "your child";
 
   // Goals is its own full screen (own header/back button), same pattern as Login/ForgotPassword
@@ -113,7 +170,11 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
           <div>
-            <p className="text-[1.05rem] font-semibold text-[var(--pv-ink)]">{kidName}</p>
+            {kids.length > 1 && kid ? (
+              <KidSwitcher kids={kids} selectedKidId={kid.id} onSelect={setSelectedKidId} />
+            ) : (
+              <p className="text-[1.05rem] font-semibold text-[var(--pv-ink)]">{kidName}</p>
+            )}
             <p className="text-xs text-[var(--pv-ink-faint)]">{profile.name ? `Signed in as ${profile.name}` : profile.email}</p>
           </div>
           <button
