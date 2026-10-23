@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type ParentProfile } from "../api/client";
 import mark from "../brand/mark.svg";
+import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
 import { Growth } from "../growth/Growth";
 import { computeNudge, NudgeCard } from "./nudges";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth";
+type View = "home" | "goals" | "growth" | "activities";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
   { id: "growth" as const, label: "Growth", icon: "📈", enabled: true },
+  { id: "activities" as const, label: "Activities", icon: "🧩", enabled: true },
   { id: "goals" as const, label: "Goals", icon: "🎯", enabled: true }
 ];
 
@@ -138,6 +140,10 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     return <Growth token={token} kidId={kid.id} kidName={kidName} onBack={() => setView("home")} />;
   }
 
+  if (view === "activities" && kid) {
+    return <Activities token={token} kidId={kid.id} onBack={() => setView("home")} />;
+  }
+
   // Dismissed-for-this-session only -- no server-side "don't suggest again" state built yet (that
   // was the original L11-style activation-gap pattern, deliberately not ported, see memory). A
   // reload brings the nudge back; this is a real, known limitation, not an oversight.
@@ -156,7 +162,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
             key={tab.id}
             type="button"
             disabled={!tab.enabled || tab.id === "home"}
-            onClick={() => (tab.id === "goals" || tab.id === "growth") && setView(tab.id)}
+            onClick={() => (tab.id === "goals" || tab.id === "growth" || tab.id === "activities") && setView(tab.id)}
             className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
               tab.id === "home" ? "bg-[var(--pv-green-100)]" : tab.enabled ? "hover:bg-[var(--pv-border)]" : "cursor-default"
             }`}
@@ -235,7 +241,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
             key={tab.id}
             type="button"
             disabled={!tab.enabled || tab.id === "home"}
-            onClick={() => (tab.id === "goals" || tab.id === "growth") && setView(tab.id)}
+            onClick={() => (tab.id === "goals" || tab.id === "growth" || tab.id === "activities") && setView(tab.id)}
             className="flex flex-1 flex-col items-center gap-0.5 py-2.5"
           >
             <TabIcon tab={tab} />
