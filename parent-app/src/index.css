@@ -19,6 +19,10 @@
   --pv-green-100: #dff5ea;
   --pv-orange-500: #f39c4a;
   --pv-orange-100: #fde9d3;
+  /* Same values as the admin Growth tab's own gp-blue tokens -- the home-vs-centre evidence tag
+     distinction is meaningful in the "finalized" design, not decoration. */
+  --pv-blue-500: #4a8ff3;
+  --pv-blue-100: #dce9fd;
   --pv-ink: #1c2b22;
   --pv-ink-soft: #5b6b61;
   --pv-ink-faint: #8b998f;
