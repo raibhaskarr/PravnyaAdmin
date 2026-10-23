@@ -29,6 +29,29 @@ function evidenceSourceLabel(centreName: string | null): string {
   return centreName ?? "Logged by you at home";
 }
 
+// Previous version put this mapping in plain gray prose next to the title -- indistinguishable
+// from any other description text, which is exactly the feedback that came back ("I don't see the
+// mapping"). A tag reads as a cross-reference at a glance; plain text doesn't. Orange, not the
+// green used for the provenance badge below, so the two badge types stay visually distinct from
+// each other, not just from body text -- same orange/#B5701F pairing the admin Growth tab already
+// uses for its own tag treatment.
+function MappingTag({ goal }: { goal: Goal }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--pv-orange-500)] bg-[var(--pv-orange-100)] px-2.5 py-1 text-xs font-medium text-[#8a5a1f]">
+      <span aria-hidden="true">🏷️</span>
+      {goal.canonicalSkill.domain.name} › {goal.canonicalSkill.name}
+    </span>
+  );
+}
+
+function ProvenanceTag({ label }: { label: string }) {
+  return (
+    <span className="inline-block rounded-full bg-[var(--pv-green-100)] px-2.5 py-1 text-xs font-medium text-[var(--pv-green-900)]">
+      {label}
+    </span>
+  );
+}
+
 const OUTCOME_LABEL: Record<string, string> = {
   CORRECT: "Did it independently",
   PARTIAL: "Needed a little help",
@@ -65,12 +88,10 @@ function GoalDetail({
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-[var(--pv-ink-faint)]">{goal.discipline.name}</p>
         <h2 className="mt-1 text-[1.3rem] font-semibold text-[var(--pv-ink)]">{goal.title}</h2>
-        <p className="mt-1 text-sm text-[var(--pv-ink-soft)]">
-          Maps to <span className="font-medium text-[var(--pv-ink)]">{goal.canonicalSkill.domain.name} › {goal.canonicalSkill.name}</span> in Pravnya's skill list
-        </p>
-        <span className="mt-2 inline-block rounded-full bg-[var(--pv-green-100)] px-2.5 py-1 text-xs font-medium text-[var(--pv-green-900)]">
-          {goalSourceLabel(goal)}
-        </span>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <MappingTag goal={goal} />
+          <ProvenanceTag label={goalSourceLabel(goal)} />
+        </div>
       </div>
 
       {logging ? (
@@ -182,10 +203,12 @@ export function Goals({
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-0.5 text-sm text-[var(--pv-ink-faint)]">
-                    {goal.canonicalSkill.domain.name} › {goal.canonicalSkill.name} · {evidenceCount(goal)} entr{evidenceCount(goal) === 1 ? "y" : "ies"}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <MappingTag goal={goal} />
+                  </div>
+                  <p className="mt-1.5 text-xs text-[var(--pv-ink-faint)]">
+                    {evidenceCount(goal)} entr{evidenceCount(goal) === 1 ? "y" : "ies"} · {goalSourceLabel(goal)}
                   </p>
-                  <p className="mt-0.5 text-xs text-[var(--pv-ink-faint)]">{goalSourceLabel(goal)}</p>
                 </button>
               </li>
             ))}
