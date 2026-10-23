@@ -16,6 +16,10 @@ interface OnboardingContextValue {
   stepIndex: number;
   goNext: () => void;
   goBack: () => void;
+  /** Jumps straight to a step, skipping everything in between -- used when a just-claimed account
+   * (register() against an email a tenant admin already added kids under) turns out to already
+   * have kids, so the child-name..child-iep steps (built for a parent with zero kids) don't apply. */
+  goToStep: (step: StepId) => void;
   /** Only meaningful for OPTIONAL_STEPS -- marks the step explicitly skipped (not just "not
    * answered yet") and advances. */
   skipStep: (step: OptionalStepId) => void;
@@ -64,6 +68,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setStepIndex((i) => Math.max(i - 1, 0));
   }
 
+  function goToStep(step: StepId) {
+    const idx = STEP_ORDER.indexOf(step);
+    if (idx >= 0) setStepIndex(idx);
+  }
+
   function skipStep(step: OptionalStepId) {
     setOptionalStatus((s) => ({ ...s, [step]: "skipped" }));
     setStepIndex((i) => Math.min(i + 1, STEP_ORDER.length - 1));
@@ -82,6 +91,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     stepIndex,
     goNext,
     goBack,
+    goToStep,
     skipStep,
     optionalStatus,
     requiredStepNumber,

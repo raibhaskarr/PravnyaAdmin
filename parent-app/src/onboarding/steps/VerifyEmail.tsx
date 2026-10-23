@@ -5,7 +5,7 @@ import { OnboardingShell } from "../OnboardingShell";
 import { PrimaryButton, StepHeading, TextField } from "../components";
 
 export function VerifyEmail() {
-  const { draft, patchDraft, goNext, setToken } = useOnboarding();
+  const { draft, patchDraft, goNext, goToStep, setToken } = useOnboarding();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const canContinue = /^\d{6}$/.test(draft.verificationCode);
@@ -22,7 +22,17 @@ export function VerifyEmail() {
         consent: true
       });
       setToken(result.token);
-      goNext();
+
+      // register() can claim an existing Parent row a tenant admin already added kids under (see
+      // parentAuth.service.ts) -- its own response never includes kids (parentPublicShape strips
+      // them), so the only way to know is to ask /me. The child-name..child-iep steps that follow
+      // are built for "zero kids yet"; skip straight past them when that's not actually true.
+      const profile = await api.me(result.token);
+      if (profile.kids && profile.kids.length > 0) {
+        goToStep("done");
+      } else {
+        goNext();
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't verify that code. Try again.");
     } finally {
