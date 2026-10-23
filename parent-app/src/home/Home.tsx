@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type ParentProfile } from "../api/client";
 import mark from "../brand/mark.svg";
+import { Goals } from "../goals/Goals";
 import { computeNudge, NudgeCard } from "./nudges";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
+type View = "home" | "goals";
 
 const TABS = [
-  { id: "home", label: "Home", icon: "🏠", enabled: true },
-  { id: "growth", label: "Growth", icon: "📈", enabled: false },
-  { id: "goals", label: "Goals", icon: "🎯", enabled: false }
-] as const;
+  { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
+  { id: "growth" as const, label: "Growth", icon: "📈", enabled: false },
+  { id: "goals" as const, label: "Goals", icon: "🎯", enabled: true }
+];
 
 function TabIcon({ tab }: { tab: (typeof TABS)[number] }) {
   return (
@@ -32,6 +34,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [error, setError] = useState("");
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<View>("home");
 
   function refetch() {
     return api
@@ -65,6 +68,14 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
 
   const kid: Kid | undefined = profile.kids?.[0];
   const kidName = kid?.firstName || "your child";
+
+  // Goals is its own full screen (own header/back button), same pattern as Login/ForgotPassword
+  // being their own App-level phases -- simpler than nesting it inside Home's shell and ending up
+  // with two headers, and a parent can still get back to Home with one tap either way.
+  if (view === "goals" && kid) {
+    return <Goals token={token} kidId={kid.id} onBack={() => setView("home")} />;
+  }
+
   // Dismissed-for-this-session only -- no server-side "don't suggest again" state built yet (that
   // was the original L11-style activation-gap pattern, deliberately not ported, see memory). A
   // reload brings the nudge back; this is a real, known limitation, not an oversight.
@@ -79,10 +90,18 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           <span className="text-[1rem] font-semibold text-[var(--pv-green-900)]">Pravnya</span>
         </div>
         {TABS.map((tab) => (
-          <div key={tab.id} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${tab.enabled ? "bg-[var(--pv-green-100)]" : ""}`}>
+          <button
+            key={tab.id}
+            type="button"
+            disabled={!tab.enabled || tab.id === "home"}
+            onClick={() => tab.id === "goals" && setView("goals")}
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+              tab.id === "home" ? "bg-[var(--pv-green-100)]" : tab.enabled ? "hover:bg-[var(--pv-border)]" : "cursor-default"
+            }`}
+          >
             <TabIcon tab={tab} />
             <NavLabel tab={tab} />
-          </div>
+          </button>
         ))}
       </nav>
 
@@ -146,10 +165,16 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
       {/* Bottom tabs on narrow viewports. */}
       <nav className="flex border-t border-[var(--pv-border)] bg-[var(--pv-surface)] pb-[env(safe-area-inset-bottom)] md:hidden">
         {TABS.map((tab) => (
-          <div key={tab.id} className="flex flex-1 flex-col items-center gap-0.5 py-2.5">
+          <button
+            key={tab.id}
+            type="button"
+            disabled={!tab.enabled || tab.id === "home"}
+            onClick={() => tab.id === "goals" && setView("goals")}
+            className="flex flex-1 flex-col items-center gap-0.5 py-2.5"
+          >
             <TabIcon tab={tab} />
             <NavLabel tab={tab} />
-          </div>
+          </button>
         ))}
       </nav>
     </div>

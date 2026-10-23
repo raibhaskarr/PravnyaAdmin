@@ -60,6 +60,50 @@ export type IepGoalCandidate = {
 
 export type IepSource = { kind: "pdf"; base64: string } | { kind: "image"; base64: string; mimeType: string };
 
+export type GoalItemEvidence = {
+  id: string;
+  logDate: string | null;
+  centreName: string | null;
+  outcome: string;
+  supportLevel: string;
+  modality: string;
+  measurementType: string | null;
+  measurementValue: number | null;
+  measurementUnit: string | null;
+  measurementBoolean: boolean | null;
+  measurementText: string | null;
+};
+
+export type GoalItem = {
+  id: string;
+  canonicalSkillItemId: string | null;
+  canonicalSkillItem: { id: string; displayName: string } | null;
+  customText: string | null;
+  evidence: GoalItemEvidence[];
+};
+
+export type Goal = {
+  id: string;
+  title: string;
+  status: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
+  canonicalSkill: { id: string; name: string; measurementType: string | null; domain: { id: string; name: string } };
+  discipline: { id: string; name: string };
+  items: GoalItem[];
+};
+
+export type CreateEvidenceInput = {
+  goalItemId?: string;
+  newItemCustomText?: string;
+  logDate: string;
+  outcome: string;
+  supportLevel: string;
+  modality: string;
+  measurementValue?: number | null;
+  measurementUnit?: string | null;
+  measurementBoolean?: boolean | null;
+  measurementText?: string | null;
+};
+
 export const api = {
   sendVerificationCode(email: string) {
     return request<{ sent: boolean }>("/parent-auth/send-verification-code", { method: "POST", body: { email } });
@@ -102,5 +146,15 @@ export const api = {
   },
   resetPassword(input: { email: string; verificationCode: string; newPassword: string }) {
     return request<{ token: string; parent: ParentProfile }>("/parent-auth/reset-password", { method: "POST", body: input });
+  },
+  listGoals(token: string, kidId: string) {
+    return request<Goal[]>(`/parent-kids/${kidId}/goals`, { token });
+  },
+  logEvidence(token: string, kidId: string, goalId: string, input: CreateEvidenceInput) {
+    return request<GoalItemEvidence & { goalItem: GoalItem }>(`/parent-kids/${kidId}/goals/${goalId}/evidence`, {
+      token,
+      method: "POST",
+      body: input
+    });
   }
 };

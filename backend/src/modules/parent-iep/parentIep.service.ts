@@ -1,17 +1,11 @@
 import { prisma } from "../../config/prisma";
-import { notFound } from "../../common/errors/AppError";
+import { assertOwnsKid } from "../../common/access/parentKidAccess";
 import { iepExtractionService } from "../iep/iepExtraction.service";
 import { AcceptIepGoalsInput, ParentIepExtractInput } from "./parentIep.schemas";
 
-async function findOwnedKid(parentId: string, kidId: string) {
-  const kid = await prisma.kid.findFirst({ where: { id: kidId, parentId }, select: { id: true, tenantId: true } });
-  if (!kid) throw notFound("Kid not found");
-  return kid;
-}
-
 export const parentIepService = {
   async extract(parentId: string, kidId: string, input: ParentIepExtractInput) {
-    const kid = await findOwnedKid(parentId, kidId);
+    const kid = await assertOwnsKid(parentId, kidId);
     return iepExtractionService.extract(kid, input.source);
   },
 
@@ -23,7 +17,7 @@ export const parentIepService = {
   // Modality is lower-stakes (how the child responds, not which specialty this belongs to) so a
   // missing one defaults to VERBAL instead of being skipped.
   async acceptGoals(parentId: string, kidId: string, input: AcceptIepGoalsInput) {
-    const kid = await findOwnedKid(parentId, kidId);
+    const kid = await assertOwnsKid(parentId, kidId);
 
     const creatable = input.candidates.filter((c) => c.disciplineId !== null);
     const skipped = input.candidates.length - creatable.length;

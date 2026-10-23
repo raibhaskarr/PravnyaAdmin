@@ -25,6 +25,7 @@ import { iepRoutes } from "./modules/iep/iep.routes";
 import { parentAuthRoutes } from "./modules/parent-auth/parentAuth.routes";
 import { parentKidsRoutes } from "./modules/parent-kids/parentKids.routes";
 import { parentIepRoutes } from "./modules/parent-iep/parentIep.routes";
+import { parentGoalsRoutes } from "./modules/parent-goals/parentGoals.routes";
 
 export function createApp() {
   const app = express();
@@ -77,6 +78,7 @@ export function createApp() {
   app.use("/api/parent-auth", parentAuthRoutes);
   app.use("/api/parent-kids", parentKidsRoutes);
   app.use("/api/parent-kids", parentIepRoutes);
+  app.use("/api/parent-kids", parentGoalsRoutes);
 
   app.use(errorMiddleware);
 
