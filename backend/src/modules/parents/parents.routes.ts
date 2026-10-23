@@ -3,7 +3,7 @@ import { asyncHandler } from "../../common/middleware/asyncHandler";
 import { requireAuth, requireRole, requireTenantScope } from "../../common/middleware/auth";
 import { validateRequest } from "../../common/middleware/validateRequest";
 import { parentsService } from "./parents.service";
-import { createParentSchema, parentParamsSchema } from "./parents.schemas";
+import { createParentSchema, parentParamsSchema, updateParentSchema } from "./parents.schemas";
 
 export const parentsRoutes = Router();
 
@@ -32,5 +32,14 @@ parentsRoutes.post(
   validateRequest({ body: createParentSchema }),
   asyncHandler(async (req, res) => {
     res.status(201).json(await parentsService.create(req.user!, req.body));
+  })
+);
+
+parentsRoutes.patch(
+  "/:parentId",
+  requireRole("TENANT_ADMIN"),
+  validateRequest({ params: parentParamsSchema, body: updateParentSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(await parentsService.update(req.user!, req.params.parentId, req.body));
   })
 );

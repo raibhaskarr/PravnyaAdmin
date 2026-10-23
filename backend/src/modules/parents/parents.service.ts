@@ -1,9 +1,9 @@
 import { prisma } from "../../config/prisma";
-import { notFound } from "../../common/errors/AppError";
+import { conflict, notFound } from "../../common/errors/AppError";
 import { AuthUser } from "../../common/middleware/auth";
 import { kidVisibilityFilter } from "../../common/access/kidAccess";
 import { findOrCreateParent } from "../../common/parents/findOrCreateParent";
-import { CreateParentInput } from "./parents.schemas";
+import { CreateParentInput, UpdateParentInput } from "./parents.schemas";
 
 // TENANT_ADMIN/VIEWER already see every kid in their own tenant (kidVisibilityFilter's own
 // unfiltered tenantId match) -- extend that same breadth to a parent record with zero kids yet
@@ -80,5 +80,33 @@ export const parentsService = {
   // apply to a parent they themselves created.
   create(actor: AuthUser, input: CreateParentInput) {
     return findOrCreateParent({ ...input, actorTenantId: actor.tenantId! });
+  },
+
+  // TENANT_ADMIN-only (see routes) -- same visibility check as get() so an admin can't reach into
+  // a parent entirely outside their own tenant's kids by guessing an id. Editing parentEmail here
+  // only changes where a self-service account is reachable at -- it never touches passwordHash,
+  // so an already-claimed account keeps its password and an unclaimed one still needs its own
+  // registration/verification to be usable, exactly like before the edit.
+  async update(actor: AuthUser, parentId: string, input: UpdateParentInput) {
+    await parentsService.get(actor, parentId);
+
+    if (input.parentEmail) {
+      const existing = await prisma.parent.findUnique({ where: { email: input.parentEmail } });
+      if (existing && existing.id !== parentId) {
+        throw conflict("Another parent already uses this email.", "EMAIL_TAKEN");
+      }
+    }
+
+    return prisma.parent.update({
+      where: { id: parentId },
+      data: {
+        email: input.parentEmail,
+        mobile: input.parentMobile,
+        fatherName: input.fatherName,
+        motherName: input.motherName,
+        addressLine1: input.addressLine1,
+        city: input.city
+      }
+    });
   }
 };

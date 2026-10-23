@@ -16,3 +16,17 @@ export const createParentSchema = z.object({
 });
 
 export type CreateParentInput = z.infer<typeof createParentSchema>;
+
+// Partial, unlike createParentSchema -- an admin correcting a parent's contact email shouldn't
+// have to resupply every other field. Password/login state is untouched here: changing the email
+// a self-service account is reachable at doesn't retroactively re-verify or re-authenticate it.
+export const updateParentSchema = z.object({
+  parentEmail: z.string().email().optional(),
+  parentMobile: z.string().min(1).max(30).optional(),
+  fatherName: z.string().min(1).max(200).optional(),
+  motherName: z.string().min(1).max(200).optional(),
+  addressLine1: z.string().min(1).max(300).optional(),
+  city: z.string().min(1).max(120).optional()
+});
+
+export type UpdateParentInput = z.infer<typeof updateParentSchema>;
