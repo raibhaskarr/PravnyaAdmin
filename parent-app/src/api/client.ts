@@ -86,6 +86,10 @@ export type Goal = {
   id: string;
   title: string;
   status: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
+  // null means this goal was never touched by a staff member -- the only way a parent-owned kid
+  // gets a goal today is the IEP-accept flow (parentIep.service.ts), which never sets this. Non-
+  // null means a therapist/tenant admin created or last edited it on the admin side.
+  createdById: string | null;
   canonicalSkill: { id: string; name: string; measurementType: string | null; domain: { id: string; name: string } };
   discipline: { id: string; name: string };
   items: GoalItem[];

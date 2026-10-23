@@ -18,6 +18,17 @@ function formatDate(date: string | null): string {
   return new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// null createdById is the one real signal available: the only way a parent-owned kid gets a goal
+// today is the IEP-accept flow, which never sets it. A goal a therapist created or edited always
+// has it set. Same "Home when null" convention as evidence's centreName, just on the other field.
+function goalSourceLabel(goal: Goal): string {
+  return goal.createdById ? "Added by your care team" : "From your IEP upload";
+}
+
+function evidenceSourceLabel(centreName: string | null): string {
+  return centreName ?? "Logged by you at home";
+}
+
 const OUTCOME_LABEL: Record<string, string> = {
   CORRECT: "Did it independently",
   PARTIAL: "Needed a little help",
@@ -52,10 +63,14 @@ function GoalDetail({
         ← All goals
       </button>
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-[var(--pv-ink-faint)]">
-          {goal.canonicalSkill.domain.name} · {goal.discipline.name}
-        </p>
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--pv-ink-faint)]">{goal.discipline.name}</p>
         <h2 className="mt-1 text-[1.3rem] font-semibold text-[var(--pv-ink)]">{goal.title}</h2>
+        <p className="mt-1 text-sm text-[var(--pv-ink-soft)]">
+          Maps to <span className="font-medium text-[var(--pv-ink)]">{goal.canonicalSkill.domain.name} › {goal.canonicalSkill.name}</span> in Pravnya's skill list
+        </p>
+        <span className="mt-2 inline-block rounded-full bg-[var(--pv-green-100)] px-2.5 py-1 text-xs font-medium text-[var(--pv-green-900)]">
+          {goalSourceLabel(goal)}
+        </span>
       </div>
 
       {logging ? (
@@ -92,6 +107,7 @@ function GoalDetail({
                   <span className="text-xs text-[var(--pv-ink-faint)]">{formatDate(e.logDate)}</span>
                 </div>
                 <p className="text-sm text-[var(--pv-ink-soft)]">{OUTCOME_LABEL[e.outcome] ?? e.outcome}</p>
+                <p className="mt-0.5 text-xs text-[var(--pv-ink-faint)]">{evidenceSourceLabel(e.centreName)}</p>
               </li>
             ))}
           </ul>
@@ -167,8 +183,9 @@ export function Goals({
                     ) : null}
                   </div>
                   <p className="mt-0.5 text-sm text-[var(--pv-ink-faint)]">
-                    {goal.canonicalSkill.domain.name} · {evidenceCount(goal)} entr{evidenceCount(goal) === 1 ? "y" : "ies"}
+                    {goal.canonicalSkill.domain.name} › {goal.canonicalSkill.name} · {evidenceCount(goal)} entr{evidenceCount(goal) === 1 ? "y" : "ies"}
                   </p>
+                  <p className="mt-0.5 text-xs text-[var(--pv-ink-faint)]">{goalSourceLabel(goal)}</p>
                 </button>
               </li>
             ))}
