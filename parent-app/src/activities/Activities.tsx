@@ -31,7 +31,7 @@ function flatEvidence(goal: Goal): EvidenceWithItem[] {
   return goal.items.flatMap((i) => i.evidence.map((e) => ({ ...e, itemLabelText: itemLabel(i) })));
 }
 
-interface ActivityCandidate {
+export interface ActivityCandidate {
   goal: Goal;
   centreEvidenceCount: number;
   homeEvidenceCount: number;
@@ -56,7 +56,7 @@ function pickSuggestedItem(goal: Goal): { itemLabel: string; centreName: string;
   return best;
 }
 
-function buildActivityCandidates(goals: Goal[]): ActivityCandidate[] {
+export function buildActivityCandidates(goals: Goal[]): ActivityCandidate[] {
   const candidates: ActivityCandidate[] = [];
   for (const g of goals) {
     const all = flatEvidence(g);

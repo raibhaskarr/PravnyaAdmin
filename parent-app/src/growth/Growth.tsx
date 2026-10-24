@@ -107,7 +107,7 @@ function allEvidenceWithItem(goal: Goal): EvidenceWithItem[] {
     .sort((a, b) => (a.logDate ?? "").localeCompare(b.logDate ?? ""));
 }
 
-interface GrowthGoalView {
+export interface GrowthGoalView {
   goalId: string;
   skillName: string;
   domainName: string;
@@ -137,7 +137,7 @@ function recentItemNames(goal: Goal, limit = 4): string[] {
   return names;
 }
 
-function buildGrowthGoals(goals: Goal[]): GrowthGoalView[] {
+export function buildGrowthGoals(goals: Goal[]): GrowthGoalView[] {
   const views: GrowthGoalView[] = [];
   for (const g of goals) {
     const sorted = allEvidenceWithItem(g);
@@ -182,14 +182,14 @@ function buildGrowthGoals(goals: Goal[]): GrowthGoalView[] {
   return views.sort((a, b) => b.evidenceCount - a.evidenceCount);
 }
 
-interface GrowthMoment {
+export interface GrowthMoment {
   date: string;
   goalTitle: string;
   title: string;
   environment: string;
 }
 
-function buildGrowthMoments(goals: Goal[], limit = 10): GrowthMoment[] {
+export function buildGrowthMoments(goals: Goal[], limit = 10): GrowthMoment[] {
   const moments: GrowthMoment[] = [];
   for (const g of goals) {
     const sorted = allEvidenceWithItem(g).filter((e) => e.logDate);

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, type ParentProfile } from "../api/client";
+import { api, ApiError, type Goal, type ParentProfile } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
 import { Growth } from "../growth/Growth";
 import { LogSession } from "../log/LogSession";
+import { buildFeed, FeedCard } from "./feed";
 import { computeNudge, NudgeCard } from "./nudges";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
@@ -95,6 +96,9 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // Null until the parent actively picks one -- falls back to the first kid below, same as before
   // a switcher existed, so a one-kid account (the common case) behaves exactly as it always did.
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
+  // Drives the feed below -- same Goal[] shape Growth/Goals/Activities each already fetch
+  // independently; Home needs its own copy since it renders a digest of all three at once.
+  const [goals, setGoals] = useState<Goal[] | null>(null);
 
   function refetch() {
     return api
@@ -109,6 +113,19 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   useEffect(() => {
     void refetch();
   }, [token, onSessionExpired]);
+
+  // kid is computed here (not after the early returns below) so this effect can depend on
+  // kid?.id -- hooks can't follow a conditional return, and the feed needs to refetch whenever
+  // the parent switches kids via KidSwitcher, not just once on mount.
+  const kids = profile?.kids ?? [];
+  const kid: Kid | undefined = kids.find((k) => k.id === selectedKidId) ?? kids[0];
+  const kidName = kid?.firstName || "your child";
+
+  useEffect(() => {
+    if (!kid) return;
+    setGoals(null);
+    void api.listGoals(token, kid.id).then(setGoals).catch(() => setGoals([]));
+  }, [token, kid?.id]);
 
   if (error) {
     return (
@@ -126,15 +143,18 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     );
   }
 
-  const kids = profile.kids ?? [];
-  const kid: Kid | undefined = kids.find((k) => k.id === selectedKidId) ?? kids[0];
-  const kidName = kid?.firstName || "your child";
+  // Returning from any screen that can create evidence re-fetches goals so the feed below
+  // reflects it immediately, rather than waiting for the next kid-switch to catch up.
+  function backToHome() {
+    setView("home");
+    if (kid) void api.listGoals(token, kid.id).then(setGoals).catch(() => {});
+  }
 
   // Goals is its own full screen (own header/back button), same pattern as Login/ForgotPassword
   // being their own App-level phases -- simpler than nesting it inside Home's shell and ending up
   // with two headers, and a parent can still get back to Home with one tap either way.
   if (view === "goals" && kid) {
-    return <Goals token={token} kidId={kid.id} onBack={() => setView("home")} />;
+    return <Goals token={token} kidId={kid.id} onBack={backToHome} />;
   }
 
   if (view === "growth" && kid) {
@@ -142,17 +162,18 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   }
 
   if (view === "activities" && kid) {
-    return <Activities token={token} kidId={kid.id} onBack={() => setView("home")} />;
+    return <Activities token={token} kidId={kid.id} onBack={backToHome} />;
   }
 
   if (view === "logSession" && kid) {
-    return <LogSession token={token} kidId={kid.id} kidName={kidName} onBack={() => setView("home")} />;
+    return <LogSession token={token} kidId={kid.id} kidName={kidName} onBack={backToHome} />;
   }
 
   // Dismissed-for-this-session only -- no server-side "don't suggest again" state built yet (that
   // was the original L11-style activation-gap pattern, deliberately not ported, see memory). A
   // reload brings the nudge back; this is a real, known limitation, not an oversight.
   const activeNudge = kid && !dismissed.has(kid.id + computeNudge(kid)) ? computeNudge(kid) : null;
+  const feed = goals ? buildFeed(goals) : [];
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--pv-bg)] md:flex-row">
@@ -204,17 +225,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           </button>
         </header>
 
-        <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-5 py-6">
-          <div className="rounded-2xl bg-[var(--pv-surface)] px-4 py-3">
-            <div className="mb-1 flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--pv-green-100)] text-sm">🤖</span>
-              <span className="text-sm font-medium text-[var(--pv-ink-faint)]">Pravnya</span>
-            </div>
-            <p className="text-[0.98rem] leading-relaxed text-[var(--pv-ink)]">
-              Welcome! This is where you'll see {kidName}'s updates as they come in.
-            </p>
-          </div>
-
+        <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 px-5 py-6">
           {activeNudge && kid ? (
             <NudgeCard
               type={activeNudge}
@@ -224,11 +235,25 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
               onResolved={refetch}
               onDismiss={() => setDismissed((prev) => new Set(prev).add(kid.id + activeNudge))}
             />
-          ) : (
-            <p className="px-1 text-sm text-[var(--pv-ink-faint)]">
-              You're all set for now -- we'll let you know when there's something new to look at.
-            </p>
-          )}
+          ) : null}
+
+          {feed.map((item, i) => (
+            <FeedCard key={i} item={item} kidName={kidName} onNavigate={setView} />
+          ))}
+
+          {!activeNudge && feed.length === 0 ? (
+            <div className="rounded-2xl bg-[var(--pv-surface)] px-4 py-3">
+              <div className="mb-1 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--pv-green-100)] text-sm">🤖</span>
+                <span className="text-sm font-medium text-[var(--pv-ink-faint)]">Pravnya</span>
+              </div>
+              <p className="text-[0.98rem] leading-relaxed text-[var(--pv-ink)]">
+                {goals === null
+                  ? `Loading ${kidName}'s updates...`
+                  : `Welcome! This is where you'll see ${kidName}'s updates as they come in.`}
+              </p>
+            </div>
+          ) : null}
         </main>
 
         <footer className="border-t border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
