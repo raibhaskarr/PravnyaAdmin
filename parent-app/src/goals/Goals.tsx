@@ -33,12 +33,13 @@ function evidenceSourceLabel(centreName: string | null): string {
 // from any other description text, which is exactly the feedback that came back ("I don't see the
 // mapping"). A tag reads as a cross-reference at a glance; plain text doesn't. Orange, not the
 // green used for the provenance badge below, so the two badge types stay visually distinct from
-// each other, not just from body text -- same orange/#B5701F pairing the admin Growth tab already
-// uses for its own tag treatment.
+// each other, not just from body text. A full pill (rounded-full) works for a short word but a
+// domain+skill string stretched the capsule into a wide stadium shape that out-shouted the title
+// above it -- rounded-md, no border, reads as a calm label at any length instead of a banner.
 function MappingTag({ goal }: { goal: Goal }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--pv-orange-500)] bg-[var(--pv-orange-100)] px-2.5 py-1 text-xs font-medium text-[#8a5a1f]">
-      <span aria-hidden="true">🏷️</span>
+    <span className="inline-flex items-start gap-1.5 rounded-md bg-[var(--pv-orange-100)] px-2 py-1 text-[0.72rem] font-medium leading-snug text-[#8a5a1f]">
+      <span aria-hidden="true" className="mt-px">🏷️</span>
       {goal.canonicalSkill.domain.name} › {goal.canonicalSkill.name}
     </span>
   );
