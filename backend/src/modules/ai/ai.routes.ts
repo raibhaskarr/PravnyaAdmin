@@ -3,6 +3,7 @@ import { z } from "zod";
 import { asyncHandler } from "../../common/middleware/asyncHandler";
 import { blockViewer, requireAuth, requireTenantScope } from "../../common/middleware/auth";
 import { validateRequest } from "../../common/middleware/validateRequest";
+import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { goalSkillSuggestionService } from "./goalSkillSuggestion.service";
 import { extractEvidenceService } from "./extractEvidence.service";
 
@@ -48,7 +49,8 @@ aiRoutes.post(
   blockViewer,
   validateRequest({ body: extractEvidenceSchema }),
   asyncHandler(async (req, res) => {
+    const kid = await assertCanAccessKid(req.user!, req.body.kidId);
     const input = req.body.freeText !== undefined ? { freeText: req.body.freeText } : { media: req.body.media };
-    res.json(await extractEvidenceService.extract(req.user!, req.body.kidId, input));
+    res.json(await extractEvidenceService.extract(kid, input));
   })
 );

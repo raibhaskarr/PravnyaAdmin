@@ -2,8 +2,6 @@ import { z } from "zod";
 import { createExecutionContext } from "@pravnix/ai-core";
 import type { AiContentPart } from "@pravnix/ai-core";
 import { prisma } from "../../config/prisma";
-import { AuthUser } from "../../common/middleware/auth";
-import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { orchestrator } from "./ai.platform";
 import { evidenceItemSchema, type EvidenceCandidate } from "./evidenceFields.shared";
 
@@ -75,14 +73,11 @@ export type { EvidenceCandidate };
 
 export const extractEvidenceService = {
   async extract(
-    user: AuthUser,
-    kidId: string,
+    kid: { id: string; tenantId: string },
     input: { freeText: string } | { media: EvidenceMedia }
   ): Promise<{ candidates: EvidenceCandidate[] } | { error: string }> {
-    const kid = await assertCanAccessKid(user, kidId);
-
     const goals = await prisma.goal.findMany({
-      where: { kidId, status: "ACTIVE" },
+      where: { kidId: kid.id, status: "ACTIVE" },
       select: { id: true, title: true, canonicalSkill: { select: { name: true, measurementType: true, domain: { select: { name: true } } } } }
     });
     if (goals.length === 0) return { error: "This kid has no active goals to match against yet." };

@@ -5,8 +5,10 @@ import { ChoiceChip, PrimaryButton } from "../onboarding/components";
 // Mirrors the admin panel's LogEvidenceForm field-for-field (outcome/support level/modality, plus
 // a measurement-type-conditional block) -- built fresh for this app, not shared code, but the same
 // shape on purpose: this is the exact "parent can select the goal and update logs for it, like we
-// have on admin panel" ask from the original planning pass. No centreName field -- a parent's own
-// entry is inherently a home observation (the backend forces this; see parentGoals.schemas.ts).
+// have on admin panel" ask from the original planning pass. No centreName field here -- this form
+// is for a parent's own direct observation, which defaults to Home when the field's omitted
+// (parentGoals.schemas.ts no longer force-blanks it; LogSession's AI-assisted flow is where a
+// parent tags which centre/therapist actually suggested the activity).
 
 const OUTCOMES: { value: string; label: string }[] = [
   { value: "CORRECT", label: "Did it independently" },

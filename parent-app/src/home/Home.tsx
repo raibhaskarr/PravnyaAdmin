@@ -4,10 +4,11 @@ import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
 import { Growth } from "../growth/Growth";
+import { LogSession } from "../log/LogSession";
 import { computeNudge, NudgeCard } from "./nudges";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth" | "activities";
+type View = "home" | "goals" | "growth" | "activities" | "logSession";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
@@ -144,6 +145,10 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     return <Activities token={token} kidId={kid.id} onBack={() => setView("home")} />;
   }
 
+  if (view === "logSession" && kid) {
+    return <LogSession token={token} kidId={kid.id} kidName={kidName} onBack={() => setView("home")} />;
+  }
+
   // Dismissed-for-this-session only -- no server-side "don't suggest again" state built yet (that
   // was the original L11-style activation-gap pattern, deliberately not ported, see memory). A
   // reload brings the nudge back; this is a real, known limitation, not an oversight.
@@ -227,10 +232,14 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
         </main>
 
         <footer className="border-t border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="mx-auto flex w-full max-w-2xl items-center gap-2 rounded-full border border-[var(--pv-border)] bg-[var(--pv-bg)] px-4 py-2.5 opacity-60">
+          <button
+            type="button"
+            onClick={() => setView("logSession")}
+            className="mx-auto flex w-full max-w-2xl items-center gap-2 rounded-full border border-[var(--pv-border)] bg-[var(--pv-bg)] px-4 py-2.5 text-left transition hover:border-[var(--pv-green-500)]"
+          >
             <span className="text-[0.95rem] text-[var(--pv-ink-faint)]">Type, photo, or voice note...</span>
-            <span className="ml-auto text-xs text-[var(--pv-ink-faint)]">Soon</span>
-          </div>
+            <span className="ml-auto text-xs font-semibold text-[var(--pv-green-700)]">Log</span>
+          </button>
         </footer>
       </div>
 

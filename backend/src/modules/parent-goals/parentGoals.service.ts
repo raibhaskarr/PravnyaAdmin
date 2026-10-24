@@ -1,7 +1,8 @@
 import { prisma } from "../../config/prisma";
 import { notFound } from "../../common/errors/AppError";
 import { assertOwnsKid } from "../../common/access/parentKidAccess";
-import { ParentCreateEvidenceInput } from "./parentGoals.schemas";
+import { extractEvidenceService } from "../ai/extractEvidence.service";
+import { ParentCreateEvidenceInput, ParentExtractEvidenceInput } from "./parentGoals.schemas";
 
 // Same shape as the staff-facing goals.service.ts's includeRelations, minus the `kid` relation --
 // redundant here, the caller already knows which kid (it's in the URL).
@@ -20,6 +21,15 @@ export const parentGoalsService = {
   async listGoals(parentId: string, kidId: string) {
     await assertOwnsKid(parentId, kidId);
     return prisma.goal.findMany({ where: { kidId }, include: includeRelations, orderBy: { createdAt: "desc" } });
+  },
+
+  // Never persists anything -- same contract as the staff-side extractEvidenceService.extract(),
+  // which this just calls directly after the ownership check. Saving an approved candidate still
+  // goes through createEvidence() below, same as a manually-entered log.
+  async extractEvidence(parentId: string, kidId: string, input: ParentExtractEvidenceInput) {
+    const kid = await assertOwnsKid(parentId, kidId);
+    const serviceInput = input.freeText !== undefined ? { freeText: input.freeText } : { media: input.media! };
+    return extractEvidenceService.extract(kid, serviceInput);
   },
 
   // Mirrors goals.service.ts's createEvidence() find-or-create-item logic exactly -- a parent
@@ -50,7 +60,7 @@ export const parentGoalsService = {
       data: {
         goalItemId,
         logDate: new Date(input.logDate),
-        centreName: null,
+        centreName: input.centreName?.trim() || null,
         outcome: input.outcome,
         supportLevel: input.supportLevel,
         modality: input.modality,

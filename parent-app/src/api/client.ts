@@ -99,6 +99,7 @@ export type CreateEvidenceInput = {
   goalItemId?: string;
   newItemCustomText?: string;
   logDate: string;
+  centreName?: string | null;
   outcome: string;
   supportLevel: string;
   modality: string;
@@ -107,6 +108,26 @@ export type CreateEvidenceInput = {
   measurementBoolean?: boolean | null;
   measurementText?: string | null;
 };
+
+export type EvidenceCandidate = {
+  goalId: string;
+  goalTitle: string;
+  skillName: string;
+  domainName: string;
+  measurementType: string | null;
+  itemHint: string | null;
+  outcome: string;
+  supportLevel: string;
+  modality: string;
+  measurementValue: number | null;
+  measurementUnit: string | null;
+  measurementBoolean: boolean | null;
+  measurementText: string | null;
+  confidence: number;
+  excerpt: string;
+};
+
+export type ExtractEvidenceInput = { freeText: string } | { media: { kind: "image" | "audio"; mimeType: string; base64: string } };
 
 export const api = {
   sendVerificationCode(email: string) {
@@ -156,6 +177,13 @@ export const api = {
   },
   logEvidence(token: string, kidId: string, goalId: string, input: CreateEvidenceInput) {
     return request<GoalItemEvidence & { goalItem: GoalItem }>(`/parent-kids/${kidId}/goals/${goalId}/evidence`, {
+      token,
+      method: "POST",
+      body: input
+    });
+  },
+  extractEvidence(token: string, kidId: string, input: ExtractEvidenceInput) {
+    return request<{ candidates: EvidenceCandidate[] } | { error: string }>(`/parent-kids/${kidId}/goals/extract-evidence`, {
       token,
       method: "POST",
       body: input
