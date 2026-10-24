@@ -129,6 +129,15 @@ export type EvidenceCandidate = {
 
 export type ExtractEvidenceInput = { freeText: string } | { media: { kind: "image" | "audio"; mimeType: string; base64: string } };
 
+export type CompanionMessage = {
+  id: string;
+  role: "PARENT" | "ASSISTANT";
+  content: string;
+  createdAt: string;
+};
+
+export type CompanionResponse = { intent: "log" } | { intent: "question"; reply: string };
+
 export const api = {
   sendVerificationCode(email: string) {
     return request<{ sent: boolean }>("/parent-auth/send-verification-code", { method: "POST", body: { email } });
@@ -187,6 +196,16 @@ export const api = {
       token,
       method: "POST",
       body: input
+    });
+  },
+  listCompanionMessages(token: string, kidId: string) {
+    return request<CompanionMessage[]>(`/parent-kids/${kidId}/companion/messages`, { token });
+  },
+  sendCompanionMessage(token: string, kidId: string, text: string) {
+    return request<CompanionResponse>(`/parent-kids/${kidId}/companion/messages`, {
+      token,
+      method: "POST",
+      body: { text }
     });
   }
 };

@@ -72,9 +72,23 @@ function measurementLabel(c: EvidenceCandidate): string | null {
   }
 }
 
-export function LogSession({ token, kidId, kidName, onBack }: { token: string; kidId: string; kidName: string; onBack: () => void }) {
+export function LogSession({
+  token,
+  kidId,
+  kidName,
+  initialText,
+  onBack
+}: {
+  token: string;
+  kidId: string;
+  kidName: string;
+  // Set when routed here from Home's composer after the companion call decided this was a "log"
+  // intent -- carries over what was already typed instead of making the parent retype it.
+  initialText?: string;
+  onBack: () => void;
+}) {
   const [mode, setMode] = useState<InputMode>("text");
-  const [freeText, setFreeText] = useState("");
+  const [freeText, setFreeText] = useState(initialText ?? "");
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);

@@ -336,6 +336,7 @@ model Kid {
   therapists KidTherapist[]
   goals      Goal[]
   therapistInvitations TherapistInvitation[]
+  companionMessages    CompanionMessage[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -744,4 +745,26 @@ model ParentVerificationCode {
   codeHash  String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+/// Home's composer thread -- a parent types either something to log or a question/request, one AI
+/// call decides which (companion.service.ts). A "log"-routed message is still saved here as a
+/// PARENT row for continuity (the thread shows what was typed even though the real response was a
+/// navigation into LogSession, not a reply) but never gets a paired ASSISTANT row -- only a
+/// "question" intent does. Scoped to Kid (not Parent) since a parent with 2+ kids asks about one
+/// at a time, same scoping as Goal/GoalItemEvidence.
+model CompanionMessage {
+  id        String               @id @default(uuid()) @db.Uuid
+  kidId     String               @db.Uuid
+  kid       Kid                  @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  role      CompanionMessageRole
+  content   String
+  createdAt DateTime             @default(now())
+
+  @@index([kidId, createdAt])
+}
+
+enum CompanionMessageRole {
+  PARENT
+  ASSISTANT
 }

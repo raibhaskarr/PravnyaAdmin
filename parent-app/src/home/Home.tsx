@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, type Goal, type ParentProfile } from "../api/client";
+import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
@@ -88,6 +88,29 @@ function KidSwitcher({
   );
 }
 
+// A real back-and-forth, not another digest card -- the parent's own messages get a distinct
+// right-aligned style so a genuine conversation reads clearly top-to-bottom, same visual grammar
+// as any messaging app. Assistant replies reuse the same 🤖 Pravnya card look as everything else
+// on Home (feed items, the nudge) rather than inventing a third style.
+function ThreadMessage({ message }: { message: CompanionMessage }) {
+  if (message.role === "PARENT") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[var(--pv-green-700)] px-4 py-2.5 text-[0.95rem] text-white">{message.content}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-2xl bg-[var(--pv-surface)] px-4 py-3">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--pv-green-100)] text-sm">🤖</span>
+        <span className="text-sm font-medium text-[var(--pv-ink-faint)]">Pravnya</span>
+      </div>
+      <p className="text-[0.98rem] leading-relaxed text-[var(--pv-ink)]">{message.content}</p>
+    </div>
+  );
+}
+
 export function Home({ token, onSessionExpired, onSignOut }: { token: string; onSessionExpired: () => void; onSignOut: () => void }) {
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [error, setError] = useState("");
@@ -99,6 +122,14 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // Drives the feed below -- same Goal[] shape Growth/Goals/Activities each already fetch
   // independently; Home needs its own copy since it renders a digest of all three at once.
   const [goals, setGoals] = useState<Goal[] | null>(null);
+  // The real conversation thread, separate from the digest feed above -- persisted server-side
+  // (companion.service.ts), fetched fresh whenever the kid changes.
+  const [thread, setThread] = useState<CompanionMessage[]>([]);
+  const [composerText, setComposerText] = useState("");
+  const [sending, setSending] = useState(false);
+  // Carries what was typed into the composer across the LogSession navigation when the companion
+  // call decides this was a "log" intent -- LogSession seeds its own text field from this.
+  const [pendingLogText, setPendingLogText] = useState<string | undefined>(undefined);
 
   function refetch() {
     return api
@@ -125,6 +156,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     if (!kid) return;
     setGoals(null);
     void api.listGoals(token, kid.id).then(setGoals).catch(() => setGoals([]));
+    void api.listCompanionMessages(token, kid.id).then(setThread).catch(() => setThread([]));
   }, [token, kid?.id]);
 
   if (error) {
@@ -144,10 +176,41 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   }
 
   // Returning from any screen that can create evidence re-fetches goals so the feed below
-  // reflects it immediately, rather than waiting for the next kid-switch to catch up.
+  // reflects it immediately, rather than waiting for the next kid-switch to catch up. Also
+  // refetches the thread -- a "log"-routed message was already persisted server-side before the
+  // navigation into LogSession, so it only becomes visible here once we come back.
   function backToHome() {
     setView("home");
-    if (kid) void api.listGoals(token, kid.id).then(setGoals).catch(() => {});
+    if (kid) {
+      void api.listGoals(token, kid.id).then(setGoals).catch(() => {});
+      void api.listCompanionMessages(token, kid.id).then(setThread).catch(() => {});
+    }
+  }
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    const text = composerText.trim();
+    if (!text || !kid || sending) return;
+    setSending(true);
+    setComposerText("");
+    try {
+      const result = await api.sendCompanionMessage(token, kid.id, text);
+      if (result.intent === "log") {
+        setPendingLogText(text);
+        setView("logSession");
+      } else {
+        setThread((prev) => [
+          ...prev,
+          { id: `local-${Date.now()}-u`, role: "PARENT", content: text, createdAt: new Date().toISOString() },
+          { id: `local-${Date.now()}-a`, role: "ASSISTANT", content: result.reply, createdAt: new Date().toISOString() }
+        ]);
+      }
+    } catch (err) {
+      setComposerText(text);
+      if (err instanceof ApiError && err.status === 401) onSessionExpired();
+    } finally {
+      setSending(false);
+    }
   }
 
   // Goals is its own full screen (own header/back button), same pattern as Login/ForgotPassword
@@ -166,7 +229,18 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   }
 
   if (view === "logSession" && kid) {
-    return <LogSession token={token} kidId={kid.id} kidName={kidName} onBack={backToHome} />;
+    return (
+      <LogSession
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        initialText={pendingLogText}
+        onBack={() => {
+          setPendingLogText(undefined);
+          backToHome();
+        }}
+      />
+    );
   }
 
   // Dismissed-for-this-session only -- no server-side "don't suggest again" state built yet (that
@@ -241,7 +315,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
             <FeedCard key={i} item={item} kidName={kidName} onNavigate={setView} />
           ))}
 
-          {!activeNudge && feed.length === 0 ? (
+          {!activeNudge && feed.length === 0 && thread.length === 0 ? (
             <div className="rounded-2xl bg-[var(--pv-surface)] px-4 py-3">
               <div className="mb-1 flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--pv-green-100)] text-sm">🤖</span>
@@ -250,21 +324,40 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
               <p className="text-[0.98rem] leading-relaxed text-[var(--pv-ink)]">
                 {goals === null
                   ? `Loading ${kidName}'s updates...`
-                  : `Welcome! This is where you'll see ${kidName}'s updates as they come in.`}
+                  : `Welcome! Ask me anything about ${kidName}, or tell me what you tried today.`}
               </p>
             </div>
           ) : null}
+
+          {thread.map((message) => (
+            <ThreadMessage key={message.id} message={message} />
+          ))}
         </main>
 
         <footer className="border-t border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={() => setView("logSession")}
-            className="mx-auto flex w-full max-w-2xl items-center gap-2 rounded-full border border-[var(--pv-border)] bg-[var(--pv-bg)] px-4 py-2.5 text-left transition hover:border-[var(--pv-green-500)]"
-          >
-            <span className="text-[0.95rem] text-[var(--pv-ink-faint)]">Type, photo, or voice note...</span>
-            <span className="ml-auto text-xs font-semibold text-[var(--pv-green-700)]">Log</span>
-          </button>
+          <div className="mx-auto flex w-full max-w-2xl items-center gap-2">
+            <form onSubmit={handleSend} className="flex flex-1 items-center gap-2 rounded-full border border-[var(--pv-border)] bg-[var(--pv-bg)] px-4 py-2.5">
+              <input
+                type="text"
+                value={composerText}
+                onChange={(e) => setComposerText(e.target.value)}
+                placeholder="Ask a question, or tell me what happened..."
+                disabled={sending}
+                className="min-w-0 flex-1 bg-transparent text-[0.95rem] text-[var(--pv-ink)] outline-none placeholder:text-[var(--pv-ink-faint)] disabled:opacity-60"
+              />
+              <button type="submit" disabled={sending || !composerText.trim()} className="flex-shrink-0 text-xs font-semibold text-[var(--pv-green-700)] disabled:text-[var(--pv-ink-faint)]">
+                {sending ? "..." : "Send"}
+              </button>
+            </form>
+            <button
+              type="button"
+              onClick={() => setView("logSession")}
+              aria-label="Log with a photo or voice note"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-[var(--pv-border)] bg-[var(--pv-bg)] text-[1.05rem] transition hover:border-[var(--pv-green-500)]"
+            >
+              📷
+            </button>
+          </div>
         </footer>
       </div>
 
