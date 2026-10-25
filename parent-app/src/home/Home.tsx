@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
@@ -132,6 +132,9 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // Carries what was typed into the composer across the LogSession navigation when the companion
   // call decides this was a "log" intent -- LogSession seeds its own text field from this.
   const [pendingLogText, setPendingLogText] = useState<string | undefined>(undefined);
+  // Scrolled to the bottom on load/update so the composer's conversation reads like a real chat
+  // thread -- the most recent message already in view, not the top of the digest feed.
+  const mainRef = useRef<HTMLElement>(null);
 
   function refetch() {
     return api
@@ -160,6 +163,12 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     void api.listGoals(token, kid.id).then(setGoals).catch(() => setGoals([]));
     void api.listCompanionMessages(token, kid.id).then(setThread).catch(() => setThread([]));
   }, [token, kid?.id]);
+
+  // useLayoutEffect (not useEffect) -- runs before paint, so the content never visibly flashes at
+  // the top before jumping down. Keyed on whatever can change the scrollable content's height.
+  useLayoutEffect(() => {
+    mainRef.current?.scrollTo({ top: mainRef.current.scrollHeight });
+  }, [thread.length, goals, view]);
 
   if (error) {
     return (
@@ -305,7 +314,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           </button>
         </header>
 
-        <main className="mx-auto flex w-full min-h-0 max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-5 py-6">
+        <main ref={mainRef} className="mx-auto flex w-full min-h-0 max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-5 py-6">
           {activeNudge && kid ? (
             <NudgeCard
               type={activeNudge}
