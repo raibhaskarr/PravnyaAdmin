@@ -378,6 +378,7 @@ model Parent {
   /// down with it (it may still be linked to kids at other tenants).
   createdByTenantId String?  @db.Uuid
   createdByTenant   Tenant?  @relation(fields: [createdByTenantId], references: [id], onDelete: SetNull)
+  therapistInvitations TherapistInvitation[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -402,8 +403,17 @@ model TherapistInvitation {
   disciplineIds String[]         @default([])
   kidId         String?          @db.Uuid
   kid           Kid?             @relation(fields: [kidId], references: [id], onDelete: Cascade)
-  invitedById   String           @db.Uuid
-  invitedBy     User             @relation("InvitationSentBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  /// Exactly one of invitedById/invitedByParentId is set, enforced at the application level (same
+  /// "exactly one of" convention as extractEvidenceSchema's freeText/media, not a DB constraint).
+  /// Both nullable (not just one) because a parent has no User row at all -- see
+  /// parentTherapistInvitations.service.ts's inviteTherapist(), the one flow that sets the parent
+  /// side instead of the staff side. Neither field is ever read back after invite-creation time
+  /// (only used to pull the inviter's name for the invite email), so onDelete: SetNull rather than
+  /// Cascade -- deleting the inviter shouldn't delete the historical invitation record.
+  invitedById       String?  @db.Uuid
+  invitedBy         User?    @relation("InvitationSentBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedByParentId String?  @db.Uuid
+  invitedByParent   Parent?  @relation(fields: [invitedByParentId], references: [id], onDelete: SetNull)
   tokenHash     String           @unique
   status        InvitationStatus @default(PENDING)
   expiresAt     DateTime

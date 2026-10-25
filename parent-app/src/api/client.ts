@@ -138,6 +138,26 @@ export type CompanionMessage = {
 
 export type CompanionResponse = { intent: "log" } | { intent: "question"; reply: string };
 
+export type LinkedTherapist = {
+  id: string;
+  name: string;
+  disciplineIds: string[];
+  status: string;
+  tenant: { id: string; name: string };
+};
+
+export type TherapistInvitationSummary = {
+  id: string;
+  email: string;
+  status: "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+  kidId: string | null;
+  createdAt: string;
+};
+
+export type InviteTherapistResponse =
+  | { linked: true; therapist: LinkedTherapist }
+  | { linked: false; invitation: TherapistInvitationSummary; inviteUrl?: string };
+
 export const api = {
   sendVerificationCode(email: string) {
     return request<{ sent: boolean }>("/parent-auth/send-verification-code", { method: "POST", body: { email } });
@@ -206,6 +226,19 @@ export const api = {
       token,
       method: "POST",
       body: { text }
+    });
+  },
+  listTherapists(token: string, kidId: string) {
+    return request<LinkedTherapist[]>(`/parent-kids/${kidId}/therapists`, { token });
+  },
+  listTherapistInvitations(token: string, kidId: string) {
+    return request<TherapistInvitationSummary[]>(`/parent-kids/${kidId}/therapist-invitations`, { token });
+  },
+  inviteTherapist(token: string, kidId: string, email: string) {
+    return request<InviteTherapistResponse>(`/parent-kids/${kidId}/therapist-invitations`, {
+      token,
+      method: "POST",
+      body: { email }
     });
   }
 };
