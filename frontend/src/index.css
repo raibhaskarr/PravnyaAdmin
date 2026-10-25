@@ -281,6 +281,15 @@ select.input {
   box-shadow: var(--shadow-sm);
 }
 
+.companion-message {
+  border-left: 3px solid var(--color-border);
+}
+
+.companion-message-assistant {
+  border-left-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
 .callout {
   background: var(--color-primary-soft);
   border: 1px solid #cfe4da;

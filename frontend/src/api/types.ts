@@ -235,6 +235,21 @@ export type Kid = {
   }[];
 };
 
+export type ScheduleEntry = {
+  id: string;
+  label: string;
+  dayOfWeek: string;
+  startTime: string;
+  therapist: { id: string; name: string } | null;
+};
+
+export type StaffCompanionMessage = {
+  id: string;
+  role: "PARENT" | "ASSISTANT";
+  content: string;
+  createdAt: string;
+};
+
 export type Modality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL";
 
 export type GoalItemEvidenceRow = {

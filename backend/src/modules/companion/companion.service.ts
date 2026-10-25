@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { createExecutionContext } from "@pravnix/ai-core";
 import { prisma } from "../../config/prisma";
+import { AuthUser } from "../../common/middleware/auth";
+import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { assertOwnsKid } from "../../common/access/parentKidAccess";
 import { orchestrator } from "../ai/ai.platform";
 
@@ -48,6 +50,13 @@ export type CompanionResponse = z.infer<typeof companionResponseSchema>;
 export const companionService = {
   async listMessages(parentId: string, kidId: string) {
     await assertOwnsKid(parentId, kidId);
+    return prisma.companionMessage.findMany({ where: { kidId }, orderBy: { createdAt: "asc" } });
+  },
+
+  // Staff-side read (admin panel's Kid detail > Companion tab) -- same query, gated by the staff
+  // kid-access check instead of parent ownership.
+  async listForStaff(user: AuthUser, kidId: string) {
+    await assertCanAccessKid(user, kidId);
     return prisma.companionMessage.findMany({ where: { kidId }, orderBy: { createdAt: "asc" } });
   },
 

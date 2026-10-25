@@ -18,6 +18,8 @@ import type {
   Kid,
   Modality,
   Parent,
+  ScheduleEntry,
+  StaffCompanionMessage,
   PocEvidenceOutcome,
   PocModality,
   PocReviewChild,
@@ -293,6 +295,14 @@ export const api = {
   // Goals
   listGoals(token: string, kidId?: string) {
     return request<Goal[]>(`/goals${kidId ? `?kidId=${kidId}` : ""}`, { token });
+  },
+
+  // Schedule / Companion -- read-only staff views of parent-app data
+  listKidSchedule(token: string, kidId: string) {
+    return request<ScheduleEntry[]>(`/schedule?kidId=${kidId}`, { token });
+  },
+  listKidCompanionMessages(token: string, kidId: string) {
+    return request<StaffCompanionMessage[]>(`/companion-messages?kidId=${kidId}`, { token });
   },
   createGoal(
     token: string,
