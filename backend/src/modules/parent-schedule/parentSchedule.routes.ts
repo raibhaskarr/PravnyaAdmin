@@ -25,6 +25,14 @@ parentScheduleRoutes.post(
   })
 );
 
+parentScheduleRoutes.patch(
+  "/:kidId/schedule/:slotId",
+  validateRequest({ params: scheduleSlotParamsSchema, body: createScheduleSlotSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(await parentScheduleService.update(req.parent!.id, req.params.kidId, req.params.slotId, req.body));
+  })
+);
+
 parentScheduleRoutes.delete(
   "/:kidId/schedule/:slotId",
   validateRequest({ params: scheduleSlotParamsSchema }),

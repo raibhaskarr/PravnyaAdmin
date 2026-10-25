@@ -97,9 +97,23 @@ function formatTime(time: string): string {
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-function ScheduleRow({ slot, onDelete }: { slot: ScheduleSlot; onDelete: () => void }) {
+function ScheduleRow({
+  slot,
+  editing,
+  onEdit,
+  onDelete
+}: {
+  slot: ScheduleSlot;
+  editing: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] px-4 py-3">
+    <div
+      className={`flex items-center justify-between gap-2 rounded-2xl border px-4 py-3 ${
+        editing ? "border-[var(--pv-green-500)] bg-[var(--pv-green-100)]" : "border-[var(--pv-border)] bg-[var(--pv-surface)]"
+      }`}
+    >
       <div className="min-w-0">
         <p className="text-[0.95rem] font-semibold text-[var(--pv-ink)]">
           {slot.dayOfWeek} · {formatTime(slot.startTime)}
@@ -109,9 +123,14 @@ function ScheduleRow({ slot, onDelete }: { slot: ScheduleSlot; onDelete: () => v
           {slot.therapist ? ` — ${slot.therapist.name}` : ""}
         </p>
       </div>
-      <button type="button" onClick={onDelete} aria-label="Remove slot" className="flex-shrink-0 px-1 text-[1.1rem] text-[var(--pv-ink-faint)] transition hover:text-red-600">
-        ×
-      </button>
+      <div className="flex flex-shrink-0 items-center gap-3">
+        <button type="button" onClick={onEdit} className="whitespace-nowrap text-[0.8rem] font-medium text-[var(--pv-green-700)] transition hover:underline">
+          {editing ? "Editing..." : "Edit"}
+        </button>
+        <button type="button" onClick={onDelete} aria-label="Remove slot" className="px-1 text-[1.1rem] text-[var(--pv-ink-faint)] transition hover:text-red-600">
+          ×
+        </button>
+      </div>
     </div>
   );
 }
@@ -136,6 +155,7 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
   const [newTherapistId, setNewTherapistId] = useState("");
   const [addingSlot, setAddingSlot] = useState(false);
   const [slotError, setSlotError] = useState("");
+  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
 
   function refetch() {
     setError("");
@@ -218,22 +238,42 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
     }
   }
 
+  function startEditSlot(slot: ScheduleSlot) {
+    setEditingSlotId(slot.id);
+    setNewLabel(slot.label);
+    setNewDay(slot.dayOfWeek);
+    setNewTime(slot.startTime);
+    setNewTherapistId(slot.therapist?.id ?? "");
+    setSlotError("");
+  }
+
+  function cancelEditSlot() {
+    setEditingSlotId(null);
+    setNewLabel(SCHEDULE_LABELS[0]);
+    setNewDay(SCHEDULE_DAYS[0]);
+    setNewTime("16:00");
+    setNewTherapistId("");
+    setSlotError("");
+  }
+
   async function handleAddSlot(e: React.FormEvent) {
     e.preventDefault();
     if (addingSlot) return;
     setAddingSlot(true);
     setSlotError("");
+    const input = { label: newLabel, dayOfWeek: newDay, startTime: newTime, therapistId: newTherapistId || undefined };
     try {
-      await api.createScheduleSlot(token, kidId, {
-        label: newLabel,
-        dayOfWeek: newDay,
-        startTime: newTime,
-        therapistId: newTherapistId || undefined
-      });
-      setNewTherapistId("");
+      if (editingSlotId) {
+        await api.updateScheduleSlot(token, kidId, editingSlotId, input);
+      } else {
+        await api.createScheduleSlot(token, kidId, input);
+      }
+      cancelEditSlot();
       refetch();
     } catch (err) {
-      setSlotError(err instanceof ApiError ? err.message : "Couldn't add that slot. Try again.");
+      setSlotError(
+        err instanceof ApiError ? err.message : `Couldn't ${editingSlotId ? "save that change" : "add that slot"}. Try again.`
+      );
     } finally {
       setAddingSlot(false);
     }
@@ -242,6 +282,7 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
   async function handleDeleteSlot(slotId: string) {
     try {
       await api.deleteScheduleSlot(token, kidId, slotId);
+      if (editingSlotId === slotId) cancelEditSlot();
       refetch();
     } catch {
       // A failed delete just leaves the slot in place -- the list re-fetches successfully next
@@ -324,12 +365,19 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
               ) : (
                 <div className="flex flex-col gap-2">
                   {schedule.map((s) => (
-                    <ScheduleRow key={s.id} slot={s} onDelete={() => handleDeleteSlot(s.id)} />
+                    <ScheduleRow
+                      key={s.id}
+                      slot={s}
+                      editing={editingSlotId === s.id}
+                      onEdit={() => startEditSlot(s)}
+                      onDelete={() => handleDeleteSlot(s.id)}
+                    />
                   ))}
                 </div>
               )}
 
               <form onSubmit={handleAddSlot} className="mt-4 flex flex-col gap-3 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] px-4 py-4">
+                {editingSlotId ? <p className="text-[0.82rem] font-medium text-[var(--pv-green-700)]">Editing this slot</p> : null}
                 <div>
                   <span className="mb-1.5 block text-[0.95rem] font-medium text-[var(--pv-ink-soft)]">What</span>
                   <div className="flex flex-wrap gap-2">
@@ -369,9 +417,16 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
                 ) : null}
 
                 {slotError ? <p className="text-sm text-red-600">{slotError}</p> : null}
-                <PrimaryButton type="submit" disabled={addingSlot}>
-                  {addingSlot ? "Adding..." : "Add to schedule"}
-                </PrimaryButton>
+                <div className="flex items-center gap-4">
+                  <PrimaryButton type="submit" disabled={addingSlot}>
+                    {addingSlot ? "Saving..." : editingSlotId ? "Save changes" : "Add to schedule"}
+                  </PrimaryButton>
+                  {editingSlotId ? (
+                    <button type="button" onClick={cancelEditSlot} className="text-[0.85rem] font-medium text-[var(--pv-ink-faint)] transition hover:text-[var(--pv-ink)]">
+                      Cancel
+                    </button>
+                  ) : null}
+                </div>
               </form>
             </section>
           </div>

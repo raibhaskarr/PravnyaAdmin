@@ -285,6 +285,9 @@ export const api = {
   createScheduleSlot(token: string, kidId: string, input: CreateScheduleSlotInput) {
     return request<ScheduleSlot>(`/parent-kids/${kidId}/schedule`, { token, method: "POST", body: input });
   },
+  updateScheduleSlot(token: string, kidId: string, slotId: string, input: CreateScheduleSlotInput) {
+    return request<ScheduleSlot>(`/parent-kids/${kidId}/schedule/${slotId}`, { token, method: "PATCH", body: input });
+  },
   deleteScheduleSlot(token: string, kidId: string, slotId: string) {
     return request<void>(`/parent-kids/${kidId}/schedule/${slotId}`, { token, method: "DELETE" });
   }
