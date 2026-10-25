@@ -104,6 +104,25 @@ enum TenantKycStatus {
   REJECTED
 }
 
+/// A real-world clinic/organization -- deliberately independent of Tenant. Existing in this
+/// directory never requires being a paying platform customer: most Centres are a guest therapist's
+/// own (possibly unregistered) practice, referenced only for labeling which clinic a goal/evidence
+/// row came from. A Tenant is "just a Centre that happens to subscribe" -- see Tenant.centreId.
+/// See docs/manual/03-business-logic.md's "Tenant vs. Centre" section for the full rationale.
+model Centre {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// Case-sensitive DB backstop; real dedup is a case-insensitive check in centres.service.ts's
+  /// create(), same "service check + DB unique backstop" layering Tenant.slug already uses.
+  name      String   @unique
+  city      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant?
+  goals     Goal[]
+  evidence  GoalItemEvidence[]
+}
+
 /// Business/KYC profile fields are deliberately separate from the TENANT_ADMIN login created at
 /// signup (adminName/adminEmail on CreateTenantInput) -- leadOwner* is the registered business
 /// contact for compliance purposes, independent of who happens to hold the login credential.
@@ -134,6 +153,15 @@ model Tenant {
   kycStatus      TenantKycStatus @default(PENDING)
   kycNotes       String?
   kycReviewedAt  DateTime?
+
+  /// Optional: a Tenant is "just a centre that happens to subscribe" -- this attaches it to its
+  /// own Centre directory row when/if that happens. Nullable because most Centres never become a
+  /// Tenant, and a Tenant can in principle exist without ever being linked to a Centre row (no
+  /// retroactive backfill required for existing tenants). @unique -- one real-world centre maps to
+  /// at most one tenant account. onDelete: SetNull, not Cascade -- deleting a Centre (no UI for
+  /// this yet) should never take a Tenant down with it.
+  centreId   String?  @unique @db.Uuid
+  centre     Centre?  @relation(fields: [centreId], references: [id], onDelete: SetNull)
 
   users      User[]
   disciplines TenantDiscipline[]
@@ -459,6 +487,11 @@ model Goal {
   /// from another (possibly unregistered) clinic contribute a goal plan; this records that clinic's
   /// name for display, not a hard reference to any Tenant row.
   centreName       String?
+  /// Replaces centreName going forward -- centreName stays in place (deprecated, unused by new
+  /// writes) rather than being dropped in the same migration that introduces Centre, so an
+  /// additive schema change and a destructive one never happen in the same pass against production.
+  centreId         String?             @db.Uuid
+  centre           Centre?             @relation(fields: [centreId], references: [id], onDelete: SetNull)
   /// How confident the AI was in this skill match (0-1), when this goal came from an AI-assisted
   /// flow (IEP extraction). Null for a goal created by hand with no AI involved -- there's no
   /// number to show, not a 0.
@@ -512,6 +545,9 @@ model GoalItemEvidence {
   goalItem           GoalItem            @relation(fields: [goalItemId], references: [id], onDelete: Cascade)
   logDate            DateTime?
   centreName         String?
+  /// Replaces centreName going forward -- same deprecated-in-place convention as Goal.centreId.
+  centreId           String?             @db.Uuid
+  centre             Centre?             @relation(fields: [centreId], references: [id], onDelete: SetNull)
   outcome            PocEvidenceOutcome
   supportLevel       PocSupportLevel
   modality           PocModality         @default(UNKNOWN)

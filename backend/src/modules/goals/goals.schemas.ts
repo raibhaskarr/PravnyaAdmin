@@ -16,9 +16,10 @@ export const createGoalSchema = z.object({
   modality: z.enum(["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL"]),
   title: z.string().min(1).max(300),
   notes: z.string().max(4000).optional(),
-  // Free text, independent of the kid's own tenant -- doesn't need to match a real registered
-  // Tenant (a goal can come from a clinic that isn't one), see the schema comment on Goal.
-  centreName: z.string().max(200).optional(),
+  // Replaces centreName -- a real Centre directory row, independent of the kid's own tenant
+  // (doesn't need to match a registered Tenant, a goal can come from a clinic that isn't one).
+  // See the schema comment on Goal.centreId / the Centre model.
+  centreId: z.string().uuid().optional(),
   // Only present when an AI-assisted flow produced this goal -- see the schema comment on Goal.
   confidence: z.number().min(0).max(1).optional(),
   rationale: z.string().max(2000).optional(),
@@ -34,7 +35,7 @@ export const updateGoalSchema = z.object({
   notes: z.string().max(4000).nullable().optional(),
   confidence: z.number().min(0).max(1).nullable().optional(),
   rationale: z.string().max(2000).nullable().optional(),
-  centreName: z.string().max(200).nullable().optional(),
+  centreId: z.string().uuid().nullable().optional(),
   items: z.array(goalItemSchema).max(50).optional()
 });
 
@@ -49,7 +50,7 @@ export const createEvidenceSchema = z.object({
   goalItemId: z.string().uuid().optional(),
   newItemCustomText: z.string().min(1).max(300).optional(),
   logDate: z.string().min(1),
-  centreName: z.string().max(200).nullable().optional(),
+  centreId: z.string().uuid().nullable().optional(),
   outcome: z.enum(["CORRECT", "INCORRECT", "PARTIAL", "ATTEMPTED", "NOT_OBSERVED", "UNKNOWN"]),
   supportLevel: z.enum(["INDEPENDENT", "VISUAL_PROMPT", "VERBAL_PROMPT", "GESTURAL_PROMPT", "PHYSICAL_PROMPT", "PARTIAL_ASSISTANCE", "FULL_ASSISTANCE", "UNKNOWN"]),
   modality: z.enum(["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL", "UNKNOWN", "NOT_APPLICABLE"]).default("UNKNOWN"),
@@ -60,10 +61,10 @@ export const createEvidenceSchema = z.object({
 });
 
 // Narrow on purpose -- correcting which centre a logged session actually happened at is the one
-// real need (see the Goal.centreName schema comment); the rest of an evidence row reflects what
+// real need (see the Goal.centreId schema comment); the rest of an evidence row reflects what
 // was actually observed at the time and isn't meant to be edited after the fact.
 export const updateEvidenceSchema = z.object({
-  centreName: z.string().max(200).nullable()
+  centreId: z.string().uuid().nullable()
 });
 
 export type CreateGoalInput = z.infer<typeof createGoalSchema>;

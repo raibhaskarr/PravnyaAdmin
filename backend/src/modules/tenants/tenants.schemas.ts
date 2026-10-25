@@ -23,7 +23,11 @@ const kycFieldsSchema = z.object({
 
 export const updateTenantSchema = z.object({
   name: z.string().min(1).max(200).optional(),
-  status: z.enum(["ACTIVE", "SUSPENDED"]).optional()
+  status: z.enum(["ACTIVE", "SUSPENDED"]).optional(),
+  // Attaches this Tenant to its own Centre directory row -- "a Tenant is just a Centre that
+  // happens to subscribe." Nullable to support detaching. No UI for this yet (settable via this
+  // endpoint directly); a picker in TenantDetailPage.tsx is a separate follow-up.
+  centreId: z.string().uuid().nullable().optional()
 });
 
 // Superadmin: can also set KYC status/notes.

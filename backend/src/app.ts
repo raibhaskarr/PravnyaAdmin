@@ -31,6 +31,8 @@ import { staffCompanionRoutes } from "./modules/companion/staffCompanion.routes"
 import { parentTherapistInvitationsRoutes } from "./modules/parent-therapist-invitations/parentTherapistInvitations.routes";
 import { parentScheduleRoutes } from "./modules/parent-schedule/parentSchedule.routes";
 import { scheduleRoutes } from "./modules/schedule/schedule.routes";
+import { centresRoutes } from "./modules/centres/centres.routes";
+import { parentCentresRoutes } from "./modules/parent-centres/parentCentres.routes";
 
 export function createApp() {
   const app = express();
@@ -72,6 +74,8 @@ export function createApp() {
   app.use("/api/goals", goalsRoutes);
   app.use("/api/schedule", scheduleRoutes);
   app.use("/api/companion-messages", staffCompanionRoutes);
+  app.use("/api/centres", centresRoutes);
+  app.use("/api/parent-centres", parentCentresRoutes);
   app.use("/api/manual", manualRoutes);
   app.use("/api/ai", aiRoutes);
   app.use("/api/poc-review", pocReviewRoutes);

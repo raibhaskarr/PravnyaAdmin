@@ -79,7 +79,8 @@ export const tenantsService = {
       where: { id: tenantId },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {})
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.centreId !== undefined ? { centreId: input.centreId } : {})
       }
     });
     if (input.status !== undefined && input.status !== existing.status) {

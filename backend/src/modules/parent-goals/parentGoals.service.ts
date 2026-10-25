@@ -4,15 +4,18 @@ import { assertOwnsKid } from "../../common/access/parentKidAccess";
 import { extractEvidenceService } from "../ai/extractEvidence.service";
 import { ParentCreateEvidenceInput, ParentExtractEvidenceInput } from "./parentGoals.schemas";
 
+const centreSelect = { select: { id: true, name: true } };
+
 // Same shape as the staff-facing goals.service.ts's includeRelations, minus the `kid` relation --
 // redundant here, the caller already knows which kid (it's in the URL).
 const includeRelations = {
   canonicalSkill: { select: { id: true, name: true, measurementType: true, domain: { select: { id: true, name: true } } } },
   discipline: { select: { id: true, name: true } },
+  centre: centreSelect,
   items: {
     include: {
       canonicalSkillItem: { select: { id: true, displayName: true } },
-      evidence: { orderBy: { logDate: "desc" as const } }
+      evidence: { orderBy: { logDate: "desc" as const }, include: { centre: centreSelect } }
     }
   }
 };
@@ -60,7 +63,7 @@ export const parentGoalsService = {
       data: {
         goalItemId,
         logDate: new Date(input.logDate),
-        centreName: input.centreName?.trim() || null,
+        centreId: input.centreId ?? null,
         outcome: input.outcome,
         supportLevel: input.supportLevel,
         modality: input.modality,
@@ -70,7 +73,10 @@ export const parentGoalsService = {
         measurementBoolean: input.measurementBoolean ?? null,
         measurementText: input.measurementText ?? null
       },
-      include: { goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } } }
+      include: {
+        centre: centreSelect,
+        goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } }
+      }
     });
   }
 };

@@ -3,16 +3,15 @@ import { z } from "zod";
 export const parentGoalListParamsSchema = z.object({ kidId: z.string().uuid() });
 export const parentGoalEvidenceParamsSchema = z.object({ kidId: z.string().uuid(), goalId: z.string().uuid() });
 
-// Same fields as the staff-facing createEvidenceSchema (goals.schemas.ts). centreName is optional,
-// same environmentLabel centreName-null-means-Home convention Growth/Activities already rely on --
-// but unlike an earlier version of this schema, not force-blanked: a parent can tag which centre
-// or therapist suggested the activity (e.g. "my OT at Bright Steps told me to try this"), same
-// free-text field the admin panel's own AI-assisted logging form already exposes.
+// Same fields as the staff-facing createEvidenceSchema (goals.schemas.ts). centreId is optional,
+// same environmentLabel null-means-Home convention Growth/Activities already rely on -- a parent
+// can tag which centre or therapist suggested the activity (e.g. "my OT at Bright Steps told me to
+// try this"), same Centre field the admin panel's own AI-assisted logging form now exposes too.
 export const parentCreateEvidenceSchema = z.object({
   goalItemId: z.string().uuid().optional(),
   newItemCustomText: z.string().min(1).max(300).optional(),
   logDate: z.string().min(1),
-  centreName: z.string().min(1).max(200).nullable().optional(),
+  centreId: z.string().uuid().nullable().optional(),
   outcome: z.enum(["CORRECT", "INCORRECT", "PARTIAL", "ATTEMPTED", "NOT_OBSERVED", "UNKNOWN"]),
   supportLevel: z.enum(["INDEPENDENT", "VISUAL_PROMPT", "VERBAL_PROMPT", "GESTURAL_PROMPT", "PHYSICAL_PROMPT", "PARTIAL_ASSISTANCE", "FULL_ASSISTANCE", "UNKNOWN"]),
   modality: z.enum(["VERBAL", "MANUAL_SIGN", "AAC", "WRITTEN", "GESTURAL", "UNKNOWN", "NOT_APPLICABLE"]).default("UNKNOWN"),

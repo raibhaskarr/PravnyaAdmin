@@ -4,14 +4,17 @@ import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid, kidVisibilityFilter } from "../../common/access/kidAccess";
 import { CreateEvidenceInput, CreateGoalInput, UpdateEvidenceInput, UpdateGoalInput } from "./goals.schemas";
 
+const centreSelect = { select: { id: true, name: true } };
+
 const includeRelations = {
   kid: { select: { id: true, firstName: true, lastName: true } },
   canonicalSkill: { select: { id: true, name: true, measurementType: true, domain: { select: { id: true, name: true } } } },
   discipline: { select: { id: true, name: true } },
+  centre: centreSelect,
   items: {
     include: {
       canonicalSkillItem: { select: { id: true, displayName: true } },
-      evidence: { orderBy: { logDate: "desc" as const } }
+      evidence: { orderBy: { logDate: "desc" as const }, include: { centre: centreSelect } }
     }
   }
 };
@@ -52,7 +55,7 @@ export const goalsService = {
         modality: input.modality,
         title: input.title,
         notes: input.notes,
-        centreName: input.centreName ?? null,
+        centreId: input.centreId ?? null,
         confidence: input.confidence ?? null,
         rationale: input.rationale ?? null,
         createdById: user.id,
@@ -115,7 +118,7 @@ export const goalsService = {
       data: {
         goalItemId,
         logDate: new Date(input.logDate),
-        centreName: input.centreName ?? null,
+        centreId: input.centreId ?? null,
         outcome: input.outcome,
         supportLevel: input.supportLevel,
         modality: input.modality,
@@ -125,11 +128,14 @@ export const goalsService = {
         measurementBoolean: input.measurementBoolean ?? null,
         measurementText: input.measurementText ?? null
       },
-      include: { goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } } }
+      include: {
+        centre: centreSelect,
+        goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } }
+      }
     });
   },
 
-  // Deliberately narrow -- see the updateEvidenceSchema comment. Only centreName, since that's the
+  // Deliberately narrow -- see the updateEvidenceSchema comment. Only centreId, since that's the
   // one thing that's turned out to be wrong after the fact in practice (an AI-assisted upload
   // attributed to the wrong clinic); the rest of a logged evidence row is what was actually
   // observed in the session and isn't meant to change later.
@@ -143,8 +149,11 @@ export const goalsService = {
 
     return prisma.goalItemEvidence.update({
       where: { id: evidenceId },
-      data: { centreName: input.centreName },
-      include: { goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } } }
+      data: { centreId: input.centreId },
+      include: {
+        centre: centreSelect,
+        goalItem: { select: { id: true, customText: true, canonicalSkillItem: { select: { id: true, displayName: true } } } }
+      }
     });
   }
 };
