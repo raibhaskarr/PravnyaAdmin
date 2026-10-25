@@ -3,7 +3,12 @@ import { asyncHandler } from "../../common/middleware/asyncHandler";
 import { requireParentAuth } from "../../common/middleware/parentAuth";
 import { validateRequest } from "../../common/middleware/validateRequest";
 import { parentTherapistInvitationsService } from "./parentTherapistInvitations.service";
-import { inviteTherapistSchema, parentTherapistKidParamsSchema } from "./parentTherapistInvitations.schemas";
+import {
+  inviteTherapistSchema,
+  parentTherapistInvitationParamsSchema,
+  parentTherapistKidParamsSchema,
+  parentUnlinkTherapistParamsSchema
+} from "./parentTherapistInvitations.schemas";
 
 export const parentTherapistInvitationsRoutes = Router();
 
@@ -30,5 +35,30 @@ parentTherapistInvitationsRoutes.post(
   validateRequest({ params: parentTherapistKidParamsSchema, body: inviteTherapistSchema }),
   asyncHandler(async (req, res) => {
     res.status(201).json(await parentTherapistInvitationsService.inviteTherapist(req.parent!.id, req.params.kidId, req.body));
+  })
+);
+
+parentTherapistInvitationsRoutes.delete(
+  "/:kidId/therapist-invitations/:invitationId",
+  validateRequest({ params: parentTherapistInvitationParamsSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(await parentTherapistInvitationsService.revokeInvitation(req.parent!.id, req.params.kidId, req.params.invitationId));
+  })
+);
+
+parentTherapistInvitationsRoutes.post(
+  "/:kidId/therapist-invitations/:invitationId/resend",
+  validateRequest({ params: parentTherapistInvitationParamsSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(await parentTherapistInvitationsService.resendInvitation(req.parent!.id, req.params.kidId, req.params.invitationId));
+  })
+);
+
+parentTherapistInvitationsRoutes.delete(
+  "/:kidId/therapists/:therapistId",
+  validateRequest({ params: parentUnlinkTherapistParamsSchema }),
+  asyncHandler(async (req, res) => {
+    await parentTherapistInvitationsService.unlinkTherapist(req.parent!.id, req.params.kidId, req.params.therapistId);
+    res.status(204).send();
   })
 );

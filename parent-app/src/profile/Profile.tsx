@@ -27,30 +27,65 @@ function formatDate(date: string): string {
   return new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function TherapistCard({ therapist }: { therapist: LinkedTherapist }) {
+function TherapistCard({ therapist, onUnlink, busy }: { therapist: LinkedTherapist; onUnlink: () => void; busy: boolean }) {
   return (
-    <div className="rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] px-4 py-3">
-      <p className="text-[0.98rem] font-semibold text-[var(--pv-ink)]">{therapist.name}</p>
-      <p className="text-[0.82rem] text-[var(--pv-ink-faint)]">{therapist.tenant.name}</p>
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] px-4 py-3">
+      <div className="min-w-0">
+        <p className="truncate text-[0.98rem] font-semibold text-[var(--pv-ink)]">{therapist.name}</p>
+        <p className="truncate text-[0.82rem] text-[var(--pv-ink-faint)]">{therapist.tenant.name}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onUnlink}
+        disabled={busy}
+        className="flex-shrink-0 whitespace-nowrap text-[0.8rem] font-medium text-[var(--pv-ink-faint)] transition hover:text-red-600 disabled:opacity-50"
+      >
+        {busy ? "Removing..." : "Remove"}
+      </button>
     </div>
   );
 }
 
-function InvitationCard({ invitation }: { invitation: TherapistInvitationSummary }) {
+function InvitationCard({
+  invitation,
+  onRevoke,
+  onResend,
+  busy
+}: {
+  invitation: TherapistInvitationSummary;
+  onRevoke: () => void;
+  onResend: () => void;
+  busy: boolean;
+}) {
   const pending = invitation.status === "PENDING";
+  const expired = invitation.status === "EXPIRED";
   return (
-    <div className="flex items-center justify-between gap-2 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] px-4 py-3">
-      <div className="min-w-0">
-        <p className="truncate text-[0.95rem] font-medium text-[var(--pv-ink)]">{invitation.email}</p>
-        <p className="text-[0.78rem] text-[var(--pv-ink-faint)]">Sent {formatDate(invitation.createdAt)}</p>
+    <div className="flex flex-col gap-2 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] px-4 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[0.95rem] font-medium text-[var(--pv-ink)]">{invitation.email}</p>
+        <span
+          className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+            pending ? "bg-[var(--pv-orange-100)] text-[#8a5a1f]" : "bg-[var(--pv-border)] text-[var(--pv-ink-soft)]"
+          }`}
+        >
+          {STATUS_LABEL[invitation.status]}
+        </span>
       </div>
-      <span
-        className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-          pending ? "bg-[var(--pv-orange-100)] text-[#8a5a1f]" : "bg-[var(--pv-border)] text-[var(--pv-ink-soft)]"
-        }`}
-      >
-        {STATUS_LABEL[invitation.status]}
-      </span>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[0.78rem] text-[var(--pv-ink-faint)]">Sent {formatDate(invitation.createdAt)}</p>
+        <div className="flex flex-shrink-0 items-center gap-3">
+          {pending || expired ? (
+            <button type="button" onClick={onResend} disabled={busy} className="whitespace-nowrap text-[0.8rem] font-medium text-[var(--pv-green-700)] transition hover:underline disabled:opacity-50">
+              {expired ? "Retry" : "Resend"}
+            </button>
+          ) : null}
+          {pending ? (
+            <button type="button" onClick={onRevoke} disabled={busy} className="whitespace-nowrap text-[0.8rem] font-medium text-[var(--pv-ink-faint)] transition hover:text-red-600 disabled:opacity-50">
+              Cancel
+            </button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -91,6 +126,9 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [inviteResult, setInviteResult] = useState("");
+
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
 
   const [newLabel, setNewLabel] = useState<string>(SCHEDULE_LABELS[0]);
   const [newDay, setNewDay] = useState<string>(SCHEDULE_DAYS[0]);
@@ -141,6 +179,45 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
     }
   }
 
+  async function handleRevoke(invitationId: string) {
+    setActioningId(invitationId);
+    setActionError("");
+    try {
+      await api.revokeTherapistInvitation(token, kidId, invitationId);
+      refetch();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't cancel that invite. Try again.");
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  async function handleResend(invitationId: string) {
+    setActioningId(invitationId);
+    setActionError("");
+    try {
+      await api.resendTherapistInvitation(token, kidId, invitationId);
+      refetch();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't resend that invite. Try again.");
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  async function handleUnlink(therapistId: string) {
+    setActioningId(therapistId);
+    setActionError("");
+    try {
+      await api.unlinkTherapist(token, kidId, therapistId);
+      refetch();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't remove that therapist. Try again.");
+    } finally {
+      setActioningId(null);
+    }
+  }
+
   async function handleAddSlot(e: React.FormEvent) {
     e.preventDefault();
     if (addingSlot) return;
@@ -172,7 +249,10 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
     }
   }
 
-  const pendingInvitations = (invitations ?? []).filter((i) => i.status === "PENDING");
+  // EXPIRED kept visible (not just PENDING) so a lapsed invite stays a "Retry" button instead of
+  // silently disappearing -- ACCEPTED is redundant with the therapist card above, REVOKED is a
+  // dead end with nothing left to do, so neither earns a slot in this list.
+  const actionableInvitations = (invitations ?? []).filter((i) => i.status === "PENDING" || i.status === "EXPIRED");
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--pv-bg)]">
@@ -197,17 +277,24 @@ export function Profile({ token, kidId, kidName, onBack }: { token: string; kidI
             <section>
               <h2 className="mb-2 text-[0.78rem] font-bold uppercase tracking-wide text-[var(--pv-ink-faint)]">Care team</h2>
 
-              {therapists.length === 0 && pendingInvitations.length === 0 ? (
+              {therapists.length === 0 && actionableInvitations.length === 0 ? (
                 <p className="text-sm text-[var(--pv-ink-faint)]">
                   No one's linked to {kidName}'s care team yet -- invite their therapist below.
                 </p>
               ) : (
                 <div className="flex flex-col gap-2">
+                  {actionError ? <p className="text-sm text-red-600">{actionError}</p> : null}
                   {therapists.map((t) => (
-                    <TherapistCard key={t.id} therapist={t} />
+                    <TherapistCard key={t.id} therapist={t} onUnlink={() => handleUnlink(t.id)} busy={actioningId === t.id} />
                   ))}
-                  {pendingInvitations.map((i) => (
-                    <InvitationCard key={i.id} invitation={i} />
+                  {actionableInvitations.map((i) => (
+                    <InvitationCard
+                      key={i.id}
+                      invitation={i}
+                      onRevoke={() => handleRevoke(i.id)}
+                      onResend={() => handleResend(i.id)}
+                      busy={actioningId === i.id}
+                    />
                   ))}
                 </div>
               )}

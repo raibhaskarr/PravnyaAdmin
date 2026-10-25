@@ -158,6 +158,8 @@ export type InviteTherapistResponse =
   | { linked: true; therapist: LinkedTherapist }
   | { linked: false; invitation: TherapistInvitationSummary; inviteUrl?: string };
 
+export type ResendInvitationResponse = { invitation: TherapistInvitationSummary; inviteUrl?: string };
+
 // Same fixed sets as onboarding's ChildTherapies/ChildSchedule steps -- kept in sync by hand, same
 // convention as the backend's own parentSchedule.schemas.ts duplicating-not-importing the admin's
 // equivalent lists.
@@ -261,6 +263,21 @@ export const api = {
       method: "POST",
       body: { email }
     });
+  },
+  revokeTherapistInvitation(token: string, kidId: string, invitationId: string) {
+    return request<TherapistInvitationSummary>(`/parent-kids/${kidId}/therapist-invitations/${invitationId}`, {
+      token,
+      method: "DELETE"
+    });
+  },
+  resendTherapistInvitation(token: string, kidId: string, invitationId: string) {
+    return request<ResendInvitationResponse>(`/parent-kids/${kidId}/therapist-invitations/${invitationId}/resend`, {
+      token,
+      method: "POST"
+    });
+  },
+  unlinkTherapist(token: string, kidId: string, therapistId: string) {
+    return request<void>(`/parent-kids/${kidId}/therapists/${therapistId}`, { token, method: "DELETE" });
   },
   listSchedule(token: string, kidId: string) {
     return request<ScheduleSlot[]>(`/parent-kids/${kidId}/schedule`, { token });
