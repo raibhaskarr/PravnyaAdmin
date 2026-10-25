@@ -500,7 +500,7 @@ export function Growth({ token, kidId, kidName, onBack }: { token: string; kidId
   const selected = goalViews.find((g) => g.goalId === selectedGoalId) ?? null;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--pv-bg)]">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[var(--pv-bg)]">
       <header className="flex items-center gap-3 border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
         <button
           type="button"
@@ -515,7 +515,7 @@ export function Growth({ token, kidId, kidName, onBack }: { token: string; kidId
         <p className="text-[1.05rem] font-semibold text-[var(--pv-ink)]">Growth</p>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-6">
+      <main className="mx-auto w-full min-h-0 max-w-2xl flex-1 overflow-y-auto px-5 py-6">
         {error ? (
           <p className="text-sm text-red-600">{error}</p>
         ) : !goals ? (

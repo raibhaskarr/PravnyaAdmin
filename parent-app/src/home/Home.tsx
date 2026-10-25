@@ -250,7 +250,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   const feed = goals ? buildFeed(goals) : [];
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--pv-bg)] md:flex-row">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[var(--pv-bg)] md:flex-row">
       {/* Left rail on wide viewports -- bottom tabs (below) take over on narrow ones. */}
       <nav className="hidden w-56 flex-col gap-1 border-r border-[var(--pv-border)] bg-[var(--pv-surface)] p-4 md:flex">
         <div className="mb-4 flex items-center gap-2 px-2">
@@ -273,7 +273,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
         ))}
       </nav>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
           <div>
             {kids.length > 1 && kid ? (
@@ -299,7 +299,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           </button>
         </header>
 
-        <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 px-5 py-6">
+        <main className="mx-auto flex w-full min-h-0 max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-5 py-6">
           {activeNudge && kid ? (
             <NudgeCard
               type={activeNudge}
