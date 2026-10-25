@@ -42,11 +42,11 @@ export interface ActivityCandidate {
 function pickSuggestedItem(goal: Goal): { itemLabel: string; centreName: string; date: string | null } | null {
   let best: { itemLabel: string; centreName: string; date: string | null; homeCount: number; centreDate: string } | null = null;
   for (const item of goal.items) {
-    const centreEv = item.evidence.filter((e) => e.centreName != null);
-    const homeCount = item.evidence.filter((e) => e.centreName == null).length;
+    const centreEv = item.evidence.filter((e) => e.centre != null);
+    const homeCount = item.evidence.filter((e) => e.centre == null).length;
     if (centreEv.length === 0 || homeCount >= centreEv.length) continue;
     const latest = [...centreEv].sort((a, b) => (b.logDate ?? "").localeCompare(a.logDate ?? ""))[0];
-    const candidate = { itemLabel: itemLabel(item), centreName: latest.centreName!, date: latest.logDate, homeCount, centreDate: latest.logDate ?? "" };
+    const candidate = { itemLabel: itemLabel(item), centreName: latest.centre!.name, date: latest.logDate, homeCount, centreDate: latest.logDate ?? "" };
     if (!best || candidate.homeCount < best.homeCount || (candidate.homeCount === best.homeCount && candidate.centreDate > best.centreDate)) {
       best = candidate;
     }
@@ -58,8 +58,8 @@ export function buildActivityCandidates(goals: Goal[]): ActivityCandidate[] {
   const candidates: ActivityCandidate[] = [];
   for (const g of goals) {
     const all = flatEvidence(g);
-    const centreEvidenceCount = all.filter((e) => e.centreName != null).length;
-    const homeEvidenceCount = all.filter((e) => e.centreName == null).length;
+    const centreEvidenceCount = all.filter((e) => e.centre != null).length;
+    const homeEvidenceCount = all.filter((e) => e.centre == null).length;
     if (centreEvidenceCount === 0 || homeEvidenceCount >= centreEvidenceCount) continue;
 
     const suggested = pickSuggestedItem(g);

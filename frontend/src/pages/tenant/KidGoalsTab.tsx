@@ -1,7 +1,8 @@
 import { Fragment, FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { CanonicalDomain, CanonicalSkillDetail, Goal, GoalItemInput, Modality, TenantDiscipline } from "../../api/types";
+import { CentrePicker } from "../../components/CentrePicker";
+import type { CanonicalDomain, CanonicalSkillDetail, Centre, Goal, GoalItemInput, Modality, TenantDiscipline } from "../../api/types";
 import { EditableCentre, GoalEvidenceDetail, Th, formatDate } from "./goalEvidence";
 import { IepUploadForm } from "./IepUploadForm";
 
@@ -27,7 +28,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
-  const [centreName, setCentreName] = useState("");
+  const [centre, setCentre] = useState<Centre | null>(null);
   const [canonicalSkillId, setCanonicalSkillId] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
   const [modality, setModality] = useState<Modality | "">("");
@@ -71,7 +72,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
     setPendingItems([]);
     setCustomText("");
     setTitle("");
-    setCentreName("");
+    setCentre(null);
     setCanonicalSkillId("");
     setDisciplineId("");
     setModality("");
@@ -145,7 +146,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
         disciplineId,
         modality: modality as Modality,
         title,
-        centreName: centreName.trim() || undefined,
+        centreId: centre?.id,
         rationale: appliedRationale ?? undefined,
         items: pendingItems.map(({ canonicalSkillItemId, customText: text }) => ({ canonicalSkillItemId, customText: text }))
       });
@@ -194,12 +195,7 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
               </label>
               <label className="field">
                 <span className="field-label">Centre / source clinic (optional)</span>
-                <input
-                  value={centreName}
-                  onChange={(e) => setCentreName(e.target.value)}
-                  className="input"
-                  placeholder="e.g. vListen -- doesn't need to be a registered organization"
-                />
+                <CentrePicker value={centre} onChange={setCentre} placeholder="e.g. vListen -- doesn't need to be a registered organization" />
               </label>
               <div style={{ marginTop: "-0.5rem", marginBottom: "0.75rem" }}>
                 <button type="button" className="btn btn-secondary" onClick={handleSuggest} disabled={suggesting}>
@@ -411,10 +407,10 @@ export function KidGoalsTab({ kidId, canEdit }: { kidId: string; canEdit: boolea
                     <td>{g.status}</td>
                     <td>
                       <EditableCentre
-                        value={g.centreName}
+                        centre={g.centre}
                         canEdit={canEdit}
-                        onSave={async (next) => {
-                          await api.updateGoal(token!, g.id, { centreName: next });
+                        onSave={async (centreId) => {
+                          await api.updateGoal(token!, g.id, { centreId });
                           load();
                         }}
                       />

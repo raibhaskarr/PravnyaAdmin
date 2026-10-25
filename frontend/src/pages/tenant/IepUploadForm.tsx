@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { EvidenceCandidate, IepGoalCandidate } from "../../api/types";
+import { CentrePicker } from "../../components/CentrePicker";
+import type { Centre, EvidenceCandidate, IepGoalCandidate } from "../../api/types";
 
 type InputMode = "pdf" | "photo" | "csv";
 type ExtractionResult = { statusUpdates: EvidenceCandidate[]; newGoals: IepGoalCandidate[] };
@@ -39,7 +40,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
   const [result, setResult] = useState<ExtractionResult | null>(null);
   const [approvedUpdates, setApprovedUpdates] = useState<Set<number>>(new Set());
   const [approvedGoals, setApprovedGoals] = useState<Set<number>>(new Set());
-  const [centreName, setCentreName] = useState("");
+  const [centre, setCentre] = useState<Centre | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
@@ -50,7 +51,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
     setResult(null);
     setApprovedUpdates(new Set());
     setApprovedGoals(new Set());
-    setCentreName("");
+    setCentre(null);
     setSavedCount(0);
   }
 
@@ -125,7 +126,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
     setResult(null);
     setApprovedUpdates(new Set());
     setApprovedGoals(new Set());
-    setCentreName("");
+    setCentre(null);
     setError("");
   }
 
@@ -133,7 +134,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
     if (!result) return;
     setSaving(true);
     setError("");
-    const trimmedCentre = centreName.trim() || null;
+    const centreId = centre?.id ?? null;
     let count = 0;
     try {
       for (const i of approvedUpdates) {
@@ -141,7 +142,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
         await api.logEvidence(token!, c.goalId, {
           newItemCustomText: c.itemHint ?? undefined,
           logDate: new Date().toISOString(),
-          centreName: trimmedCentre,
+          centreId,
           outcome: c.outcome,
           supportLevel: c.supportLevel,
           modality: c.modality,
@@ -161,7 +162,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
           disciplineId: c.disciplineId,
           modality: c.modality,
           title: c.title,
-          centreName: trimmedCentre ?? undefined,
+          centreId: centreId ?? undefined,
           confidence: c.confidence,
           rationale: c.sourceExcerpt,
           notes: "Extracted from an uploaded IEP."
@@ -243,12 +244,7 @@ export function IepUploadForm({ kidId, onAdded }: { kidId: string; onAdded: () =
 
           <label className="field" style={{ marginBottom: "1rem" }}>
             <span className="field-label">Centre / source clinic (optional)</span>
-            <input
-              className="input"
-              value={centreName}
-              onChange={(e) => setCentreName(e.target.value)}
-              placeholder="e.g. vListen -- doesn't need to be a registered organization"
-            />
+            <CentrePicker value={centre} onChange={setCentre} placeholder="e.g. vListen -- doesn't need to be a registered organization" />
             <p className="hint-text" style={{ marginTop: "0.3rem" }}>
               Applied to everything you approve below -- useful when this document came from a different clinic than the one you're logged into.
             </p>

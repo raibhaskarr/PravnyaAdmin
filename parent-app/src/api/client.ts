@@ -60,10 +60,12 @@ export type IepGoalCandidate = {
 
 export type IepSource = { kind: "pdf"; base64: string } | { kind: "image"; base64: string; mimeType: string };
 
+export type Centre = { id: string; name: string; city: string | null };
+
 export type GoalItemEvidence = {
   id: string;
   logDate: string | null;
-  centreName: string | null;
+  centre: Centre | null;
   outcome: string;
   supportLevel: string;
   modality: string;
@@ -99,7 +101,7 @@ export type CreateEvidenceInput = {
   goalItemId?: string;
   newItemCustomText?: string;
   logDate: string;
-  centreName?: string | null;
+  centreId?: string | null;
   outcome: string;
   supportLevel: string;
   modality: string;
@@ -226,6 +228,13 @@ export const api = {
   },
   listGoals(token: string, kidId: string) {
     return request<Goal[]>(`/parent-kids/${kidId}/goals`, { token });
+  },
+  // Centres -- shared directory, independent of Tenant, same as the admin panel's own
+  listCentres(token: string) {
+    return request<Centre[]>("/parent-centres", { token });
+  },
+  createCentre(token: string, input: { name: string; city?: string }) {
+    return request<Centre>("/parent-centres", { token, method: "POST", body: input });
   },
   logEvidence(token: string, kidId: string, goalId: string, input: CreateEvidenceInput) {
     return request<GoalItemEvidence & { goalItem: GoalItem }>(`/parent-kids/${kidId}/goals/${goalId}/evidence`, {

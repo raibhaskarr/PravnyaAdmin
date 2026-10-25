@@ -5,6 +5,7 @@ import type {
   CanonicalDomain,
   CanonicalSkill,
   CanonicalSkillDetail,
+  Centre,
   DbModel,
   DocSection,
   EvidenceCandidate,
@@ -297,6 +298,14 @@ export const api = {
     return request<Goal[]>(`/goals${kidId ? `?kidId=${kidId}` : ""}`, { token });
   },
 
+  // Centres -- shared directory, independent of Tenant
+  listCentres(token: string) {
+    return request<Centre[]>("/centres", { token });
+  },
+  createCentre(token: string, input: { name: string; city?: string }) {
+    return request<Centre>("/centres", { token, method: "POST", body: input });
+  },
+
   // Schedule / Companion -- read-only staff views of parent-app data
   listKidSchedule(token: string, kidId: string) {
     return request<ScheduleEntry[]>(`/schedule?kidId=${kidId}`, { token });
@@ -313,7 +322,7 @@ export const api = {
       modality: Modality;
       title: string;
       notes?: string;
-      centreName?: string;
+      centreId?: string;
       confidence?: number;
       rationale?: string;
       items?: GoalItemInput[];
@@ -331,7 +340,7 @@ export const api = {
       title?: string;
       status?: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
       notes?: string | null;
-      centreName?: string | null;
+      centreId?: string | null;
       confidence?: number | null;
       rationale?: string | null;
       items?: GoalItemInput[];
@@ -359,7 +368,7 @@ export const api = {
       goalItemId?: string;
       newItemCustomText?: string;
       logDate: string;
-      centreName?: string | null;
+      centreId?: string | null;
       outcome: PocEvidenceOutcome;
       supportLevel: PocSupportLevel;
       modality: PocModality;
@@ -374,10 +383,10 @@ export const api = {
       { token, method: "POST", body: input }
     );
   },
-  updateEvidenceCentre(token: string, goalId: string, evidenceId: string, centreName: string | null) {
+  updateEvidenceCentre(token: string, goalId: string, evidenceId: string, centreId: string | null) {
     return request<GoalItemEvidenceRow & { goalItem: { id: string; customText: string | null; canonicalSkillItem: { id: string; displayName: string } | null } }>(
       `/goals/${goalId}/evidence/${evidenceId}`,
-      { token, method: "PATCH", body: { centreName } }
+      { token, method: "PATCH", body: { centreId } }
     );
   },
 

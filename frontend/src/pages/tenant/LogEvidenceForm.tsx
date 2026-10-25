@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { Goal, PocEvidenceOutcome, PocModality, PocSupportLevel } from "../../api/types";
+import { CentrePicker } from "../../components/CentrePicker";
+import type { Centre, Goal, PocEvidenceOutcome, PocModality, PocSupportLevel } from "../../api/types";
 import { itemLabel } from "./goalEvidence";
 
 const OUTCOMES: { value: PocEvidenceOutcome; label: string }[] = [
@@ -99,7 +100,7 @@ export function LogEvidenceForm({ goal, onLogged }: { goal: Goal; onLogged: (upd
   const { token } = useAuth();
   const [itemQuery, setItemQuery] = useState("");
   const [logDate, setLogDate] = useState(todayISO());
-  const [centreName, setCentreName] = useState("");
+  const [centre, setCentre] = useState<Centre | null>(null);
   const [outcome, setOutcome] = useState<PocEvidenceOutcome>("CORRECT");
   const [supportLevel, setSupportLevel] = useState<PocSupportLevel>("INDEPENDENT");
   const [modality, setModality] = useState<PocModality>("NOT_APPLICABLE");
@@ -140,7 +141,7 @@ export function LogEvidenceForm({ goal, onLogged }: { goal: Goal; onLogged: (upd
         goalItemId: matchedExisting?.id,
         newItemCustomText: !matchedExisting && trimmedItem ? trimmedItem : undefined,
         logDate: new Date(logDate).toISOString(),
-        centreName: centreName.trim() || null,
+        centreId: centre?.id ?? null,
         outcome,
         supportLevel,
         modality,
@@ -180,7 +181,7 @@ export function LogEvidenceForm({ goal, onLogged }: { goal: Goal; onLogged: (upd
         </label>
         <label className="field" style={{ flex: 1 }}>
           <span className="field-label">Centre (blank = Home)</span>
-          <input className="input" value={centreName} onChange={(e) => setCentreName(e.target.value)} placeholder="Home" />
+          <CentrePicker value={centre} onChange={setCentre} placeholder="Home" />
         </label>
       </div>
 

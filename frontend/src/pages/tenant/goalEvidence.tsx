@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
-import type { Goal, GoalItem, GoalItemEvidenceRow } from "../../api/types";
+import { CentrePicker } from "../../components/CentrePicker";
+import type { Centre, Goal, GoalItem, GoalItemEvidenceRow } from "../../api/types";
 
 // Same convention as the POC review page's column headers: dotted underline is the visual cue
 // that hovering shows an explanation (native title attribute) -- a plain <th> gives no hint.
@@ -64,27 +65,22 @@ export function itemLabel(item: GoalItem) {
   return item.customText ?? item.canonicalSkillItem?.displayName ?? "General practice";
 }
 
-/** Shows which clinic/organization a goal or logged session actually came from -- free text, so it
- * works whether or not that name matches a registered tenant (e.g. a guest therapist's own,
- * possibly-unregistered clinic, as opposed to the kid's own tenant). Click-to-edit inline rather
- * than a separate edit screen, since this is the one field that's turned out to need correcting
- * after the fact (an AI-assisted upload attributed to the wrong clinic). */
-export function EditableCentre({ value, canEdit, onSave }: { value: string | null; canEdit: boolean; onSave: (next: string | null) => Promise<void> }) {
+/** Shows which clinic/organization a goal or logged session actually came from -- a real Centre
+ * directory entry, independent of whether that clinic is a registered Tenant (e.g. a guest
+ * therapist's own, possibly-unregistered clinic). Click-to-edit inline rather than a separate edit
+ * screen, since this is the one field that's turned out to need correcting after the fact (an
+ * AI-assisted upload attributed to the wrong clinic). */
+export function EditableCentre({ centre, canEdit, onSave }: { centre: Centre | null; canEdit: boolean; onSave: (centreId: string | null) => Promise<void> }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? "");
+  const [draft, setDraft] = useState<Centre | null>(centre);
   const [saving, setSaving] = useState(false);
 
   if (editing) {
     return (
-      <span style={{ display: "inline-flex", gap: "0.3rem", alignItems: "center" }}>
-        <input
-          className="input"
-          style={{ padding: "0.1rem 0.4rem", fontSize: "0.8rem", width: 110 }}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="e.g. vListen"
-          autoFocus
-        />
+      <span style={{ display: "inline-flex", gap: "0.3rem", alignItems: "center", minWidth: 220 }}>
+        <div style={{ flex: 1 }}>
+          <CentrePicker value={draft} onChange={setDraft} disabled={saving} placeholder="e.g. vListen" />
+        </div>
         <button
           type="button"
           className="btn btn-secondary"
@@ -93,7 +89,7 @@ export function EditableCentre({ value, canEdit, onSave }: { value: string | nul
           onClick={async () => {
             setSaving(true);
             try {
-              await onSave(draft.trim() || null);
+              await onSave(draft?.id ?? null);
               setEditing(false);
             } finally {
               setSaving(false);
@@ -111,12 +107,12 @@ export function EditableCentre({ value, canEdit, onSave }: { value: string | nul
 
   return (
     <span style={{ display: "inline-flex", gap: "0.4rem", alignItems: "center" }}>
-      {value ? <span className="tag tag-framework">{value}</span> : <span className="hint-text">{canEdit ? "—" : "Home"}</span>}
+      {centre ? <span className="tag tag-framework">{centre.name}</span> : <span className="hint-text">{canEdit ? "—" : "Home"}</span>}
       {canEdit ? (
         <button
           type="button"
           onClick={() => {
-            setDraft(value ?? "");
+            setDraft(centre);
             setEditing(true);
           }}
           style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontSize: "0.7rem", textDecoration: "underline" }}
@@ -169,10 +165,10 @@ export function GoalEvidenceDetail({ goal, canEdit, onUpdated }: { goal: Goal; c
                     <td>{e.modality.replace(/_/g, " ").toLowerCase()}</td>
                     <td>
                       <EditableCentre
-                        value={e.centreName}
+                        centre={e.centre}
                         canEdit={canEdit}
-                        onSave={async (next) => {
-                          await api.updateEvidenceCentre(token!, goal.id, e.id, next);
+                        onSave={async (centreId) => {
+                          await api.updateEvidenceCentre(token!, goal.id, e.id, centreId);
                           onUpdated();
                         }}
                       />

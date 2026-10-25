@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, type EvidenceCandidate } from "../api/client";
+import { api, ApiError, type Centre, type EvidenceCandidate } from "../api/client";
 import mark from "../brand/mark.svg";
-import { PrimaryButton, TextField } from "../onboarding/components";
+import { CentrePicker } from "../components/CentrePicker";
+import { PrimaryButton } from "../onboarding/components";
 
 // Faithful port of the admin panel's AI-assisted "Log a session" (AiAssistedLogForm.tsx +
 // LogSessionPage.tsx), minus the "Pick a goal" mode and kid-picker -- manual logging already has a
@@ -102,7 +103,7 @@ export function LogSession({
   const [reviewing, setReviewing] = useState(false);
   const [candidates, setCandidates] = useState<EvidenceCandidate[] | null>(null);
   const [approved, setApproved] = useState<Set<number>>(new Set());
-  const [centreName, setCentreName] = useState("");
+  const [centre, setCentre] = useState<Centre | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
@@ -215,7 +216,7 @@ export function LogSession({
     reRecord();
     setCandidates(null);
     setApproved(new Set());
-    setCentreName("");
+    setCentre(null);
     setError("");
   }
 
@@ -223,7 +224,7 @@ export function LogSession({
     if (!candidates) return;
     setSaving(true);
     setError("");
-    const trimmedCentre = centreName.trim() || null;
+    const centreId = centre?.id ?? null;
     let count = 0;
     try {
       for (const i of approved) {
@@ -231,7 +232,7 @@ export function LogSession({
         await api.logEvidence(token, kidId, c.goalId, {
           newItemCustomText: c.itemHint ?? undefined,
           logDate: new Date().toISOString(),
-          centreName: trimmedCentre,
+          centreId,
           outcome: c.outcome,
           supportLevel: c.supportLevel,
           modality: c.modality,
@@ -347,13 +348,8 @@ export function LogSession({
             </p>
 
             <div className="mb-4">
-              <TextField
-                id="centreName"
-                label="Centre or therapist (optional)"
-                value={centreName}
-                onChange={(e) => setCentreName(e.target.value)}
-                placeholder="e.g. Bright Steps Clinic -- leave blank for Home"
-              />
+              <span className="mb-1.5 block text-[0.95rem] font-medium text-[var(--pv-ink-soft)]">Centre or therapist (optional)</span>
+              <CentrePicker token={token} value={centre} onChange={setCentre} placeholder="e.g. Bright Steps Clinic -- leave blank for Home" />
             </div>
 
             <div className="flex flex-col gap-2.5">

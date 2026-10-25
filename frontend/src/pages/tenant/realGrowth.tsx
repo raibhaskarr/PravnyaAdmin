@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Goal, GoalItem, GoalItemEvidenceRow } from "../../api/types";
+import type { Centre, Goal, GoalItem, GoalItemEvidenceRow } from "../../api/types";
 import { formatDate, itemLabel, measurementLabel } from "./goalEvidence";
 
 // Real-data port of the POC "Growth preview" Hybrid concept (frontend/src/pages/admin/growthPreview.tsx)
@@ -24,8 +24,16 @@ function levelFor(outcome: string): number {
 
 // Exported for realActivities.tsx -- same home-vs-centre split Growth already uses, kept as one
 // definition so the two views can't silently drift on what counts as "home".
-export function environmentLabel(centreName: string | null): string {
-  return centreName ?? "Home";
+export function environmentLabel(centre: Centre | null): string {
+  return centre?.name ?? "Home";
+}
+
+// Stable grouping key, not a display string -- "home" sentinel for no centre, else the centre's
+// own id. Keying distinctness off this instead of the display name is the actual bug fix: a
+// typo'd or differently-cased re-entry of the same real clinic used to silently create two
+// distinct string groups (e.g. "vListen" vs "vlisten"); a stable id can't drift like that.
+function environmentKey(centre: Centre | null): string {
+  return centre?.id ?? "home";
 }
 
 function average(values: number[]): number {
@@ -112,7 +120,11 @@ function buildGrowthGoals(goals: Goal[]): GrowthGoalView[] {
     const sorted = allEvidenceWithItem(g);
     if (sorted.length === 0) continue;
     const glyphLevels = sorted.slice(-5).map((e) => levelFor(e.outcome));
-    const environments = [...new Set(sorted.map((e) => environmentLabel(e.centreName)))];
+    // Deduped by the stable key (see environmentKey), first-seen display label wins -- distinctness
+    // can't be fooled by a casing/typo variant of the same real centre.
+    const envLabelByKey = new Map<string, string>();
+    for (const e of sorted) envLabelByKey.set(environmentKey(e.centre), environmentLabel(e.centre));
+    const environments = [...envLabelByKey.values()];
 
     const half = Math.max(1, Math.floor(sorted.length / 2));
     const earlyAvg = average(sorted.slice(0, half).map((e) => levelFor(e.outcome)));
@@ -164,19 +176,20 @@ function buildGrowthMoments(goals: Goal[], limit = 10): GrowthMoment[] {
   for (const g of goals) {
     const sorted = allEvidenceWithItem(g).filter((e) => e.logDate);
     if (!sorted.length) continue;
-    const seenEnv = new Set<string>();
+    const seenEnvKeys = new Set<string>();
     let firstCorrectFound = false;
     for (const e of sorted) {
-      const env = environmentLabel(e.centreName);
-      const isNewEnv = !seenEnv.has(env);
-      const hadSeenAnyEnv = seenEnv.size > 0;
-      seenEnv.add(env);
+      const key = environmentKey(e.centre);
+      const label = environmentLabel(e.centre);
+      const isNewEnv = !seenEnvKeys.has(key);
+      const hadSeenAnyEnv = seenEnvKeys.size > 0;
+      seenEnvKeys.add(key);
       if (e.outcome === "CORRECT" && !firstCorrectFound) {
         firstCorrectFound = true;
         const title = e.itemName ? `Got "${e.itemName}" right for the first time` : "First independent success";
-        moments.push({ date: e.logDate!, goalTitle: g.title, title, environment: env, tag: "First independent" });
+        moments.push({ date: e.logDate!, goalTitle: g.title, title, environment: label, tag: "First independent" });
       } else if (isNewEnv && hadSeenAnyEnv) {
-        moments.push({ date: e.logDate!, goalTitle: g.title, title: `First time this showed up at ${env}`, environment: env, tag: "New setting" });
+        moments.push({ date: e.logDate!, goalTitle: g.title, title: `First time this showed up at ${label}`, environment: label, tag: "New setting" });
       }
     }
   }
@@ -307,7 +320,7 @@ function GoalDetailView({ view, kidLabel, onBack }: { view: GrowthGoalView; kidL
                         {measureLabel ? <div className="gp-history-modality">{outcomeLabel(e.outcome)}</div> : null}
                         {mLabel ? <div className="gp-history-modality">{mLabel}</div> : null}
                       </div>
-                      <span className={`gp-tag ${(e.centreName ?? "Home") === "Home" ? "gp-tag-home" : "gp-tag-clinic"}`}>{e.centreName ?? "Home"}</span>
+                      <span className={`gp-tag ${e.centre === null ? "gp-tag-home" : "gp-tag-clinic"}`}>{e.centre?.name ?? "Home"}</span>
                     </div>
                   );
                 })}

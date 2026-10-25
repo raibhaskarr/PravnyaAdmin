@@ -252,10 +252,12 @@ export type StaffCompanionMessage = {
 
 export type Modality = "VERBAL" | "MANUAL_SIGN" | "AAC" | "WRITTEN" | "GESTURAL";
 
+export type Centre = { id: string; name: string; city: string | null };
+
 export type GoalItemEvidenceRow = {
   id: string;
   logDate: string | null;
-  centreName: string | null;
+  centre: Centre | null;
   outcome: PocEvidenceOutcome;
   supportLevel: PocSupportLevel;
   modality: PocModality;
@@ -445,7 +447,7 @@ export type Goal = {
   title: string;
   status: "ACTIVE" | "ACHIEVED" | "DISCONTINUED";
   notes: string | null;
-  centreName: string | null;
+  centre: Centre | null;
   confidence: number | null;
   rationale: string | null;
   createdAt: string;

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
-import type { EvidenceCandidate } from "../../api/types";
+import { CentrePicker } from "../../components/CentrePicker";
+import type { Centre, EvidenceCandidate } from "../../api/types";
 import { OUTCOME_LABEL, measurementLabel } from "./goalEvidence";
 
 type InputMode = "text" | "photo" | "voice";
@@ -46,7 +47,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
   const [reviewing, setReviewing] = useState(false);
   const [candidates, setCandidates] = useState<EvidenceCandidate[] | null>(null);
   const [approved, setApproved] = useState<Set<number>>(new Set());
-  const [centreName, setCentreName] = useState("");
+  const [centre, setCentre] = useState<Centre | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
@@ -159,7 +160,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
     reRecord();
     setCandidates(null);
     setApproved(new Set());
-    setCentreName("");
+    setCentre(null);
     setError("");
   }
 
@@ -167,7 +168,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
     if (!candidates) return;
     setSaving(true);
     setError("");
-    const trimmedCentre = centreName.trim() || null;
+    const centreId = centre?.id ?? null;
     let count = 0;
     try {
       for (const i of approved) {
@@ -175,7 +176,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
         await api.logEvidence(token!, c.goalId, {
           newItemCustomText: c.itemHint ?? undefined,
           logDate: new Date().toISOString(),
-          centreName: trimmedCentre,
+          centreId,
           outcome: c.outcome,
           supportLevel: c.supportLevel,
           modality: c.modality,
@@ -275,7 +276,7 @@ export function AiAssistedLogForm({ kidId, onLogged }: { kidId: string; onLogged
 
           <label className="field" style={{ marginBottom: "1rem" }}>
             <span className="field-label">Centre (optional)</span>
-            <input className="input" value={centreName} onChange={(e) => setCentreName(e.target.value)} placeholder="e.g. vListen -- leave blank for Home" />
+            <CentrePicker value={centre} onChange={setCentre} placeholder="e.g. vListen -- leave blank for Home" />
           </label>
 
           {candidates.map((c, i) => {

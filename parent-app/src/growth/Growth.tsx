@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, type Goal, type GoalItem, type GoalItemEvidence } from "../api/client";
+import { api, ApiError, type Centre, type Goal, type GoalItem, type GoalItemEvidence } from "../api/client";
 import mark from "../brand/mark.svg";
 
 // Faithful port of PravnyaAdmin admin panel's realGrowth.tsx -- the "finalized" Growth design,
@@ -21,8 +21,16 @@ function levelFor(outcome: string): number {
   return OUTCOME_LEVEL[outcome] ?? 1;
 }
 
-function environmentLabel(centreName: string | null): string {
-  return centreName ?? "Home";
+function environmentLabel(centre: Centre | null): string {
+  return centre?.name ?? "Home";
+}
+
+// Stable grouping key, not a display string -- "home" sentinel for no centre, else the centre's
+// own id. Keying distinctness off this instead of the display name is the actual bug fix: a
+// typo'd or differently-cased re-entry of the same real clinic used to silently create two
+// distinct string groups (e.g. "vListen" vs "vlisten"); a stable id can't drift like that.
+function environmentKey(centre: Centre | null): string {
+  return centre?.id ?? "home";
 }
 
 function average(values: number[]): number {
@@ -143,7 +151,11 @@ export function buildGrowthGoals(goals: Goal[]): GrowthGoalView[] {
     const sorted = allEvidenceWithItem(g);
     if (sorted.length === 0) continue;
     const glyphLevels = sorted.slice(-5).map((e) => levelFor(e.outcome));
-    const environments = [...new Set(sorted.map((e) => environmentLabel(e.centreName)))];
+    // Deduped by the stable key (see environmentKey), first-seen display label wins -- distinctness
+    // can't be fooled by a casing/typo variant of the same real centre.
+    const envLabelByKey = new Map<string, string>();
+    for (const e of sorted) envLabelByKey.set(environmentKey(e.centre), environmentLabel(e.centre));
+    const environments = [...envLabelByKey.values()];
 
     const half = Math.max(1, Math.floor(sorted.length / 2));
     const earlyAvg = average(sorted.slice(0, half).map((e) => levelFor(e.outcome)));
@@ -194,19 +206,20 @@ export function buildGrowthMoments(goals: Goal[], limit = 10): GrowthMoment[] {
   for (const g of goals) {
     const sorted = allEvidenceWithItem(g).filter((e) => e.logDate);
     if (!sorted.length) continue;
-    const seenEnv = new Set<string>();
+    const seenEnvKeys = new Set<string>();
     let firstCorrectFound = false;
     for (const e of sorted) {
-      const env = environmentLabel(e.centreName);
-      const isNewEnv = !seenEnv.has(env);
-      const hadSeenAnyEnv = seenEnv.size > 0;
-      seenEnv.add(env);
+      const key = environmentKey(e.centre);
+      const label = environmentLabel(e.centre);
+      const isNewEnv = !seenEnvKeys.has(key);
+      const hadSeenAnyEnv = seenEnvKeys.size > 0;
+      seenEnvKeys.add(key);
       if (e.outcome === "CORRECT" && !firstCorrectFound) {
         firstCorrectFound = true;
         const title = e.itemName ? `Got "${e.itemName}" right for the first time` : "First independent success";
-        moments.push({ date: e.logDate!, goalTitle: g.title, title, environment: env });
+        moments.push({ date: e.logDate!, goalTitle: g.title, title, environment: label });
       } else if (isNewEnv && hadSeenAnyEnv) {
-        moments.push({ date: e.logDate!, goalTitle: g.title, title: `First time this showed up at ${env}`, environment: env });
+        moments.push({ date: e.logDate!, goalTitle: g.title, title: `First time this showed up at ${label}`, environment: label });
       }
     }
   }
@@ -286,14 +299,16 @@ function GoalRow({ goal, showEvidence, onSelect }: { goal: GrowthGoalView; showE
   );
 }
 
-function EnvTag({ centreName }: { centreName: string | null }) {
-  const isHome = (centreName ?? "Home") === "Home";
+function EnvTag({ centre }: { centre: Centre | null }) {
+  // A stable identity check, not a fragile string-equality-with-the-literal-"Home" check -- a
+  // centre actually named "Home" no longer collides with the no-centre sentinel.
+  const isHome = centre === null;
   return (
     <span
       className="flex-shrink-0 rounded-full px-2 py-0.5 text-[0.66rem] font-bold"
       style={isHome ? { background: "var(--pv-orange-100)", color: "#B5701F" } : { background: "var(--pv-blue-100)", color: "var(--pv-blue-500)" }}
     >
-      {centreName ?? "Home"}
+      {centre?.name ?? "Home"}
     </span>
   );
 }
@@ -357,7 +372,7 @@ function GoalDetailView({ view, kidName, onBack }: { view: GrowthGoalView; kidNa
                         {measureLabel ? <div className="text-[0.72rem] text-[var(--pv-ink-faint)]">{outcomeLabel(e.outcome)}</div> : null}
                         {mLabel ? <div className="text-[0.72rem] text-[var(--pv-ink-faint)]">{mLabel}</div> : null}
                       </div>
-                      <EnvTag centreName={e.centreName} />
+                      <EnvTag centre={e.centre} />
                     </div>
                   );
                 })}

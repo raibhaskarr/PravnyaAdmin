@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, type Goal } from "../api/client";
+import { api, ApiError, type Centre, type Goal } from "../api/client";
 import mark from "../brand/mark.svg";
 import { LogEvidenceForm } from "./LogEvidenceForm";
 
@@ -20,13 +20,13 @@ function formatDate(date: string | null): string {
 
 // null createdById is the one real signal available: the only way a parent-owned kid gets a goal
 // today is the IEP-accept flow, which never sets it. A goal a therapist created or edited always
-// has it set. Same "Home when null" convention as evidence's centreName, just on the other field.
+// has it set. Same "Home when null" convention as evidence's centre, just on the other field.
 function goalSourceLabel(goal: Goal): string {
   return goal.createdById ? "Added by your care team" : "From your IEP upload";
 }
 
-function evidenceSourceLabel(centreName: string | null): string {
-  return centreName ?? "Logged by you at home";
+function evidenceSourceLabel(centre: Centre | null): string {
+  return centre?.name ?? "Logged by you at home";
 }
 
 // Previous version put this mapping in plain gray prose next to the title -- indistinguishable
@@ -129,7 +129,7 @@ function GoalDetail({
                   <span className="text-xs text-[var(--pv-ink-faint)]">{formatDate(e.logDate)}</span>
                 </div>
                 <p className="text-sm text-[var(--pv-ink-soft)]">{OUTCOME_LABEL[e.outcome] ?? e.outcome}</p>
-                <p className="mt-0.5 text-xs text-[var(--pv-ink-faint)]">{evidenceSourceLabel(e.centreName)}</p>
+                <p className="mt-0.5 text-xs text-[var(--pv-ink-faint)]">{evidenceSourceLabel(e.centre)}</p>
               </li>
             ))}
           </ul>
