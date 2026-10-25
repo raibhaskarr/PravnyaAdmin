@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile } from "../api/client";
+import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile, type ScheduleSlot } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
@@ -8,6 +8,7 @@ import { LogSession } from "../log/LogSession";
 import { Profile } from "../profile/Profile";
 import { buildFeed, FeedCard } from "./feed";
 import { computeNudge, NudgeCard } from "./nudges";
+import { computeOpener, OpenerCard } from "./opener";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
 type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile";
@@ -124,6 +125,9 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // Drives the feed below -- same Goal[] shape Growth/Goals/Activities each already fetch
   // independently; Home needs its own copy since it renders a digest of all three at once.
   const [goals, setGoals] = useState<Goal[] | null>(null);
+  // Drives the schedule-aware opener below -- same ScheduleSlot[] shape Profile.tsx already
+  // fetches independently.
+  const [schedule, setSchedule] = useState<ScheduleSlot[] | null>(null);
   // The real conversation thread, separate from the digest feed above -- persisted server-side
   // (companion.service.ts), fetched fresh whenever the kid changes.
   const [thread, setThread] = useState<CompanionMessage[]>([]);
@@ -160,15 +164,17 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   useEffect(() => {
     if (!kid) return;
     setGoals(null);
+    setSchedule(null);
     void api.listGoals(token, kid.id).then(setGoals).catch(() => setGoals([]));
     void api.listCompanionMessages(token, kid.id).then(setThread).catch(() => setThread([]));
+    void api.listSchedule(token, kid.id).then(setSchedule).catch(() => setSchedule([]));
   }, [token, kid?.id]);
 
   // useLayoutEffect (not useEffect) -- runs before paint, so the content never visibly flashes at
   // the top before jumping down. Keyed on whatever can change the scrollable content's height.
   useLayoutEffect(() => {
     mainRef.current?.scrollTo({ top: mainRef.current.scrollHeight });
-  }, [thread.length, goals, view]);
+  }, [thread.length, goals, schedule, view]);
 
   if (error) {
     return (
@@ -195,6 +201,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     if (kid) {
       void api.listGoals(token, kid.id).then(setGoals).catch(() => {});
       void api.listCompanionMessages(token, kid.id).then(setThread).catch(() => {});
+      void api.listSchedule(token, kid.id).then(setSchedule).catch(() => {});
     }
   }
 
@@ -263,6 +270,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // reload brings the nudge back; this is a real, known limitation, not an oversight.
   const activeNudge = kid && !dismissed.has(kid.id + computeNudge(kid)) ? computeNudge(kid) : null;
   const feed = goals ? buildFeed(goals) : [];
+  const opener = kid && goals && schedule ? computeOpener(kid.id, goals, schedule) : null;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--pv-bg)] md:flex-row">
@@ -347,6 +355,19 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           {thread.map((message) => (
             <ThreadMessage key={message.id} message={message} />
           ))}
+
+          {opener && kid ? (
+            <OpenerCard
+              opener={opener}
+              kidId={kid.id}
+              kidName={kidName}
+              onSeeGrowth={() => setView("growth")}
+              onLogIt={(seedText) => {
+                setPendingLogText(seedText);
+                setView("logSession");
+              }}
+            />
+          ) : null}
         </main>
 
         <footer className="border-t border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
