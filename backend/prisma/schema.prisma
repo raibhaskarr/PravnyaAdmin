@@ -303,6 +303,7 @@ model Therapist {
   /// "what this tenant has them doing" and may be a narrower subset.
   qualifiedDisciplineIds String[] @default([])
   kids          KidTherapist[]
+  scheduleSlots ScheduleSlot[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -337,6 +338,7 @@ model Kid {
   goals      Goal[]
   therapistInvitations TherapistInvitation[]
   companionMessages    CompanionMessage[]
+  scheduleSlots        ScheduleSlot[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -777,4 +779,28 @@ model CompanionMessage {
 enum CompanionMessageRole {
   PARENT
   ASSISTANT
+}
+
+/// A recurring weekly therapy slot, parent-managed (parent-schedule module) -- "Speech Therapy,
+/// every Tuesday 4pm", not a dated calendar appointment. therapistId is optional: a parent may
+/// want to note a slot before that therapist is actually linked via Care Team yet.
+model ScheduleSlot {
+  id    String @id @default(uuid()) @db.Uuid
+  kidId String @db.Uuid
+  kid   Kid    @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  /// Same fixed set as onboarding's ChildTherapies step (nudges.tsx/ChildTherapies.tsx's own
+  /// THERAPIES array) -- reused rather than a second, divergent taxonomy or an unstructured field.
+  label String
+  /// Same string convention as Kid.selfReportedScheduleDays ("Mon".."Sun") -- the one other place
+  /// a day-of-week is already represented in this schema.
+  dayOfWeek String
+  /// Plain "HH:MM" (24-hour) -- a label for a recurring slot, never used to compute or trigger
+  /// anything time-zone-sensitive in this pass, so there's nothing a real time type would buy.
+  startTime String
+  therapistId String?    @db.Uuid
+  therapist   Therapist? @relation(fields: [therapistId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kidId])
 }

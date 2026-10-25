@@ -28,6 +28,7 @@ import { parentIepRoutes } from "./modules/parent-iep/parentIep.routes";
 import { parentGoalsRoutes } from "./modules/parent-goals/parentGoals.routes";
 import { companionRoutes } from "./modules/companion/companion.routes";
 import { parentTherapistInvitationsRoutes } from "./modules/parent-therapist-invitations/parentTherapistInvitations.routes";
+import { parentScheduleRoutes } from "./modules/parent-schedule/parentSchedule.routes";
 
 export function createApp() {
   const app = express();
@@ -83,6 +84,7 @@ export function createApp() {
   app.use("/api/parent-kids", parentGoalsRoutes);
   app.use("/api/parent-kids", companionRoutes);
   app.use("/api/parent-kids", parentTherapistInvitationsRoutes);
+  app.use("/api/parent-kids", parentScheduleRoutes);
 
   app.use(errorMiddleware);
 

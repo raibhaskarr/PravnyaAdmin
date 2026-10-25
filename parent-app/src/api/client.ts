@@ -158,6 +158,27 @@ export type InviteTherapistResponse =
   | { linked: true; therapist: LinkedTherapist }
   | { linked: false; invitation: TherapistInvitationSummary; inviteUrl?: string };
 
+// Same fixed sets as onboarding's ChildTherapies/ChildSchedule steps -- kept in sync by hand, same
+// convention as the backend's own parentSchedule.schemas.ts duplicating-not-importing the admin's
+// equivalent lists.
+export const SCHEDULE_LABELS = ["Speech therapy", "ABA", "Occupational therapy", "Physiotherapy", "Special education", "Other"] as const;
+export const SCHEDULE_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+export type ScheduleSlot = {
+  id: string;
+  label: string;
+  dayOfWeek: string;
+  startTime: string;
+  therapist: { id: string; name: string } | null;
+};
+
+export type CreateScheduleSlotInput = {
+  label: string;
+  dayOfWeek: string;
+  startTime: string;
+  therapistId?: string;
+};
+
 export const api = {
   sendVerificationCode(email: string) {
     return request<{ sent: boolean }>("/parent-auth/send-verification-code", { method: "POST", body: { email } });
@@ -240,5 +261,14 @@ export const api = {
       method: "POST",
       body: { email }
     });
+  },
+  listSchedule(token: string, kidId: string) {
+    return request<ScheduleSlot[]>(`/parent-kids/${kidId}/schedule`, { token });
+  },
+  createScheduleSlot(token: string, kidId: string, input: CreateScheduleSlotInput) {
+    return request<ScheduleSlot>(`/parent-kids/${kidId}/schedule`, { token, method: "POST", body: input });
+  },
+  deleteScheduleSlot(token: string, kidId: string, slotId: string) {
+    return request<void>(`/parent-kids/${kidId}/schedule/${slotId}`, { token, method: "DELETE" });
   }
 };
