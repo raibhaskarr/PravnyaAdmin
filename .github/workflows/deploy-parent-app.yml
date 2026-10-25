@@ -1,0 +1,40 @@
+name: Deploy Parent App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "parent-app/**"
+      - ".github/workflows/deploy-parent-app.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Build parent-app
+        working-directory: parent-app
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_API_BASE_URL: ""
+
+      - name: Package deploy artifact
+        run: tar czf /tmp/parent-app-deploy.tar.gz -C parent-app/dist .
+
+      - name: Upload artifact and run deploy script
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          scp -i ~/.ssh/deploy_key /tmp/parent-app-deploy.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/parent-app-deploy.tar.gz"
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/apps/deploy-parent-app.sh"

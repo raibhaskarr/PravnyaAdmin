@@ -54,3 +54,18 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+
+  parent-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: parent-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+          cache-dependency-path: parent-app/package-lock.json
+      - run: npm ci
+      - run: npx tsc -b
