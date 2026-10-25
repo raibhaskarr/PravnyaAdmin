@@ -57,16 +57,24 @@ reference where it came from would be backwards: most of these centres will neve
 the goal/session data shouldn't be blocked on an administrative step a parent or guest therapist
 has no ability to complete.
 
-So `Goal.centreName` / `GoalItemEvidence.centreName` are plain free text, not a foreign key to
-`Tenant` — see `02-definitions.md`'s **Centre** entry. The tradeoff: no autocomplete, no
-deduplication ("vListen" vs "V-Listen" are different strings), no way to query "every goal from
-this centre" as a join. Revisit if that friction becomes real — the natural fix is a lightweight
-`Centre` directory table (name, maybe city) that `Tenant` optionally references when a centre
-*does* subscribe, so promoting a centre to a tenant is attaching a `Tenant` row to an existing
-`Centre`, not migrating data — every kid/goal/evidence already pointing at that `Centre` keeps
-working unchanged. Not built yet because the free-text version already unblocks the real need
-(showing and correcting which clinic something came from) at a fraction of the schema/migration
-cost, and it's not yet clear the autocomplete/dedup/reporting value is worth that cost.
+`Centre` is a real, independent directory entity for exactly this (`name`, optional `city`) —
+`Goal.centreId` / `GoalItemEvidence.centreId` reference it, and `Tenant.centreId` optionally
+references it back, so promoting a centre to a tenant is attaching a `Tenant` row to an existing
+`Centre`, not migrating data: every kid/goal/evidence already pointing at that `Centre` keeps
+working unchanged. See `02-definitions.md`'s **Centre** entry.
+
+This replaced an earlier, deliberately simpler design: `Goal.centreName` / `GoalItemEvidence.centreName`
+as plain free text, no entity at all. That version shipped first because it unblocked the real need
+(showing and correcting which clinic something came from) at a fraction of the schema cost, with an
+explicitly named tradeoff — no dedup, no reporting join, a typo or casing variant ("vListen" vs
+"vlisten") silently creating two different strings. The free-text columns still exist on both
+tables (deprecated, no longer written by new requests) rather than being dropped in the same pass
+that added `Centre` — a backfill matched every existing value to a real `Centre` row first
+(case-insensitively grouped; verified against production, only 4 real centres existed, one casing
+duplicate, correctly merged into one row). The old fragmentation risk wasn't just theoretical: the
+parent-facing Growth view grouped a kid's "environments" by exact `centreName` string equality, so
+the same typo/casing drift could silently split one real clinic into two in a parent's own view of
+their kid's progress — resolved by keying that grouping off the stable `centreId` instead.
 
 See `06-parent-kid-onboarding-spec.md` for a draft proposal (not yet built) that adds a household
 identity (`Parent`) on top of this — a kid still belongs to exactly one tenant, unchanged; a

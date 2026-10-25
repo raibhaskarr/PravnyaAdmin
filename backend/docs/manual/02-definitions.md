@@ -64,12 +64,13 @@ a centre they separately attend). Deliberately free and unlimited today, indepen
 side's subscription — see `03-business-logic.md` for the billing question this raises and why it's
 intentionally deferred rather than solved now.
 
-**Centre** (`Goal.centreName` / `GoalItemEvidence.centreName`) — free text naming which
-clinic/organization a goal or logged session actually came from. Deliberately *not* a reference to
-`Tenant` — the centre a document or session came from doesn't need to be a registered tenant at
-all (e.g. a clinic that's never signed up), and even when it happens to share a name with a real
-tenant, that's coincidental, not a link. See `03-business-logic.md` for why this stayed free text
-instead of becoming its own entity.
+**Centre** (`Centre` model, referenced by `Goal.centreId` / `GoalItemEvidence.centreId`) — a real
+directory entity naming which clinic/organization a goal or logged session actually came from.
+Deliberately independent of `Tenant` — existing in this directory never requires being a paying
+platform customer (e.g. a clinic that's never signed up). `Tenant.centreId` optionally links a
+Tenant back to its own Centre row when/if that clinic does subscribe — "a Tenant is just a Centre
+that happens to subscribe." See `03-business-logic.md` for the full rationale and this entity's
+history (it replaced an earlier free-text-only version).
 
 **Goal** — a specific clinical target for one kid: which Canonical Skill, which Discipline, which
 Modality, plus the therapist's own free-text title (the actual wording they'd use, e.g. copied
