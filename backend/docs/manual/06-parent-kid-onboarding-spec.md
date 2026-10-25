@@ -123,6 +123,58 @@ does not change" above. If they later add a real centre, that's a guest-therapis
 (`KidTherapist`), same mechanism as any cross-tenant guest therapist -- the kid's home tenant never
 changes.
 
+## Update: Companion AI, Care Team, and the weekly Schedule have shipped
+
+Three more parent-facing pieces have shipped since the update above, all in the same
+`parent-app/` frontend, all following the same pattern as parent-auth: a parent-side module that
+hand-duplicates (never imports) the admin-side schema/logic it mirrors, so the two sides can evolve
+independently. None of these required any change to `Kid.tenantId` ownership.
+
+**Companion AI** (`backend/src/modules/companion/`) — a real chat on the parent app's Home screen,
+not just another digest card. A parent types a question or a log, and `companion.service.ts` asks
+the shared AI platform (see `04-ai-platform.md`) to classify intent first: a logging message routes
+into the existing log-a-session flow, anything else gets a real model-generated reply. This is
+explicitly scoped broader than the kid's own logged data — general parenting/therapy questions are
+in scope too, which is why `companion.service.ts`'s system prompt is the first genuinely explicit
+safety boundary in this codebase (never diagnose, never discuss medication, never make a
+safety-critical judgment call — redirect to the kid's own therapist instead). Every message,
+parent and assistant, persists to a new `CompanionMessage` table, scoped by `kidId`.
+
+Separately, Home also has a deterministic, non-AI "opener" (`parent-app/src/home/opener.tsx`) that
+proactively surfaces a new growth milestone or a same-day schedule slot as if Pravnya spoke first —
+not a model call, just a templated message, same spirit as the existing onboarding nudge. It's
+client-side only: "already shown" lives in local storage per kid, not synced across devices, a
+deliberate scope cut to avoid the backend work of detecting-and-persisting a trigger server-side.
+
+**Care Team** (`backend/src/modules/parent-therapist-invitations/`) — a parent can invite a
+therapist onto their kid's support team directly from the parent app, mirroring the admin side's own
+`therapistInvitationsService.inviteForKid` closely: an email that already belongs to a `Therapist`
+anywhere gets linked immediately (no invite), a brand-new email gets a real invite. The one real
+difference is where a new invitee lands — a parent has no tenant of their own, so `TherapistInvitation.invitedByParentId`
+(new, nullable, alongside the existing `invitedById`) is set instead, and the new therapist joins
+`RETAIL_TENANT_ID` on acceptance rather than "the inviting admin's own tenant." Full lifecycle now
+exists: revoke (pending only, same 409-if-already-acted-on rule the admin side's own revoke uses),
+resend (pending *or* expired — deliberately revives a lapsed invite rather than leaving it a dead
+end), and unlink (remove an already-linked therapist from the kid's care team).
+
+**Weekly Schedule** (`backend/src/modules/parent-schedule/`) — resolves the "Weekly schedule — not
+addressed at all yet" item below. Recurring weekly slots ("Speech therapy, every Tuesday 4pm"), not
+dated calendar appointments, via a new `ScheduleSlot` model (`kidId`, `label`, `dayOfWeek` as
+`"Mon".."Sun"` text — same convention `Kid.selfReportedScheduleDays` already used — plain `"HH:MM"`
+`startTime`, optional `therapistId`). Parent-managed only; a slot's `therapistId` must already be a
+real Care Team link (`KidTherapist`), checked server-side, not just any `Therapist` id. Two gaps from
+the first pass were closed in a follow-up: editing a slot was originally delete-and-recreate (now a
+real full-replace `PATCH`), and nothing stopped two slots at the same day+time for the same kid
+(now a same-kid/day/time clash check, 409, shared by create and edit).
+
+**Admin-side read visibility** — until now, staff had zero visibility into either of the two
+features above even though the data sits in the same database their own admin panel already reads
+from. The Kid detail page (`admin.pravnya.com`) now has two read-only tabs, Schedule and Companion,
+reusing the exact same `assertCanAccessKid`/`kidVisibilityFilter` access control every other
+kid-scoped read (Goals, Kids) already uses — Tenant Admin/Viewer see any kid in their tenant,
+Therapist only kids they're linked to via `KidTherapist`. Staff can see what a parent scheduled and
+asked Pravnya; they can't create, edit, or reply from this view.
+
 ## Deferred — parent-facing app (original scope cut, see update above)
 
 - ~~**Parent login** — no `passwordHash`, no JWT issuance, no invite-acceptance flow for parents.~~
@@ -135,7 +187,7 @@ changes.
 
 ## Open items not decided by this spec
 
-- Weekly schedule — not addressed at all yet. `PranTrackingSystem`'s `WeeklyScheduleEntry` is the
-  closest analog, but nothing here proposes an equivalent for PravnyaAdmin.
+- ~~Weekly schedule — not addressed at all yet.~~ Shipped — see "Update: Companion AI, Care Team,
+  and the weekly Schedule have shipped" above.
 - What a Tenant Admin sees/can do when the email lookup in sub-case 2 above finds an existing
   household (full reuse vs. a lighter "this email is already registered, contact support" path).
