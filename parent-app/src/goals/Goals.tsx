@@ -142,11 +142,13 @@ function GoalDetail({
 export function Goals({
   token,
   kidId,
-  onBack
+  onBack,
+  onUploadIep
 }: {
   token: string;
   kidId: string;
   onBack: () => void;
+  onUploadIep: () => void;
 }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [error, setError] = useState("");
@@ -173,7 +175,12 @@ export function Goals({
             <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <p className="text-[1.05rem] font-semibold text-[var(--pv-ink)]">Goals</p>
+        <p className="flex-1 text-[1.05rem] font-semibold text-[var(--pv-ink)]">Goals</p>
+        {!selected ? (
+          <button type="button" onClick={onUploadIep} className="text-[0.88rem] font-semibold text-[var(--pv-green-700)]">
+            Upload IEP
+          </button>
+        ) : null}
       </header>
 
       <main className="mx-auto w-full min-h-0 max-w-2xl flex-1 overflow-y-auto px-5 py-6">

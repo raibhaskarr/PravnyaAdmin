@@ -3,6 +3,7 @@ import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile, ty
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
+import { IepUpload } from "../goals/IepUpload";
 import { Growth } from "../growth/Growth";
 import { LogSession } from "../log/LogSession";
 import { Profile } from "../profile/Profile";
@@ -11,7 +12,7 @@ import { computeNudge, NudgeCard } from "./nudges";
 import { computeOpener, OpenerCard } from "./opener";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile";
+type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
@@ -235,7 +236,11 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // being their own App-level phases -- simpler than nesting it inside Home's shell and ending up
   // with two headers, and a parent can still get back to Home with one tap either way.
   if (view === "goals" && kid) {
-    return <Goals token={token} kidId={kid.id} onBack={backToHome} />;
+    return <Goals token={token} kidId={kid.id} onBack={backToHome} onUploadIep={() => setView("iepUpload")} />;
+  }
+
+  if (view === "iepUpload" && kid) {
+    return <IepUpload token={token} kidId={kid.id} kidName={kidName} onBack={backToHome} />;
   }
 
   if (view === "growth" && kid) {

@@ -210,7 +210,7 @@ export const api = {
     );
   },
   extractIep(token: string, kidId: string, source: IepSource) {
-    return request<{ statusUpdates: unknown[]; newGoals: IepGoalCandidate[] } | { error: string }>(`/parent-kids/${kidId}/iep/extract`, {
+    return request<{ statusUpdates: EvidenceCandidate[]; newGoals: IepGoalCandidate[] } | { error: string }>(`/parent-kids/${kidId}/iep/extract`, {
       token,
       method: "POST",
       body: { source }
