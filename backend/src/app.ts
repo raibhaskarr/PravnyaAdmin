@@ -3,6 +3,7 @@ import express from "express";
 import helmet from "helmet";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
+import { testOutbox } from "./modules/therapist-invitations/invitationEmail.service";
 import { errorMiddleware } from "./common/errors/errorMiddleware";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { tenantsRoutes } from "./modules/tenants/tenants.routes";
@@ -93,6 +94,15 @@ export function createApp() {
   app.use("/api/parent-kids", companionRoutes);
   app.use("/api/parent-kids", parentTherapistInvitationsRoutes);
   app.use("/api/parent-kids", parentScheduleRoutes);
+
+  // Test-only: lets E2E tests (a separate process) read emails the memory provider captured, e.g.
+  // a parent's sign-up verification code. Never registered outside NODE_ENV=test.
+  if (env.NODE_ENV === "test" && env.EMAIL_PROVIDER === "memory") {
+    app.get("/api/__test__/outbox", (req, res) => {
+      const to = typeof req.query.to === "string" ? req.query.to.toLowerCase() : null;
+      res.json(to ? testOutbox.filter((m) => m.to.toLowerCase() === to) : testOutbox);
+    });
+  }
 
   app.use(errorMiddleware);
 

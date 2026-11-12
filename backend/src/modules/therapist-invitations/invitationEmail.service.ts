@@ -11,7 +11,7 @@ import { env } from "../../config/env";
 // bottom are per-invite-type.
 
 export type EmailSendInput = { to: string; subject: string; text: string; html?: string };
-export type EmailSendResult = { sent: boolean; provider: "log" | "smtp" };
+export type EmailSendResult = { sent: boolean; provider: "log" | "smtp" | "memory" };
 
 export interface EmailProvider {
   send(input: EmailSendInput): Promise<EmailSendResult>;
@@ -79,7 +79,27 @@ class SmtpEmailProvider implements EmailProvider {
   }
 }
 
+export type OutboxEmail = EmailSendInput & { sentAt: string };
+
+// Test-only outbox for EMAIL_PROVIDER=memory. Integration tests read it directly; E2E tests (a
+// separate process) read it through the NODE_ENV=test-only /api/__test__/outbox route in app.ts.
+export const testOutbox: OutboxEmail[] = [];
+
+class MemoryEmailProvider implements EmailProvider {
+  async send(input: EmailSendInput): Promise<EmailSendResult> {
+    testOutbox.push({ ...input, sentAt: new Date().toISOString() });
+    return { sent: true, provider: "memory" };
+  }
+}
+
 function createEmailProvider(): EmailProvider {
+  if (env.EMAIL_PROVIDER === "memory") {
+    if (env.NODE_ENV === "production") {
+      console.error("EMAIL_PROVIDER=memory is test-only and is ignored in production -- falling back to logging.");
+      return new LoggingEmailProvider();
+    }
+    return new MemoryEmailProvider();
+  }
   if (env.EMAIL_PROVIDER === "smtp") {
     if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
       console.error("EMAIL_PROVIDER=smtp but SMTP_HOST/SMTP_USER/SMTP_PASS are not set -- falling back to logging.");

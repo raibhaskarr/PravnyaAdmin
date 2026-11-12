@@ -1,7 +1,10 @@
 import dotenv from "dotenv";
 import { z } from "zod";
 
-dotenv.config();
+// Tests get their whole config from the environment (backend/.env.test locally, workflow env in
+// CI) -- never from backend/.env, so a developer's real API keys, tenant ids or database can't
+// leak into a test run.
+if (process.env.NODE_ENV !== "test") dotenv.config();
 
 // z.coerce.boolean() coerces "false" -> true (truthy string). This preprocessor
 // treats "false"/"0"/"no"/"off"/"" as false and any other string as true.
@@ -29,7 +32,9 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   // Optional: therapist invitation emails degrade to logging the message server-side (dev-visible,
   // content-free in production) when unconfigured -- see modules/therapist-invitations/invitationEmail.service.ts.
-  EMAIL_PROVIDER: z.enum(["log", "smtp"]).default("log"),
+  // "memory" is test-only: emails are kept in an in-process outbox (testOutbox) instead of sent,
+  // so automated tests can read verification codes and invite links. Refused in production.
+  EMAIL_PROVIDER: z.enum(["log", "smtp", "memory"]).default("log"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_SECURE: boolFromEnv.default(false),
