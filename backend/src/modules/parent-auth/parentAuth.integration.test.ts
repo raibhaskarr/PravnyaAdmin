@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { after, beforeEach, describe, test } from "node:test";
 import { prisma } from "../../config/prisma";
 import { testOutbox } from "../therapist-invitations/invitationEmail.service";
-import { makeTenant, makeUser } from "../../test/factories";
+import jwt from "jsonwebtoken";
+import { env } from "../../config/env";
+import { signParentToken } from "../../common/middleware/parentAuth";
+import { makeKid, makeParent, makeTenant, makeUser, TEST_PASSWORD } from "../../test/factories";
 import { disconnectDb, resetDb } from "../../test/db";
 import { api, bearer } from "../../test/http";
 
@@ -122,4 +125,153 @@ describe("parent sign-up, login and password reset", () => {
     const { token: staffToken } = await makeUser("TENANT_ADMIN", tenant.id);
     assert.equal((await api().get("/api/parent-auth/me").set(bearer(staffToken))).status, 401);
   });
+});
+
+// Gaps not covered above: request validation, the "claim a staff-created parent record" register
+// branch, reset/login edge cases, the /me response shape and token edge cases.
+describe("parent auth: validation and edge cases", () => {
+  beforeEach(resetDb);
+  after(disconnectDb);
+
+  test("send-verification-code: 400 for a missing/invalid email, nothing sent; email is lower-cased", async () => {
+    assert.equal((await api().post("/api/parent-auth/send-verification-code").send({})).status, 400);
+    assert.equal((await api().post("/api/parent-auth/send-verification-code").send({ email: "nope" })).status, 400);
+    assert.equal(testOutbox.length, 0);
+    const res = await api().post("/api/parent-auth/send-verification-code").send({ email: "Mixed.Case@Test.Local" });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { sent: true });
+    assert.equal(testOutbox[0].to, "mixed.case@test.local");
+    assert.ok(await prisma.parentVerificationCode.findUnique({ where: { email: "mixed.case@test.local" } }));
+  });
+
+  test("register: response shape; 400 for short password, missing name, malformed code; nothing created", async () => {
+    const code = await requestCode();
+    for (const overrides of [{ password: "short" }, { name: "" }, { verificationCode: "123" }, { email: "not-an-email" }]) {
+      const res = await register(code, overrides);
+      assert.equal(res.status, 400, JSON.stringify(overrides));
+    }
+    assert.equal(await prisma.parent.count(), 0);
+    const ok = await register(code);
+    assert.equal(ok.status, 201);
+    assert.deepEqual(Object.keys(ok.body).sort(), ["parent", "token"]);
+    assert.deepEqual(Object.keys(ok.body.parent).sort(), ["email", "id", "name"]);
+    assert.equal(ok.body.parent.name, "New Parent");
+    assert.ok(!JSON.stringify(ok.body).includes("passwordHash"));
+  });
+
+  test("register without ever requesting a code -> 400", async () => {
+    const res = await register("123456");
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, "INVALID_CODE");
+  });
+
+  test("register claims a staff-created parent record (no password yet) and keeps its kids", async () => {
+    const tenant = await makeTenant();
+    const existing = await prisma.parent.create({ data: { email: EMAIL } });
+    const kid = await makeKid(tenant.id, existing.id, { firstName: "Alex" });
+    const res = await register(await requestCode());
+    assert.equal(res.status, 201);
+    assert.equal(res.body.parent.id, existing.id);
+    assert.equal(await prisma.parent.count(), 1);
+    const row = await prisma.parent.findUniqueOrThrow({ where: { id: existing.id } });
+    assert.ok(row.emailVerifiedAt);
+    assert.equal(row.displayName, "New Parent");
+    const me = await api().get("/api/parent-auth/me").set(bearer(res.body.token));
+    assert.deepEqual(me.body.kids.map((k: { id: string }) => k.id), [kid.id]);
+  });
+
+  test("login: a staff-created parent with no password gets the generic 401; 400 for a malformed body", async () => {
+    await prisma.parent.create({ data: { email: EMAIL } });
+    const res = await api().post("/api/parent-auth/login").send({ email: EMAIL, password: PASSWORD });
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error.code, "INVALID_CREDENTIALS");
+    assert.equal((await api().post("/api/parent-auth/login").send({ email: EMAIL })).status, 400);
+    assert.equal((await api().post("/api/parent-auth/login").send({ email: "nope", password: "x" })).status, 400);
+    assert.equal((await api().post("/api/parent-auth/login").send({ email: EMAIL, password: "" })).status, 400);
+  });
+
+  test("login response shape", async () => {
+    const { parent } = await makeParent({ name: "Shape Parent" });
+    const res = await api().post("/api/parent-auth/login").send({ email: parent.email, password: TEST_PASSWORD });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.parent, { id: parent.id, email: parent.email, name: "Shape Parent" });
+    assert.ok(res.body.token);
+  });
+
+  test("reset-password: no account / passwordless account -> 404 NO_ACCOUNT", async () => {
+    const res = await api()
+      .post("/api/parent-auth/reset-password")
+      .send({ email: EMAIL, verificationCode: await requestCode(), newPassword: "Brand-new-pass-789" });
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error.code, "NO_ACCOUNT");
+    await prisma.parent.create({ data: { email: EMAIL } });
+    const passwordless = await api()
+      .post("/api/parent-auth/reset-password")
+      .send({ email: EMAIL, verificationCode: await requestCode(), newPassword: "Brand-new-pass-789" });
+    assert.equal(passwordless.status, 404);
+    assert.equal((await prisma.parent.findUniqueOrThrow({ where: { email: EMAIL } })).passwordHash, null);
+  });
+
+  test("reset-password: wrong code -> 400 and the password is unchanged; malformed body -> 400", async () => {
+    assert.equal((await register(await requestCode())).status, 201);
+    const code = await requestCode();
+    const wrong = code === "000000" ? "111111" : "000000";
+    const res = await api().post("/api/parent-auth/reset-password").send({ email: EMAIL, verificationCode: wrong, newPassword: "Brand-new-pass-789" });
+    assert.equal(res.status, 400);
+    assert.equal((await api().post("/api/parent-auth/login").send({ email: EMAIL, password: PASSWORD })).status, 200);
+    const short = await api().post("/api/parent-auth/reset-password").send({ email: EMAIL, verificationCode: code, newPassword: "short" });
+    assert.equal(short.status, 400);
+  });
+
+  test("reset-password returns a working token and the parent's public shape", async () => {
+    assert.equal((await register(await requestCode())).status, 201);
+    const res = await api()
+      .post("/api/parent-auth/reset-password")
+      .send({ email: EMAIL.toUpperCase(), verificationCode: await requestCode(), newPassword: "Brand-new-pass-789" });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.parent.email, EMAIL);
+    assert.equal((await api().get("/api/parent-auth/me").set(bearer(res.body.token))).status, 200);
+  });
+
+  test("/me returns id/email/name and each kid's onboarding fields", async () => {
+    const tenant = await makeTenant();
+    const { parent, token } = await makeParent({ name: "Me Parent" });
+    const kid = await makeKid(tenant.id, parent.id, { firstName: "Alex" });
+    await prisma.kid.update({ where: { id: kid.id }, data: { selfReportedTherapies: ["ABA"], selfReportedScheduleDays: ["Mon"] } });
+    const res = await api().get("/api/parent-auth/me").set(bearer(token));
+    assert.equal(res.status, 200);
+    assert.equal(res.body.id, parent.id);
+    assert.equal(res.body.name, "Me Parent");
+    assert.equal(res.body.passwordHash, undefined);
+    assert.deepEqual(Object.keys(res.body.kids[0]).sort(), [
+      "dob",
+      "firstName",
+      "gender",
+      "id",
+      "lastName",
+      "selfReportedScheduleDays",
+      "selfReportedTherapies"
+    ]);
+    assert.deepEqual(res.body.kids[0].selfReportedTherapies, ["ABA"]);
+  });
+
+  test("/me rejects an expired parent token and one signed with the wrong secret", async () => {
+    const { parent } = await makeParent();
+    const expired = jwt.sign({ id: parent.id, kind: "parent", exp: Math.floor(Date.now() / 1000) - 60 }, env.JWT_SECRET);
+    assert.equal((await api().get("/api/parent-auth/me").set(bearer(expired))).status, 401);
+    const forged = jwt.sign({ id: parent.id, kind: "parent" }, "some-other-secret-that-is-long-enough");
+    assert.equal((await api().get("/api/parent-auth/me").set(bearer(forged))).status, 401);
+    const noId = jwt.sign({ kind: "parent" }, env.JWT_SECRET);
+    assert.equal((await api().get("/api/parent-auth/me").set(bearer(noId))).status, 401);
+    assert.equal((await api().get("/api/parent-auth/me").set({ Authorization: signParentToken(parent.id) })).status, 401, "missing Bearer prefix");
+  });
+
+  test(
+    "/me with a valid token for a parent that no longer exists -> 401/404, not 500",
+    { todo: "BUG: me() uses findUniqueOrThrow; the Prisma NotFoundError surfaces as a 500" },
+    async () => {
+      const res = await api().get("/api/parent-auth/me").set(bearer(signParentToken("00000000-0000-4000-8000-0000000000ff")));
+      assert.ok(res.status === 401 || res.status === 404, `got ${res.status} ${JSON.stringify(res.body)}`);
+    }
+  );
 });
