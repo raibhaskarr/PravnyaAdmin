@@ -39,9 +39,12 @@ describe("loading and session", () => {
     renderHome();
     expect(await screen.findByText("Sam")).toBeInTheDocument();
     expect(mockApi.me).toHaveBeenCalledWith("tok");
-    expect(mockApi.listGoals).toHaveBeenCalledWith("tok", "kid-1");
-    expect(mockApi.listCompanionMessages).toHaveBeenCalledWith("tok", "kid-1");
-    expect(mockApi.listSchedule).toHaveBeenCalledWith("tok", "kid-1");
+    // The kid's data loads in an effect after the profile renders -- wait for it, don't race it.
+    await waitFor(() => {
+      expect(mockApi.listGoals).toHaveBeenCalledWith("tok", "kid-1");
+      expect(mockApi.listCompanionMessages).toHaveBeenCalledWith("tok", "kid-1");
+      expect(mockApi.listSchedule).toHaveBeenCalledWith("tok", "kid-1");
+    });
     expect(screen.getByText("Signed in as Test Parent")).toBeInTheDocument();
   });
 
