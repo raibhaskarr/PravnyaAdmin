@@ -30,9 +30,13 @@ function TabIcon({ tab }: { tab: (typeof TABS)[number] }) {
   );
 }
 
-function NavLabel({ tab }: { tab: (typeof TABS)[number] }) {
+function NavLabel({ tab, active }: { tab: (typeof TABS)[number]; active: boolean }) {
   return (
-    <span className={`text-xs font-medium ${tab.enabled ? "text-[var(--pv-green-900)]" : "text-[var(--pv-ink-faint)]"}`}>
+    <span
+      className={`text-xs ${
+        active ? "font-semibold text-[var(--pv-green-700)]" : tab.enabled ? "font-medium text-[var(--pv-ink-soft)]" : "font-medium text-[var(--pv-ink-faint)]"
+      }`}
+    >
       {tab.label}
       {!tab.enabled ? " · Soon" : ""}
     </span>
@@ -232,23 +236,13 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     }
   }
 
-  // Goals is its own full screen (own header/back button), same pattern as Login/ForgotPassword
-  // being their own App-level phases -- simpler than nesting it inside Home's shell and ending up
-  // with two headers, and a parent can still get back to Home with one tap either way.
-  if (view === "goals" && kid) {
-    return <Goals token={token} kidId={kid.id} onBack={backToHome} onUploadIep={() => setView("iepUpload")} />;
-  }
-
+  // IEP upload and Log session are one-off tasks with a clear end, so they still take over the
+  // whole screen with their own Back button. Growth/Activities/Goals/Profile are top-level tabs and
+  // render inside the shell below instead, so the bottom tab bar (left rail on wide screens) stays
+  // visible on every tab -- no dead-end screens that need Back to get anywhere else.
   if (view === "iepUpload" && kid) {
-    return <IepUpload token={token} kidId={kid.id} kidName={kidName} onBack={backToHome} />;
-  }
-
-  if (view === "growth" && kid) {
-    return <Growth token={token} kidId={kid.id} kidName={kidName} onBack={() => setView("home")} />;
-  }
-
-  if (view === "activities" && kid) {
-    return <Activities token={token} kidId={kid.id} onBack={backToHome} />;
+    // Launched from the Goals tab, so finishing or backing out returns there.
+    return <IepUpload token={token} kidId={kid.id} kidName={kidName} onBack={() => setView("goals")} />;
   }
 
   if (view === "logSession" && kid) {
@@ -266,9 +260,16 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     );
   }
 
-  if (view === "profile" && kid) {
-    return <Profile token={token} kidId={kid.id} kidName={kidName} onBack={() => setView("home")} />;
+  function selectTab(tab: (typeof TABS)[number]["id"]) {
+    if (tab === view) return;
+    // Going back to Home refetches so anything logged on another tab shows up in the feed.
+    if (tab === "home") backToHome();
+    else setView(tab);
   }
+
+  // The active tab: a non-tab view (none reach here, they return early above) falls back to Home.
+  const activeTab: (typeof TABS)[number]["id"] =
+    view === "growth" || view === "activities" || view === "goals" || view === "profile" ? view : "home";
 
   // Dismissed-for-this-session only -- no server-side "don't suggest again" state built yet (that
   // was the original L11-style activation-gap pattern, deliberately not ported, see memory). A
@@ -289,18 +290,28 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           <button
             key={tab.id}
             type="button"
-            disabled={!tab.enabled || tab.id === "home"}
-            onClick={() => (tab.id === "goals" || tab.id === "growth" || tab.id === "activities" || tab.id === "profile") && setView(tab.id)}
+            disabled={!tab.enabled}
+            aria-current={tab.id === activeTab ? "page" : undefined}
+            onClick={() => selectTab(tab.id)}
             className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-              tab.id === "home" ? "bg-[var(--pv-green-100)]" : tab.enabled ? "hover:bg-[var(--pv-border)]" : "cursor-default"
+              tab.id === activeTab ? "bg-[var(--pv-green-100)]" : tab.enabled ? "hover:bg-[var(--pv-border)]" : "cursor-default"
             }`}
           >
             <TabIcon tab={tab} />
-            <NavLabel tab={tab} />
+            <NavLabel tab={tab} active={tab.id === activeTab} />
           </button>
         ))}
       </nav>
 
+      {activeTab === "growth" && kid ? (
+        <Growth key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
+      ) : activeTab === "activities" && kid ? (
+        <Activities key={kid.id} token={token} kidId={kid.id} />
+      ) : activeTab === "goals" && kid ? (
+        <Goals key={kid.id} token={token} kidId={kid.id} onUploadIep={() => setView("iepUpload")} />
+      ) : activeTab === "profile" && kid ? (
+        <Profile key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
+      ) : (
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
           <div>
@@ -401,19 +412,21 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           </div>
         </footer>
       </div>
+      )}
 
-      {/* Bottom tabs on narrow viewports. */}
+      {/* Bottom tabs on narrow viewports -- shown on every tab, not just Home. */}
       <nav className="flex border-t border-[var(--pv-border)] bg-[var(--pv-surface)] pb-[env(safe-area-inset-bottom)] md:hidden">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            disabled={!tab.enabled || tab.id === "home"}
-            onClick={() => (tab.id === "goals" || tab.id === "growth" || tab.id === "activities" || tab.id === "profile") && setView(tab.id)}
+            disabled={!tab.enabled}
+            aria-current={tab.id === activeTab ? "page" : undefined}
+            onClick={() => selectTab(tab.id)}
             className="flex flex-1 flex-col items-center gap-0.5 py-2.5"
           >
             <TabIcon tab={tab} />
-            <NavLabel tab={tab} />
+            <NavLabel tab={tab} active={tab.id === activeTab} />
           </button>
         ))}
       </nav>

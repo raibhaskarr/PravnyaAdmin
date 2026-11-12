@@ -107,7 +107,7 @@ function ActivityCard({ candidate, onSelect }: { candidate: ActivityCandidate; o
   );
 }
 
-export function Activities({ token, kidId, onBack }: { token: string; kidId: string; onBack: () => void }) {
+export function Activities({ token, kidId }: { token: string; kidId: string }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [error, setError] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -127,18 +127,15 @@ export function Activities({ token, kidId, onBack }: { token: string; kidId: str
   const selected = candidates.find((c) => c.goal.id === selectedGoalId) ?? null;
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-[var(--pv-bg)]">
-      <header className="flex items-center gap-3 border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
-        <button
-          type="button"
-          onClick={selected ? () => setSelectedGoalId(null) : onBack}
-          aria-label="Back"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--pv-ink-soft)] transition hover:bg-[var(--pv-border)]"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--pv-bg)]">
+      <header className="flex min-h-16 items-center gap-3 border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
+        {selected ? (
+          <button type="button" onClick={() => setSelectedGoalId(null)} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--pv-ink-soft)] transition hover:bg-[var(--pv-border)]">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        ) : null}
         <p className="text-[1.05rem] font-semibold text-[var(--pv-ink)]">Activities</p>
       </header>
 
