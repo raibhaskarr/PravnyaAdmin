@@ -75,6 +75,14 @@ async function main() {
     ? await prisma.tenant.upsert({ where: { id: tenantId }, update: {}, create: { id: tenantId, name: "Pravnix Labs (demo)", slug: "retail-demo" } })
     : await prisma.tenant.upsert({ where: { slug: "retail-demo" }, update: {}, create: { name: "Pravnix Labs (demo)", slug: "retail-demo" } });
 
+  // Mirror production's retail tenant, which has every discipline enabled: goals (e.g. from an IEP
+  // upload) are only created for disciplines the child's tenant has enabled.
+  const disciplines = await prisma.canonicalDiscipline.findMany({ select: { id: true } });
+  await prisma.tenantDiscipline.createMany({
+    data: disciplines.map((d) => ({ tenantId: tenant.id, disciplineId: d.id })),
+    skipDuplicates: true
+  });
+
   const centre = await prisma.centre.upsert({
     where: { name: "Sunrise Therapy Centre (demo)" },
     update: {},

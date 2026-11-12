@@ -1,5 +1,6 @@
 import { prisma } from "../config/prisma";
 import { testOutbox } from "../modules/therapist-invitations/invitationEmail.service";
+import { clearTestAiResponses } from "../modules/ai/ai.platform";
 
 // Integration tests wipe every table between tests, so they must never point at a real database.
 // Refuses to run unless the database name says it's a throwaway one (CI uses pravnyaadmin_ci,
@@ -20,7 +21,7 @@ export function assertTestDatabase() {
   }
 }
 
-/** Empties every application table (keeps the migration history) and clears the test outbox. */
+/** Empties every application table (keeps the migration history), the test outbox and any scripted AI responses. */
 export async function resetDb() {
   assertTestDatabase();
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
@@ -30,6 +31,7 @@ export async function resetDb() {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
   }
   testOutbox.length = 0;
+  clearTestAiResponses();
 }
 
 export async function disconnectDb() {

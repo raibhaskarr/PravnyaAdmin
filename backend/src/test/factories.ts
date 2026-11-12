@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import type { Modality, PocEvidenceOutcome, PocSupportLevel, UserRole } from "@prisma/client";
+import type { InvitationStatus, Modality, PocEvidenceOutcome, PocSupportLevel, UserRole } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { signToken } from "../common/middleware/auth";
 import { signParentToken } from "../common/middleware/parentAuth";
@@ -104,4 +104,46 @@ export async function makeGoal(
     });
   }
   return { goal, goalItems };
+}
+
+export async function makeCentre(overrides: { name?: string; city?: string | null } = {}) {
+  return prisma.centre.create({ data: { name: overrides.name ?? `Test Clinic ${uid()}`, city: overrides.city ?? null } });
+}
+
+export async function makeScheduleSlot(
+  kidId: string,
+  overrides: { label?: string; dayOfWeek?: string; startTime?: string; therapistId?: string | null } = {}
+) {
+  return prisma.scheduleSlot.create({
+    data: {
+      kidId,
+      label: overrides.label ?? "Speech therapy",
+      dayOfWeek: overrides.dayOfWeek ?? "Mon",
+      startTime: overrides.startTime ?? "16:00",
+      therapistId: overrides.therapistId ?? null
+    }
+  });
+}
+
+/** A therapist invitation row for a kid. The token is random and never usable -- tests only need the row. */
+export async function makeInvitation(
+  kid: { id: string; tenantId: string },
+  overrides: { email?: string; status?: InvitationStatus; invitedByParentId?: string | null; tenantId?: string } = {}
+) {
+  return prisma.therapistInvitation.create({
+    data: {
+      tenantId: overrides.tenantId ?? kid.tenantId,
+      kidId: kid.id,
+      email: overrides.email ?? `invitee-${uid()}@test.local`,
+      status: overrides.status ?? "PENDING",
+      invitedByParentId: overrides.invitedByParentId ?? null,
+      tokenHash: `test-${randomUUID()}`,
+      expiresAt: new Date(Date.now() + 14 * 86_400_000)
+    }
+  });
+}
+
+/** Enables disciplines on a tenant (TenantDiscipline rows) -- IEP-derived goals only get a disciplineId from these. */
+export async function enableDisciplines(tenantId: string, disciplineIds: string[]) {
+  await prisma.tenantDiscipline.createMany({ data: disciplineIds.map((disciplineId) => ({ tenantId, disciplineId })), skipDuplicates: true });
 }
