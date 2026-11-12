@@ -33,6 +33,18 @@ With `NODE_ENV=test` the backend never reads `backend/.env`, so your dev config 
 leak into test runs. Emails go to an in-memory outbox (`EMAIL_PROVIDER=memory`) that tests read
 directly.
 
+## AI features in tests
+
+With `NODE_ENV=test` no real AI provider is ever called. Every AI call is answered by a scripted
+fake, keyed by the feature's id (`companion-message`, `extract-evidence-from-note`,
+`extract-iep-goals`, `goal-skill-suggestion`); an unscripted call gets `{}`, which exercises the
+feature's "AI unavailable" path.
+
+- Integration tests: `setTestAiResponse(featureId, response)` from `modules/ai/ai.platform.ts`
+  (`resetDb()` clears the script).
+- E2E tests: `scriptAi(request, featureId, response)` from `e2e/support/api.ts` (calls the test-only
+  `POST /api/__test__/ai-responses`).
+
 ## Admin panel and parent app
 
 ```sh

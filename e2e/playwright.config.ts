@@ -22,7 +22,16 @@ export default defineConfig({
     {
       name: "parent-mobile",
       testDir: "./tests/parent",
-      use: { ...devices["Pixel 7"], baseURL: PARENT_APP_URL }
+      use: {
+        ...devices["Pixel 7"],
+        baseURL: PARENT_APP_URL,
+        // A fake microphone, so voice-note logging runs its real recording code.
+        permissions: ["microphone"],
+        launchOptions: {
+          ...(executablePath ? { executablePath } : {}),
+          args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"]
+        }
+      }
     },
     {
       name: "admin-desktop",
