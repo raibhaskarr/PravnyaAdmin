@@ -3,6 +3,8 @@ import express from "express";
 import helmet from "helmet";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
+import { testOutbox } from "./modules/therapist-invitations/invitationEmail.service";
+import { clearTestAiResponses, setTestAiResponse } from "./modules/ai/ai.platform";
 import { errorMiddleware } from "./common/errors/errorMiddleware";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { tenantsRoutes } from "./modules/tenants/tenants.routes";
@@ -93,6 +95,28 @@ export function createApp() {
   app.use("/api/parent-kids", companionRoutes);
   app.use("/api/parent-kids", parentTherapistInvitationsRoutes);
   app.use("/api/parent-kids", parentScheduleRoutes);
+
+  // Test-only: lets E2E tests (a separate process) read emails the memory provider captured, e.g.
+  // a parent's sign-up verification code. Never registered outside NODE_ENV=test.
+  if (env.NODE_ENV === "test" && env.EMAIL_PROVIDER === "memory") {
+    app.get("/api/__test__/outbox", (req, res) => {
+      const to = typeof req.query.to === "string" ? req.query.to.toLowerCase() : null;
+      res.json(to ? testOutbox.filter((m) => m.to.toLowerCase() === to) : testOutbox);
+    });
+  }
+  // Test-only: lets E2E tests script what the (fake) AI answers for a feature. See ai.platform.ts.
+  if (env.NODE_ENV === "test") {
+    app.post("/api/__test__/ai-responses", (req, res) => {
+      const { featureId, response } = req.body ?? {};
+      if (typeof featureId !== "string") return void res.status(400).json({ error: { message: "featureId required" } });
+      setTestAiResponse(featureId, response);
+      res.status(204).end();
+    });
+    app.delete("/api/__test__/ai-responses", (_req, res) => {
+      clearTestAiResponses();
+      res.status(204).end();
+    });
+  }
 
   app.use(errorMiddleware);
 
