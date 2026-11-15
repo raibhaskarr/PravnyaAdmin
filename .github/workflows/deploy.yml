@@ -6,7 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Every test suite must pass before anything is deployed.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   deploy:
+    needs: ci
     runs-on: ubuntu-latest
     # Settings come from this repo's "production" environment (Settings → Environments).
     environment: production

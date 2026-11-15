@@ -8,7 +8,12 @@ on:
       - ".github/workflows/deploy-parent-app.yml"
 
 jobs:
+  # Every test suite must pass before anything is deployed.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   deploy:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
