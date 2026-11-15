@@ -181,7 +181,7 @@ is, every suggestion request returns `{ suggestion: null, reason: "Couldn't gene
 right now -- pick manually below." }` — the fake provider's canned response never matches a real
 Canonical Skill id, by design, so this fails closed rather than returning nonsense.
 
-To make it actually suggest real skills: add `ANTHROPIC_API_KEY` and/or `GEMINI_API_KEY` to the
-server's backend `.env` (same file `DATABASE_URL`/`JWT_SECRET` already live in) and restart the
-backend service. No code or deploy changes needed — `ai.platform.ts` picks up whichever key(s) are
-present at boot.
+To make it actually suggest real skills: set `ANTHROPIC_API_KEY` and/or `GEMINI_API_KEY` as secrets in this
+repo's **production** environment (GitHub → Settings → Environments → production) and re-run the Deploy
+workflow. Every deploy writes the server's `backend/.env` from that environment (see `deploy/README.md`), so
+editing the file on the server directly is overwritten by the next deploy.
