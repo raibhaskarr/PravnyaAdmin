@@ -3,10 +3,13 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Settings come from this repo's "production" environment (Settings → Environments).
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,6 +38,38 @@ jobs:
           cp -r frontend/dist /tmp/artifact/frontend/
           tar czf /tmp/pravnyaadmin-deploy.tar.gz -C /tmp/artifact .
 
+      # The server's backend/.env is written from the production environment on every deploy
+      # (~/apps/install-env.sh refuses missing required values and keeps a backup). To change a key
+      # or setting, change it in GitHub and re-run this workflow. See deploy/README.md.
+      - name: Build the settings file
+        env:
+          NODE_ENV: ${{ vars.NODE_ENV }}
+          PORT: ${{ vars.PORT }}
+          JWT_EXPIRES_IN: ${{ vars.JWT_EXPIRES_IN }}
+          BCRYPT_SALT_ROUNDS: ${{ vars.BCRYPT_SALT_ROUNDS }}
+          CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
+          EMAIL_PROVIDER: ${{ vars.EMAIL_PROVIDER }}
+          EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
+          EMAIL_FROM_NAME: ${{ vars.EMAIL_FROM_NAME }}
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          SMTP_SECURE: ${{ vars.SMTP_SECURE }}
+          RETAIL_TENANT_ID: ${{ vars.RETAIL_TENANT_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          umask 077
+          for k in NODE_ENV PORT JWT_EXPIRES_IN BCRYPT_SALT_ROUNDS CORS_ORIGIN EMAIL_PROVIDER EMAIL_FROM_ADDRESS EMAIL_FROM_NAME APP_BASE_URL \
+                   SMTP_HOST SMTP_PORT SMTP_SECURE RETAIL_TENANT_ID DATABASE_URL JWT_SECRET SMTP_USER SMTP_PASS ANTHROPIC_API_KEY GEMINI_API_KEY; do
+            if [ -n "${!k}" ]; then printf '%s=%s\n' "$k" "${!k}"; fi
+          done | sort > /tmp/pravnyaadmin.env
+          echo "Settings: $(cut -d= -f1 /tmp/pravnyaadmin.env | tr '\n' ' ')"
+
       - name: Upload artifact and run deploy script
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -45,4 +80,6 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           scp -i ~/.ssh/deploy_key /tmp/pravnyaadmin-deploy.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/pravnyaadmin-deploy.tar.gz"
+          scp -i ~/.ssh/deploy_key /tmp/pravnyaadmin.env "$DEPLOY_USER@$DEPLOY_HOST:/tmp/pravnyaadmin.env"
+          rm -f /tmp/pravnyaadmin.env
           ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash /home/pravnix/apps/deploy-pravnyaadmin.sh"
