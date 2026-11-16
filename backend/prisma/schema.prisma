@@ -76,6 +76,7 @@ model User {
   sentSuperadminInvitations SuperadminInvitation[] @relation("SuperadminInvitationSentBy")
   progressUpdates ProgressUpdate[]
   iepPlans IepPlan[]
+  homeSessions HomeSession[]
   reviewedHomeGuides SkillHomeGuide[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -176,6 +177,8 @@ model Tenant {
   createdParents Parent[]
   progressUpdates ProgressUpdate[]
   iepPlans IepPlan[]
+  homeSessions HomeSession[]
+  homeSessionRuns HomeSessionRun[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -375,6 +378,8 @@ model Kid {
   scheduleSlots        ScheduleSlot[]
   progressUpdates      ProgressUpdate[]
   iepPlans      IepPlan[]
+  homeSessions HomeSession[]
+  homeSessionRuns HomeSessionRun[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -572,9 +577,13 @@ model GoalItemEvidence {
   confidence         Float?
   sourceChildId      String?             @db.Uuid
   sourceLogId        String?             @db.Uuid
+  /// Set when the entry was recorded during a guided home session (one entry per try).
+  sessionRunId       String?             @db.Uuid
+  sessionRun         HomeSessionRun?     @relation(fields: [sessionRunId], references: [id], onDelete: SetNull)
   createdAt          DateTime            @default(now())
 
   @@index([goalItemId, logDate])
+  @@index([sessionRunId])
 }
 
 enum PocEvidenceOutcome {
@@ -950,4 +959,72 @@ model SkillHomeGuide {
   reviewedBy       User?          @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+}
+
+enum HomeSessionStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum HomeSessionRunStatus {
+  IN_PROGRESS
+  COMPLETED
+  ENDED_EARLY
+}
+
+/// A guided practice session a therapist sets for a child to do at home with a parent. Built from
+/// the child's goals and skill items (optionally drafted by Pravnya), then published. In the parent
+/// app Pravnya runs it step by step from this plan; every try is logged as GoalItemEvidence.
+model HomeSession {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @db.Uuid
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId        String            @db.Uuid
+  kid          Kid               @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  authorUserId String?           @db.Uuid
+  author       User?             @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorName   String
+  centreName   String
+  title        String
+  /// "en" or "hi": the language Pravnya speaks during the session.
+  language     String            @default("en")
+  /// { intro, activities[{ key, goalId, goalTitle, type, items[{goalItemId,label}], trialsPerItem, setup,
+  ///   instruction, correctLooksLike, prompts[{supportLevel, say}], errorCorrection, reinforcement,
+  ///   modality, missesBeforeMovingOn }], closing }
+  plan         Json
+  /// { kind: "once" } or { kind: "weekly", days: ["Mon", ...], until: "YYYY-MM-DD" | null }
+  schedule     Json
+  aiDrafted    Boolean           @default(false)
+  status       HomeSessionStatus @default(DRAFT)
+  publishedAt  DateTime?
+  runs         HomeSessionRun[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([kidId, status])
+}
+
+/// One time a parent did a session. Only the structured results are kept -- never what was said.
+model HomeSessionRun {
+  id               String               @id @default(uuid()) @db.Uuid
+  sessionId        String               @db.Uuid
+  session          HomeSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tenantId         String               @db.Uuid
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId            String               @db.Uuid
+  kid              Kid                  @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  status           HomeSessionRunStatus @default(IN_PROGRESS)
+  /// Where the session is: { activity, item, trial, phase, missesInARow, awaitingHelpChoice }
+  state            Json
+  /// Per try: [{ activityKey, goalItemId, itemLabel, outcome, supportLevel, at }]
+  results          Json                 @default("[]")
+  summary          String?
+  startedAt        DateTime             @default(now())
+  endedAt          DateTime?
+  summaryEmailedAt DateTime?
+  evidence         GoalItemEvidence[]
+
+  @@index([sessionId, startedAt])
+  @@index([kidId, startedAt])
 }

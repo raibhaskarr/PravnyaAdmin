@@ -557,3 +557,61 @@ export type HomeGuideDetail = {
   guide: { content: GuideContent; aiDrafted: boolean; reviewedAt: string | null; reviewedBy: { name: string } | null; updatedAt: string } | null;
   general: GuideContent;
 };
+
+export type SessionActivityType =
+  | "DISCRETE_TRIAL"
+  | "RECEPTIVE_ID"
+  | "EXPRESSIVE_LABEL"
+  | "AAC_LABEL"
+  | "ARTICULATION"
+  | "REQUESTING"
+  | "FOLLOW_DIRECTIONS"
+  | "IMITATION"
+  | "OTHER";
+
+export type SessionActivity = {
+  key: string;
+  goalId: string;
+  goalTitle: string;
+  type: SessionActivityType;
+  items: { goalItemId: string; label: string }[];
+  trialsPerItem: number;
+  setup: string;
+  instruction: string;
+  correctLooksLike: string;
+  prompts: { supportLevel: string; say: string }[];
+  errorCorrection: string;
+  reinforcement: string;
+  modality: string;
+  missesBeforeMovingOn: number;
+};
+
+export type SessionPlan = { intro: string; activities: SessionActivity[]; closing: string };
+export type SessionSchedule = { kind: "once" } | { kind: "weekly"; days: string[]; until: string | null };
+
+export type SessionTry = { activityKey: string; goalItemId: string; itemLabel: string; outcome: "CORRECT" | "INCORRECT"; supportLevel: string; at: string };
+
+export type HomeSessionRun = {
+  id: string;
+  status: "IN_PROGRESS" | "COMPLETED" | "ENDED_EARLY";
+  startedAt: string;
+  endedAt: string | null;
+  summary: string | null;
+  results: SessionTry[];
+};
+
+export type HomeSession = {
+  id: string;
+  kidId: string;
+  authorName: string;
+  title: string;
+  language: "en" | "hi";
+  plan: SessionPlan;
+  schedule: SessionSchedule;
+  aiDrafted: boolean;
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  publishedAt: string | null;
+  createdAt: string;
+  runs: HomeSessionRun[];
+  skippedGoals?: string[];
+};

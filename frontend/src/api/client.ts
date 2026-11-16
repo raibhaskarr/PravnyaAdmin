@@ -46,7 +46,10 @@ import type {
   IepPlanContent,
   GuideContent,
   HomeGuideDetail,
-  HomeGuideRow
+  HomeGuideRow,
+  HomeSession,
+  SessionPlan,
+  SessionSchedule
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
@@ -334,6 +337,24 @@ export const api = {
   },
   deleteProgressUpdate(token: string, id: string) {
     return request<void>(`/progress-updates/${id}`, { token, method: "DELETE" });
+  },
+  listHomeSessions(token: string, kidId: string) {
+    return request<HomeSession[]>(`/home-sessions?kidId=${kidId}`, { token });
+  },
+  draftHomeSession(token: string, body: { kidId: string; goalIds: string[]; title?: string; language: "en" | "hi"; schedule: SessionSchedule }) {
+    return request<HomeSession>("/home-sessions/draft", { token, method: "POST", body });
+  },
+  editHomeSession(token: string, id: string, body: { title?: string; language?: "en" | "hi"; schedule?: SessionSchedule; plan?: SessionPlan }) {
+    return request<HomeSession>(`/home-sessions/${id}`, { token, method: "PATCH", body });
+  },
+  publishHomeSession(token: string, id: string) {
+    return request<HomeSession>(`/home-sessions/${id}/publish`, { token, method: "POST" });
+  },
+  archiveHomeSession(token: string, id: string) {
+    return request<HomeSession>(`/home-sessions/${id}/archive`, { token, method: "POST" });
+  },
+  deleteHomeSession(token: string, id: string) {
+    return request<void>(`/home-sessions/${id}`, { token, method: "DELETE" });
   },
   listHomeGuides(token: string) {
     return request<HomeGuideRow[]>("/home-guides", { token });
