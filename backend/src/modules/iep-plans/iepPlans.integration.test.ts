@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, beforeEach, describe, test } from "node:test";
 import { prisma } from "../../config/prisma";
 import { setTestAiResponse } from "../ai/ai.platform";
+import { testOutbox } from "../therapist-invitations/invitationEmail.service";
 import { linkTherapist, makeGoal, makeKid, makeParent, makeTaxonomy, makeTenant, makeTherapist, makeUser } from "../../test/factories";
 import { disconnectDb, resetDb } from "../../test/db";
 import { api, bearer } from "../../test/http";
@@ -29,7 +30,7 @@ async function world() {
   const linked = await makeTherapist(tenant.id);
   await linkTherapist(kid.id, linked.therapist.id);
   const unlinked = await makeTherapist(tenant.id);
-  return { tenant, kid, requests, greetings, admin, viewer, linked, unlinked };
+  return { tenant, fam, kid, requests, greetings, admin, viewer, linked, unlinked };
 }
 
 describe("IEP plans", () => {
@@ -114,6 +115,51 @@ describe("IEP plans", () => {
     assert.equal((await api().post("/api/iep-plans").set(bearer(w.admin.token)).send({ kidId: w.kid.id, reviewDate: new Date(Date.now() - DAY).toISOString() })).status, 400);
     assert.equal((await api().delete(`/api/iep-plans/${plan.id}`).set(bearer(w.admin.token))).status, 204);
     assert.equal(await prisma.iepPlan.count(), 0);
+  });
+
+  test("share a final plan: parent sees it in the app and gets an email; drafts and unshared plans stay hidden", async () => {
+    const w = await world();
+    const other = await makeParent({ name: "Other" });
+    const plan = (await api().post("/api/iep-plans").set(bearer(w.linked.token)).send({ kidId: w.kid.id })).body;
+    assert.equal((await api().post(`/api/iep-plans/${plan.id}/share`).set(bearer(w.linked.token))).body.error.code, "NOT_FINAL");
+
+    const content = { ...plan.content, goals: plan.content.goals.map((g: { title: string }) => ({ ...g, target: `Target for ${g.title}` })) };
+    await api().patch(`/api/iep-plans/${plan.id}`).set(bearer(w.linked.token)).send({ content });
+    await api().post(`/api/iep-plans/${plan.id}/finalise`).set(bearer(w.linked.token));
+    assert.deepEqual((await api().get(`/api/parent-kids/${w.kid.id}/iep-plans`).set(bearer(w.fam.token))).body, [], "final but not shared");
+    assert.equal((await api().post(`/api/iep-plans/${plan.id}/share`).set(bearer(w.viewer.token))).status, 403);
+
+    const shared = await api().post(`/api/iep-plans/${plan.id}/share`).set(bearer(w.linked.token));
+    assert.equal(shared.status, 200);
+    assert.ok(shared.body.sharedAt && shared.body.emailedAt);
+    assert.equal((await api().post(`/api/iep-plans/${plan.id}/share`).set(bearer(w.linked.token))).body.error.code, "ALREADY_SHARED");
+
+    const mail = testOutbox.filter((m) => m.to === w.fam.parent.email);
+    assert.equal(mail.length, 1);
+    assert.match(mail[0].subject, /^Aarav's Individualised Education Plan from .+, Sunrise Centre$/);
+    assert.match(mail[0].text, /1\. Request items with two words\n   Target: Target for Request items with two words/);
+    assert.match(mail[0].text, /in Pravnya: https?:\/\//);
+
+    const list = await api().get(`/api/parent-kids/${w.kid.id}/iep-plans`).set(bearer(w.fam.token));
+    assert.equal(list.status, 200);
+    assert.equal(list.body.length, 1);
+    assert.deepEqual(Object.keys(list.body[0]).sort(), ["authorName", "centreName", "content", "id", "planStart", "readAt", "reviewDate", "sharedAt", "title"]);
+    const read = await api().post(`/api/parent-kids/${w.kid.id}/iep-plans/${plan.id}/read`).set(bearer(w.fam.token));
+    assert.ok(read.body.readAt);
+    assert.equal((await api().get(`/api/parent-kids/${w.kid.id}/iep-plans`).set(bearer(other.token))).status, 404);
+  });
+
+  test("a final plan for a child without a parent account can't be shared", async () => {
+    const w = await world();
+    const noParentKid = await makeKid(w.tenant.id, null, { firstName: "Noor" });
+    await makeGoal(noParentKid, await makeTaxonomy(), { title: "Point to pictures" });
+    const plan = (await api().post("/api/iep-plans").set(bearer(w.admin.token)).send({ kidId: noParentKid.id })).body;
+    const content = { ...plan.content, goals: plan.content.goals.map((g: object) => ({ ...g, target: "t" })) };
+    await api().patch(`/api/iep-plans/${plan.id}`).set(bearer(w.admin.token)).send({ content });
+    await api().post(`/api/iep-plans/${plan.id}/finalise`).set(bearer(w.admin.token));
+    const res = await api().post(`/api/iep-plans/${plan.id}/share`).set(bearer(w.admin.token));
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error.code, "NO_PARENT");
   });
 
   test("access: unlinked therapist 403, viewer reads but can't write, other tenant 403", async () => {

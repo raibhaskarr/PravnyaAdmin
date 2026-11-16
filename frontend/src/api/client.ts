@@ -344,6 +344,9 @@ export const api = {
   finaliseIepPlan(token: string, id: string) {
     return request<IepPlan>(`/iep-plans/${id}/finalise`, { token, method: "POST" });
   },
+  shareIepPlan(token: string, id: string) {
+    return request<IepPlan>(`/iep-plans/${id}/share`, { token, method: "POST" });
+  },
   deleteIepPlan(token: string, id: string) {
     return request<void>(`/iep-plans/${id}`, { token, method: "DELETE" });
   },

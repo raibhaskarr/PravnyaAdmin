@@ -3,6 +3,9 @@ import { createExecutionContext } from "@pravnix/ai-core";
 import { prisma } from "../../config/prisma";
 import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid } from "../../common/access/kidAccess";
+import { assertOwnsKid } from "../../common/access/parentKidAccess";
+import { env } from "../../config/env";
+import { invitationEmailService } from "../therapist-invitations/invitationEmail.service";
 import { badRequest, conflict, notFound } from "../../common/errors/AppError";
 import { orchestrator } from "../ai/ai.platform";
 import { buildPeriodStats, type GoalPeriodStats, type PeriodStats } from "../progress-updates/progressStats";
@@ -147,6 +150,32 @@ function missingForFinal(content: PlanContent) {
   return missing;
 }
 
+const parentFields = {
+  id: true,
+  title: true,
+  authorName: true,
+  centreName: true,
+  planStart: true,
+  reviewDate: true,
+  content: true,
+  sharedAt: true,
+  readAt: true
+} as const;
+
+function day(d: Date) {
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+}
+
+/** The email carries the goals and targets in plain text; the full plan is in the app. */
+function emailText(plan: { title: string; reviewDate: Date; content: unknown }, kidName: string) {
+  const c = plan.content as PlanContent;
+  const goals = c.goals.map((g, i) => `${i + 1}. ${g.title}\n   Target: ${g.target}`).join("\n\n");
+  return (
+    `${kidName}'s ${plan.title} is ready. Here are the goals and what we're aiming for by ${day(plan.reviewDate)}:\n\n${goals}\n\n` +
+    `See the full plan, including how to practise at home, in Pravnya: ${env.PARENT_APP_URL}`
+  );
+}
+
 // ---------- Service ----------
 
 export const iepPlansService = {
@@ -211,6 +240,38 @@ export const iepPlansService = {
     const missing = missingForFinal(plan.content as PlanContent);
     if (missing.length) throw conflict(`Before finalising, add ${missing.join(", ")}.`, "INCOMPLETE");
     return prisma.iepPlan.update({ where: { id }, data: { status: "FINAL", finalisedAt: new Date() } });
+  },
+
+  /** Publishes a final plan in the parent app and emails the parent. An email failure doesn't undo the share. */
+  async share(user: AuthUser, id: string) {
+    const plan = await findForStaff(user, id);
+    if (plan.status !== "FINAL") throw conflict("Finalise the plan before sharing it", "NOT_FINAL");
+    if (plan.sharedAt) throw conflict("This plan has already been shared", "ALREADY_SHARED");
+    const kid = await prisma.kid.findUniqueOrThrow({ where: { id: plan.kidId }, select: { firstName: true, parent: { select: { email: true } } } });
+    if (!kid.parent) throw conflict("This child has no parent account to share the plan with", "NO_PARENT");
+
+    const shared = await prisma.iepPlan.update({ where: { id }, data: { sharedAt: new Date() } });
+    const from = plan.centreName ? `${plan.authorName}, ${plan.centreName}` : plan.authorName;
+    try {
+      await invitationEmailService.sendIepPlan({ to: kid.parent.email, subject: `${kid.firstName}'s ${plan.title} from ${from}`, text: emailText(plan, kid.firstName) });
+      return prisma.iepPlan.update({ where: { id }, data: { emailedAt: new Date() } });
+    } catch (e) {
+      console.error(`[iep plan] email for plan ${id} failed:`, e instanceof Error ? e.message : e);
+      return shared;
+    }
+  },
+
+  async listForParent(parentId: string, kidId: string) {
+    await assertOwnsKid(parentId, kidId);
+    return prisma.iepPlan.findMany({ where: { kidId, status: "FINAL", sharedAt: { not: null } }, orderBy: { sharedAt: "desc" }, select: parentFields });
+  },
+
+  async markRead(parentId: string, kidId: string, planId: string) {
+    await assertOwnsKid(parentId, kidId);
+    const plan = await prisma.iepPlan.findFirst({ where: { id: planId, kidId, status: "FINAL", sharedAt: { not: null } } });
+    if (!plan) throw notFound("Plan not found");
+    if (plan.readAt) return prisma.iepPlan.findUniqueOrThrow({ where: { id: planId }, select: parentFields });
+    return prisma.iepPlan.update({ where: { id: planId }, data: { readAt: new Date() }, select: parentFields });
   },
 
   async removeDraft(user: AuthUser, id: string) {

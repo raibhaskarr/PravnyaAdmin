@@ -132,7 +132,7 @@ function PlanEditor({ plan, kid, canEdit, onChanged }: { plan: IepPlan; kid: Kid
 
   async function run(kind: "save" | "finalise" | "delete") {
     setError("");
-    if (kind === "finalise" && !window.confirm("Finalise this plan? It can't be changed afterwards. For the next review you'll draft a new plan.")) return;
+    if (kind === "finalise" && !window.confirm("Finalise this plan? It can't be changed afterwards. For the next review you'll draft a new plan. You can share it with the parent once it's final.")) return;
     if (kind === "delete" && !window.confirm("Delete this draft plan?")) return;
     setBusy(kind);
     try {
@@ -235,26 +235,52 @@ function PlanEditor({ plan, kid, canEdit, onChanged }: { plan: IepPlan; kid: Kid
   );
 }
 
-function FinalPlan({ plan, kid }: { plan: IepPlan; kid: Kid }) {
+function FinalPlan({ plan, kid, hasParent, canEdit, onChanged }: { plan: IepPlan; kid: Kid; hasParent: boolean; canEdit: boolean; onChanged: () => void }) {
+  const { token } = useAuth();
   const [error, setError] = useState("");
+  const [sharing, setSharing] = useState(false);
   const overdue = new Date(plan.reviewDate).getTime() < Date.now();
+
+  async function share() {
+    setError("");
+    if (!window.confirm(`Share this plan with ${kid.firstName}'s parent? They'll see it in the Pravnya app and get the goals and targets by email.`)) return;
+    setSharing(true);
+    try {
+      await api.shareIepPlan(token!, plan.id);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't share the plan. Try again.");
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <div className="card" style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
       <span>
         <strong>{plan.title}</strong> <span className="hint-text">by {plan.authorName} · {plan.content.goals.length} goals · finalised {date(plan.finalisedAt!)}</span>
         <br />
         <span className={overdue ? "error-text" : "hint-text"}>Review {overdue ? "was due" : "due"} {date(plan.reviewDate)}</span>
+        <br />
+        <span className="hint-text">
+          {plan.sharedAt
+            ? `Shared with the parent ${date(plan.sharedAt)}${plan.emailedAt ? " · emailed" : " · email not sent"}${plan.readAt ? " · read in the app" : ""}`
+            : "Not shared with the parent"}
+        </span>
       </span>
-      <span>
+      <span style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {canEdit && !plan.sharedAt ? (
+          <Button label={hasParent ? "Share with parent" : "No parent account to share with"} icon="pi pi-send" className="p-button-sm" disabled={!hasParent || sharing} loading={sharing} onClick={share} />
+        ) : null}
         <Button label="Print / Save as PDF" icon="pi pi-print" className="p-button-outlined p-button-sm" onClick={() => printPlan(plan, kid) || setError("Allow pop-ups for this site to print the plan.")} />
-        {error ? <p className="error-text">{error}</p> : null}
       </span>
+      {error ? <p className="error-text" style={{ width: "100%", margin: 0 }}>{error}</p> : null}
     </div>
   );
 }
 
 // IEPs: Pravnya drafts from the child's active goals and the figures in their logs; staff edit,
-// finalise (locks it) and print or save as PDF.
+// finalise (locks it), share with the parent (parent app + email), and print or save as PDF.
 export function KidIepTab({ kid, canEdit }: { kid: Kid; canEdit: boolean }) {
   const { token } = useAuth();
   const [plans, setPlans] = useState<IepPlan[] | null>(null);
@@ -304,7 +330,7 @@ export function KidIepTab({ kid, canEdit }: { kid: Kid; canEdit: boolean }) {
         <PlanEditor key={p.id} plan={p} kid={kid} canEdit={canEdit} onChanged={load} />
       ))}
       <span className="field-label">Final plans</span>
-      {finals.length === 0 ? <p className="empty-state">No final plans yet.</p> : finals.map((p) => <FinalPlan key={p.id} plan={p} kid={kid} />)}
+      {finals.length === 0 ? <p className="empty-state">No final plans yet.</p> : finals.map((p) => <FinalPlan key={p.id} plan={p} kid={kid} hasParent={!!kid.parentId} canEdit={canEdit} onChanged={load} />)}
     </div>
   );
 }

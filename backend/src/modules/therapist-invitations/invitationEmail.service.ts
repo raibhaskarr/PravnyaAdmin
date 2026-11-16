@@ -139,6 +139,10 @@ export const invitationEmailService = {
     return emailProvider.send(input);
   },
 
+  async sendIepPlan(input: { to: string; subject: string; text: string }) {
+    return emailProvider.send(input);
+  },
+
   async sendParentVerificationCode(input: { to: string; code: string }) {
     const subject = "Your Pravnya verification code";
     const body = `Your verification code is ${input.code}.\n\nThis code expires in 10 minutes. If you didn't request this, you can ignore this email.`;

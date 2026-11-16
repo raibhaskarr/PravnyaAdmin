@@ -40,3 +40,6 @@ export const editPlanSchema = z
     content: planContentSchema.optional()
   })
   .refine((v) => v.title !== undefined || v.reviewDate !== undefined || v.content !== undefined, "Nothing to change");
+
+export const parentListParamsSchema = z.object({ kidId: z.string().uuid() });
+export const parentPlanParamsSchema = z.object({ kidId: z.string().uuid(), planId: z.string().uuid() });

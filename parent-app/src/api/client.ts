@@ -17,6 +17,20 @@ export type ProgressUpdate = {
   readAt: string | null;
 };
 
+export type IepPlanGoal = { goalId: string; title: string; area: string; baseline: string; target: string; strategies: string[]; homePractice: string[] };
+
+export type IepPlan = {
+  id: string;
+  title: string;
+  authorName: string;
+  centreName: string;
+  planStart: string;
+  reviewDate: string;
+  content: { presentLevels: string; strengths: string[]; goals: IepPlanGoal[]; notes: string };
+  sharedAt: string;
+  readAt: string | null;
+};
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -306,6 +320,12 @@ export const api = {
   },
   markUpdateRead(token: string, kidId: string, updateId: string) {
     return request<ProgressUpdate>(`/parent-kids/${kidId}/updates/${updateId}/read`, { token, method: "POST" });
+  },
+  listIepPlans(token: string, kidId: string) {
+    return request<IepPlan[]>(`/parent-kids/${kidId}/iep-plans`, { token });
+  },
+  markIepPlanRead(token: string, kidId: string, planId: string) {
+    return request<IepPlan>(`/parent-kids/${kidId}/iep-plans/${planId}/read`, { token, method: "POST" });
   },
   listSchedule(token: string, kidId: string) {
     return request<ScheduleSlot[]>(`/parent-kids/${kidId}/schedule`, { token });

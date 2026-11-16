@@ -30,6 +30,7 @@ beforeEach(() => {
   mockApi.listCompanionMessages.mockResolvedValue([]);
   mockApi.listSchedule.mockResolvedValue([]);
   mockApi.listUpdates.mockResolvedValue([]);
+  mockApi.listIepPlans.mockResolvedValue([]);
   mockApi.listTherapists.mockResolvedValue([]);
   mockApi.listTherapistInvitations.mockResolvedValue([]);
   mockApi.listCentres.mockResolvedValue([]);
@@ -380,5 +381,50 @@ describe("progress updates from the care team", () => {
     expect(await screen.findByText("Sam")).toBeInTheDocument();
     await waitFor(() => expect(mockApi.listUpdates).toHaveBeenCalledWith("tok", "kid-1"));
     expect(screen.queryByText(/Update from Speech Therapist/)).not.toBeInTheDocument();
+  });
+});
+
+describe("IEPs shared by the care team", () => {
+  const plan = (over: Partial<import("../api/client").IepPlan> = {}) => ({
+    id: "iep-1",
+    title: "Individualised Education Plan",
+    authorName: "Speech Therapist",
+    centreName: "Sunrise Centre",
+    planStart: "2026-11-16T00:00:00.000Z",
+    reviewDate: "2027-02-15T00:00:00.000Z",
+    content: {
+      presentLevels: "Sam asks for some things with two words.",
+      strengths: ["Asked for a ball without help for the first time"],
+      goals: [{ goalId: "g-1", title: "Request items with two words", area: "Expressive Language", baseline: "Correct in 7 of 18 attempts.", target: "Asks with two words in 4 of 5 opportunities.", strategies: ["Wait time"], homePractice: ["Pause before giving a snack"] }],
+      notes: ""
+    },
+    sharedAt: new Date().toISOString(),
+    readAt: null,
+    ...over
+  });
+
+  test("an unread plan shows on Home; opening it shows the goals and targets and marks it read", async () => {
+    mockApi.listIepPlans.mockResolvedValue([plan()]);
+    mockApi.markIepPlanRead.mockResolvedValue(plan({ readAt: new Date().toISOString() }));
+    renderHome();
+    expect(await screen.findByText("Sam's plan from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /See the plan/ }));
+    expect(await screen.findByText("Sam's plan")).toBeInTheDocument();
+    expect(screen.getByText("Asks with two words in 4 of 5 opportunities.")).toBeInTheDocument();
+    expect(screen.getByText("Pause before giving a snack")).toBeInTheDocument();
+    await waitFor(() => expect(mockApi.markIepPlanRead).toHaveBeenCalledWith("tok", "kid-1", "iep-1"));
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    await screen.findByText("Sam");
+    expect(screen.queryByText(/Sam's plan from/)).not.toBeInTheDocument();
+  });
+
+  test("a read plan stays reachable from the Goals tab", async () => {
+    mockApi.listIepPlans.mockResolvedValue([plan({ readAt: new Date().toISOString() })]);
+    renderHome();
+    await screen.findByText("Sam");
+    await waitFor(() => expect(mockApi.listIepPlans).toHaveBeenCalledWith("tok", "kid-1"));
+    expect(screen.queryByText(/Sam's plan from/)).not.toBeInTheDocument();
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Goals/ }));
+    expect(await screen.findByText("Sam's plan from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
   });
 });

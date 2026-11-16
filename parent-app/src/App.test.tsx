@@ -15,6 +15,7 @@ beforeEach(() => {
   mockApi.listCompanionMessages.mockResolvedValue([]);
   mockApi.listSchedule.mockResolvedValue([]);
   mockApi.listUpdates.mockResolvedValue([]);
+  mockApi.listIepPlans.mockResolvedValue([]);
   mockApi.login.mockResolvedValue({ token: "tok-login", parent: makeProfile() });
   mockApi.sendVerificationCode.mockResolvedValue({ sent: true });
   mockApi.resetPassword.mockResolvedValue({ token: "tok-reset", parent: makeProfile() });

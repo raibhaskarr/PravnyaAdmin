@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { UpdateCard, UpdatesView } from "../updates/Updates";
-import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
+import { IepPlanCard, IepPlansView } from "../iep/IepPlans";
+import { api, ApiError, type CompanionMessage, type Goal, type IepPlan, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
@@ -13,7 +14,7 @@ import { computeNudge, NudgeCard } from "./nudges";
 import { computeOpener, OpenerCard } from "./opener";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates";
+type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates" | "iepPlans";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
@@ -136,6 +137,8 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   const [schedule, setSchedule] = useState<ScheduleSlot[] | null>(null);
   // Progress updates the child's therapists have sent (newest first).
   const [updates, setUpdates] = useState<ProgressUpdate[]>([]);
+  // IEPs the child's therapists have shared (newest first).
+  const [iepPlans, setIepPlans] = useState<IepPlan[]>([]);
   // The real conversation thread, separate from the digest feed above -- persisted server-side
   // (companion.service.ts), fetched fresh whenever the kid changes.
   const [thread, setThread] = useState<CompanionMessage[]>([]);
@@ -177,6 +180,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     void api.listCompanionMessages(token, kid.id).then(setThread).catch(() => setThread([]));
     void api.listSchedule(token, kid.id).then(setSchedule).catch(() => setSchedule([]));
     void api.listUpdates(token, kid.id).then(setUpdates).catch(() => setUpdates([]));
+    void api.listIepPlans(token, kid.id).then(setIepPlans).catch(() => setIepPlans([]));
   }, [token, kid?.id]);
 
   // useLayoutEffect (not useEffect) -- runs before paint, so the content never visibly flashes at
@@ -262,6 +266,19 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     );
   }
 
+  if (view === "iepPlans" && kid) {
+    return (
+      <IepPlansView
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        plans={iepPlans}
+        onBack={() => setView("home")}
+        onRead={(read) => setIepPlans((prev) => prev.map((p) => (p.id === read.id ? read : p)))}
+      />
+    );
+  }
+
   if (view === "logSession" && kid) {
     return (
       <LogSession
@@ -327,7 +344,13 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
       ) : activeTab === "activities" && kid ? (
         <Activities key={kid.id} token={token} kidId={kid.id} />
       ) : activeTab === "goals" && kid ? (
-        <Goals key={kid.id} token={token} kidId={kid.id} onUploadIep={() => setView("iepUpload")} />
+        <Goals
+          key={kid.id}
+          token={token}
+          kidId={kid.id}
+          onUploadIep={() => setView("iepUpload")}
+          sharedPlan={iepPlans[0] ? <IepPlanCard plan={iepPlans[0]} kidName={kidName} onOpen={() => setView("iepPlans")} /> : null}
+        />
       ) : activeTab === "profile" && kid ? (
         <Profile key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
       ) : (
@@ -395,6 +418,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
 
           {/* Home opens scrolled to the bottom, so an unread update sits here, right above the composer. */}
           {latestUpdate && !latestUpdate.readAt ? <UpdateCard update={latestUpdate} onOpen={() => setView("updates")} /> : null}
+          {iepPlans[0] && !iepPlans[0].readAt ? <IepPlanCard plan={iepPlans[0]} kidName={kidName} onOpen={() => setView("iepPlans")} /> : null}
 
           {opener && kid ? (
             <OpenerCard

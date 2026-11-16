@@ -525,5 +525,8 @@ export type IepPlan = {
   aiDrafted: boolean;
   status: "DRAFT" | "FINAL";
   finalisedAt: string | null;
+  sharedAt: string | null;
+  emailedAt: string | null;
+  readAt: string | null;
   createdAt: string;
 };

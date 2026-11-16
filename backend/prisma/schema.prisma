@@ -917,6 +917,10 @@ model IepPlan {
   aiDrafted     Boolean       @default(false)
   status        IepPlanStatus @default(DRAFT)
   finalisedAt   DateTime?
+  /// Set when staff share a final plan with the parent: it then shows in the parent app.
+  sharedAt      DateTime?
+  emailedAt     DateTime?
+  readAt        DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
