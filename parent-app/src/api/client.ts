@@ -153,6 +153,39 @@ export type Walkthrough = {
   guideKind: "reviewed" | "drafted" | "general";
 };
 
+export type SessionSchedule = { kind: "once" } | { kind: "weekly"; days: string[]; until: string | null };
+
+/** A guided session a therapist set for the child, as listed for the parent. */
+export type HomeSessionSummary = {
+  id: string;
+  title: string;
+  authorName: string;
+  centreName: string;
+  schedule: SessionSchedule;
+  activities: string[];
+  dueToday: boolean;
+  inProgressRunId: string | null;
+  lastRun: { id: string; status: "COMPLETED" | "ENDED_EARLY"; startedAt: string; endedAt: string | null; summary: string | null } | null;
+};
+
+/** One step of a running session: what Pravnya says and what the parent can answer. */
+export type SessionStep = {
+  phase: "intro" | "setup" | "trial" | "help" | "done";
+  activityTitle: string | null;
+  item: string | null;
+  lines: string[];
+  choices: { id: string; label: string }[];
+  progress: { done: number; total: number };
+};
+
+export type SessionTurnResult = {
+  status: "IN_PROGRESS" | "COMPLETED" | "ENDED_EARLY";
+  step: SessionStep;
+  reply: string | null;
+  logged: { outcome: string; supportLevel: string; itemLabel: string } | null;
+  summary: string | null;
+};
+
 export type CreateEvidenceInput = {
   goalItemId?: string;
   newItemCustomText?: string;
@@ -358,6 +391,18 @@ export const api = {
   },
   markUpdateRead(token: string, kidId: string, updateId: string) {
     return request<ProgressUpdate>(`/parent-kids/${kidId}/updates/${updateId}/read`, { token, method: "POST" });
+  },
+  listSessions(token: string, kidId: string) {
+    return request<HomeSessionSummary[]>(`/parent-kids/${kidId}/sessions`, { token });
+  },
+  startSession(token: string, kidId: string, sessionId: string) {
+    return request<{ runId: string; title: string; step: SessionStep; resumed: boolean }>(`/parent-kids/${kidId}/sessions/${sessionId}/start`, { token, method: "POST" });
+  },
+  sessionTurn(token: string, kidId: string, runId: string, input: { choice: string } | { text: string } | { audio: { mimeType: string; base64: string } }) {
+    return request<SessionTurnResult>(`/parent-kids/${kidId}/session-runs/${runId}/turn`, { token, method: "POST", body: input });
+  },
+  endSession(token: string, kidId: string, runId: string) {
+    return request<{ status: string; summary: string | null }>(`/parent-kids/${kidId}/session-runs/${runId}/end`, { token, method: "POST" });
   },
   getWalkthrough(token: string, kidId: string, goalId: string) {
     return request<Walkthrough>(`/parent-kids/${kidId}/goals/${goalId}/walkthrough`, { token });

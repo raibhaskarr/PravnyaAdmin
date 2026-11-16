@@ -2,7 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { UpdateCard, UpdatesView } from "../updates/Updates";
 import { IepPlanCard, IepPlansView } from "../iep/IepPlans";
 import { AccountSection, DeletionBanner } from "../account/Account";
-import { api, ApiError, type CompanionMessage, type Goal, type IepPlan, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
+import { SessionRunner } from "../sessions/SessionRunner";
+import { TodaysSessionCard } from "../sessions/Sessions";
+import { api, ApiError, type CompanionMessage, type Goal, type HomeSessionSummary, type IepPlan, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
@@ -15,7 +17,7 @@ import { computeNudge, NudgeCard } from "./nudges";
 import { computeOpener, OpenerCard } from "./opener";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates" | "iepPlans";
+type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates" | "iepPlans" | "session";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
@@ -140,6 +142,9 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   const [updates, setUpdates] = useState<ProgressUpdate[]>([]);
   // IEPs the child's therapists have shared (newest first).
   const [iepPlans, setIepPlans] = useState<IepPlan[]>([]);
+  // Guided sessions the therapist set; the one being run, and the tab to return to afterwards.
+  const [sessions, setSessions] = useState<HomeSessionSummary[]>([]);
+  const [activeSession, setActiveSession] = useState<{ id: string; returnTo: View } | null>(null);
   // The real conversation thread, separate from the digest feed above -- persisted server-side
   // (companion.service.ts), fetched fresh whenever the kid changes.
   const [thread, setThread] = useState<CompanionMessage[]>([]);
@@ -182,6 +187,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
     void api.listSchedule(token, kid.id).then(setSchedule).catch(() => setSchedule([]));
     void api.listUpdates(token, kid.id).then(setUpdates).catch(() => setUpdates([]));
     void api.listIepPlans(token, kid.id).then(setIepPlans).catch(() => setIepPlans([]));
+    void api.listSessions(token, kid.id).then(setSessions).catch(() => setSessions([]));
   }, [token, kid?.id]);
 
   // useLayoutEffect (not useEffect) -- runs before paint, so the content never visibly flashes at
@@ -267,6 +273,32 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
     );
   }
 
+  function startSession(sessionId: string) {
+    setActiveSession({ id: sessionId, returnTo: view });
+    setView("session");
+  }
+
+  if (view === "session" && kid && activeSession) {
+    return (
+      <SessionRunner
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        sessionId={activeSession.id}
+        onClose={() => {
+          const back = activeSession.returnTo;
+          setActiveSession(null);
+          void api.listSessions(token, kid.id).then(setSessions).catch(() => {});
+          if (back === "home") backToHome();
+          else {
+            setView(back);
+            void api.listGoals(token, kid.id).then(setGoals).catch(() => {});
+          }
+        }}
+      />
+    );
+  }
+
   if (view === "iepPlans" && kid) {
     return (
       <IepPlansView
@@ -314,6 +346,8 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   // The newest update stays on Home while it's unread, or for two weeks after it was sent.
   const latestUpdate = updates.find((u) => !u.readAt || Date.now() - new Date(u.sentAt).getTime() < 14 * 86_400_000) ?? null;
   const opener = kid && goals && schedule ? computeOpener(kid.id, goals, schedule) : null;
+  // A session left halfway comes first, then one due today.
+  const todaysSession = sessions.find((s) => s.inProgressRunId) ?? sessions.find((s) => s.dueToday) ?? null;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--pv-bg)] md:flex-row">
@@ -343,7 +377,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
       {activeTab === "growth" && kid ? (
         <Growth key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
       ) : activeTab === "activities" && kid ? (
-        <Activities key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
+        <Activities key={kid.id + sessions.map((x) => x.lastRun?.id ?? "").join()} token={token} kidId={kid.id} kidName={kidName} sessions={sessions} onStartSession={startSession} />
       ) : activeTab === "goals" && kid ? (
         <Goals
           key={kid.id}
@@ -433,6 +467,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
           {/* Home opens scrolled to the bottom, so an unread update sits here, right above the composer. */}
           {latestUpdate && !latestUpdate.readAt ? <UpdateCard update={latestUpdate} onOpen={() => setView("updates")} /> : null}
           {iepPlans[0] && !iepPlans[0].readAt ? <IepPlanCard plan={iepPlans[0]} kidName={kidName} onOpen={() => setView("iepPlans")} /> : null}
+          {todaysSession ? <TodaysSessionCard session={todaysSession} kidName={kidName} onStart={() => startSession(todaysSession.id)} /> : null}
 
           {opener && kid ? (
             <OpenerCard

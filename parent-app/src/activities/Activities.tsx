@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type Goal, type GoalItemEvidence } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Walkthrough } from "./Walkthrough";
+import { SessionCard } from "../sessions/Sessions";
+import type { HomeSessionSummary } from "../api/client";
 
 // Faithful port of the admin panel's realActivities.tsx -- "Activities" = confirmation prompts,
 // not practice suggestions. A centre logging evidence for a goal is one data point; it's stronger
@@ -107,7 +109,20 @@ function ActivityCard({ candidate, onSelect }: { candidate: ActivityCandidate; o
   );
 }
 
-export function Activities({ token, kidId, kidName = "your child" }: { token: string; kidId: string; kidName?: string }) {
+export function Activities({
+  token,
+  kidId,
+  kidName = "your child",
+  sessions = [],
+  onStartSession
+}: {
+  token: string;
+  kidId: string;
+  kidName?: string;
+  /** Guided sessions the therapist set, shown above the suggestions. */
+  sessions?: HomeSessionSummary[];
+  onStartSession?: (sessionId: string) => void;
+}) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [error, setError] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -159,7 +174,18 @@ export function Activities({ token, kidId, kidName = "your child" }: { token: st
             }}
             onBack={() => setSelectedGoalId(null)}
           />
-        ) : candidates.length === 0 ? (
+        ) : (
+          <div className="flex flex-col gap-6">
+            {sessions.length > 0 && onStartSession ? (
+              <section className="flex flex-col gap-2.5">
+                <h2 className="text-[0.78rem] font-bold uppercase tracking-wide text-[var(--pv-ink-faint)]">Sessions from your therapist</h2>
+                {sessions.map((s) => (
+                  <SessionCard key={s.id} session={s} onStart={() => onStartSession(s.id)} />
+                ))}
+              </section>
+            ) : null}
+            <section>
+        {candidates.length === 0 ? (
           <p className="text-sm text-[var(--pv-ink-faint)]">
             Nothing waiting on a home try right now -- every goal with centre evidence already has at least as much logged at home.
           </p>
@@ -173,6 +199,9 @@ export function Activities({ token, kidId, kidName = "your child" }: { token: st
                 <ActivityCard key={c.goal.id} candidate={c} onSelect={() => setSelectedGoalId(c.goal.id)} />
               ))}
             </div>
+          </div>
+        )}
+            </section>
           </div>
         )}
       </main>

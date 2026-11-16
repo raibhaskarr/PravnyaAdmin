@@ -31,6 +31,7 @@ beforeEach(() => {
   mockApi.listSchedule.mockResolvedValue([]);
   mockApi.listUpdates.mockResolvedValue([]);
   mockApi.listIepPlans.mockResolvedValue([]);
+  mockApi.listSessions.mockResolvedValue([]);
   mockApi.listTherapists.mockResolvedValue([]);
   mockApi.listTherapistInvitations.mockResolvedValue([]);
   mockApi.listCentres.mockResolvedValue([]);
@@ -480,5 +481,50 @@ describe("your account: download my data, delete my account", () => {
     await userEvent.click(screen.getByRole("button", { name: "Keep my account" }));
     await waitFor(() => expect(mockApi.cancelAccountDeletion).toHaveBeenCalledWith("tok"));
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+});
+
+describe("guided sessions from the therapist", () => {
+  const session = (over: Partial<import("../api/client").HomeSessionSummary> = {}): import("../api/client").HomeSessionSummary => ({
+    id: "s-1",
+    title: "Naming game",
+    authorName: "Speech Therapist",
+    centreName: "Sunrise Centre",
+    schedule: { kind: "weekly", days: ["Mon", "Wed"], until: null },
+    activities: ["Name familiar objects", "Greet familiar adults"],
+    dueToday: true,
+    inProgressRunId: null,
+    lastRun: null,
+    ...over
+  });
+
+  test("a session due today shows on Home and opens the session screen; it's also listed on Activities", async () => {
+    mockApi.listSessions.mockResolvedValue([session()]);
+    mockApi.startSession.mockResolvedValue({
+      runId: "run-1",
+      title: "Naming game",
+      step: { phase: "intro", activityTitle: null, item: null, lines: ["Let's play!"], choices: [{ id: "ready", label: "We're ready" }], progress: { done: 0, total: 4 } },
+      resumed: false
+    });
+    renderHome();
+    expect(await screen.findByText("Today's session for Sam")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Start the session/ }));
+    expect(await screen.findByText("Let's play!")).toBeInTheDocument();
+    expect(mockApi.startSession).toHaveBeenCalledWith("tok", "kid-1", "s-1");
+    expect(screen.getByRole("button", { name: "End" })).toBeInTheDocument();
+  });
+
+  test("Activities lists the therapist's sessions with Start or Continue", async () => {
+    mockApi.listSessions.mockResolvedValue([session({ dueToday: false, inProgressRunId: "run-9", lastRun: { id: "r", status: "COMPLETED", startedAt: "2026-11-10T10:00:00.000Z", endedAt: "2026-11-10T10:12:00.000Z", summary: null } })]);
+    renderHome();
+    await screen.findByText("Sam");
+    expect(await screen.findByText("Today's session for Sam")).toBeInTheDocument();
+    expect(screen.getByText("Continue the session")).toBeInTheDocument();
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByText("Sessions from your therapist")).toBeInTheDocument();
+    expect(screen.getByText("Naming game")).toBeInTheDocument();
+    expect(screen.getByText(/Every Mon, Wed/)).toBeInTheDocument();
+    expect(screen.getByText(/Last done/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
   });
 });
