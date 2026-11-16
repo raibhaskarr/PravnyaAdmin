@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:android": "tsc -b && vite build --mode android && cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
