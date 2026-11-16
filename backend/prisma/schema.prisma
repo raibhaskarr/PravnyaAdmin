@@ -75,6 +75,7 @@ model User {
   sentTenantInvitations TenantInvitation[] @relation("TenantInvitationSentBy")
   sentSuperadminInvitations SuperadminInvitation[] @relation("SuperadminInvitationSentBy")
   progressUpdates ProgressUpdate[]
+  iepPlans IepPlan[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -173,6 +174,7 @@ model Tenant {
   auditLog   AuditLog[]
   createdParents Parent[]
   progressUpdates ProgressUpdate[]
+  iepPlans IepPlan[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -370,6 +372,7 @@ model Kid {
   companionMessages    CompanionMessage[]
   scheduleSlots        ScheduleSlot[]
   progressUpdates      ProgressUpdate[]
+  iepPlans      IepPlan[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -880,4 +883,42 @@ model ProgressUpdate {
   updatedAt    DateTime             @updatedAt
 
   @@index([kidId, status, sentAt])
+}
+
+enum IepPlanStatus {
+  DRAFT
+  FINAL
+}
+
+/// An Individualised Education Plan written by centre staff. Pravnya drafts it from the kid's
+/// active goals and the figures in their logs over a baseline window; staff edit and finalise it.
+/// A final plan is locked; a new review means a new plan.
+model IepPlan {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId         String        @db.Uuid
+  kid           Kid           @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  /// Name and centre are snapshots, so a final plan reads the same after a rename.
+  authorUserId  String?       @db.Uuid
+  author        User?         @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorName    String
+  centreName    String
+  title         String
+  /// The window of logs the baselines were taken from.
+  baselineFrom  DateTime
+  baselineTo    DateTime
+  planStart     DateTime
+  reviewDate    DateTime
+  /// { presentLevels, strengths[], goals[{goalId, title, area, baseline, target, strategies[], homePractice[]}], notes }
+  content       Json
+  /// The computed figures the baselines rest on (same shape as ProgressUpdate.stats).
+  stats         Json
+  aiDrafted     Boolean       @default(false)
+  status        IepPlanStatus @default(DRAFT)
+  finalisedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([kidId, status])
 }

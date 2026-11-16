@@ -455,6 +455,7 @@ export type Goal = {
 };
 
 export type GoalPeriodStats = {
+  goalId: string;
   goalTitle: string;
   domain: string;
   entries: number;
@@ -468,6 +469,8 @@ export type GoalPeriodStats = {
   trend: "up" | "steady" | "down" | null;
 };
 
+export type PeriodStats = { kidName: string; from: string; to: string; totalEntries: number; goals: GoalPeriodStats[]; notPractised: string[] };
+
 export type ProgressUpdate = {
   id: string;
   kidId: string;
@@ -477,7 +480,7 @@ export type ProgressUpdate = {
   periodStart: string;
   periodEnd: string;
   body: string;
-  stats: { kidName: string; from: string; to: string; totalEntries: number; goals: GoalPeriodStats[]; notPractised: string[] };
+  stats: PeriodStats;
   aiDrafted: boolean;
   status: "DRAFT" | "SENT";
   sentAt: string | null;
@@ -493,4 +496,34 @@ export type ProgressUpdateDue = {
   newEntries: number;
   draftId: string | null;
   isDue: boolean;
+};
+
+export type IepPlanGoal = {
+  goalId: string;
+  title: string;
+  area: string;
+  baseline: string;
+  target: string;
+  strategies: string[];
+  homePractice: string[];
+};
+
+export type IepPlanContent = { presentLevels: string; strengths: string[]; goals: IepPlanGoal[]; notes: string };
+
+export type IepPlan = {
+  id: string;
+  kidId: string;
+  authorName: string;
+  centreName: string;
+  title: string;
+  baselineFrom: string;
+  baselineTo: string;
+  planStart: string;
+  reviewDate: string;
+  content: IepPlanContent;
+  stats: PeriodStats;
+  aiDrafted: boolean;
+  status: "DRAFT" | "FINAL";
+  finalisedAt: string | null;
+  createdAt: string;
 };

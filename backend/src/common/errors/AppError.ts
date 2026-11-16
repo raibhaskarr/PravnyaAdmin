@@ -27,3 +27,7 @@ export function conflict(message: string, code = "CONFLICT") {
 export function gone(message: string) {
   return new AppError(410, "GONE", message);
 }
+
+export function badRequest(message: string, code = "BAD_REQUEST") {
+  return new AppError(400, code, message);
+}

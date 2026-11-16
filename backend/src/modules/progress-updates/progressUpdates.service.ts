@@ -100,7 +100,7 @@ async function draftWithAi(stats: PeriodStats, language: Language, tenantId: str
 
 // ---------- Helpers ----------
 
-async function authorFor(user: AuthUser) {
+export async function authorFor(user: AuthUser) {
   const [dbUser, therapist, tenant] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { name: true } }),
     prisma.therapist.findUnique({ where: { userId: user.id }, select: { name: true } }),

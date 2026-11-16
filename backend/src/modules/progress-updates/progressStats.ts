@@ -4,6 +4,7 @@ import { prisma } from "../../config/prisma";
 // model. The AI draft only words these; the fallback template renders them directly.
 
 export type GoalPeriodStats = {
+  goalId: string;
   goalTitle: string;
   domain: string;
   entries: number;
@@ -31,6 +32,11 @@ export type PeriodStats = {
 };
 
 const DAY = 86_400_000;
+
+// "Snack" (a shared item) and "snack" (typed by hand) are the same thing to a reader.
+function hasName(list: string[], name: string) {
+  return list.some((n) => n.toLowerCase() === name.toLowerCase());
+}
 
 function rate(correct: number, entries: number) {
   return entries ? correct / entries : 0;
@@ -61,7 +67,7 @@ export async function buildPeriodStats(kidId: string, from: Date, to: Date): Pro
   const notPractised: string[] = [];
 
   for (const g of goals) {
-    const s: GoalPeriodStats = { goalTitle: g.title, domain: g.canonicalSkill.domain.name, entries: 0, correct: 0, independent: 0, partial: 0, atHome: 0, atCentre: 0, examples: [], firstTimeIndependent: [], trend: null };
+    const s: GoalPeriodStats = { goalId: g.id, goalTitle: g.title, domain: g.canonicalSkill.domain.name, entries: 0, correct: 0, independent: 0, partial: 0, atHome: 0, atCentre: 0, examples: [], firstTimeIndependent: [], trend: null };
     let prevEntries = 0;
     let prevCorrect = 0;
     for (const item of g.items) {
@@ -82,7 +88,7 @@ export async function buildPeriodStats(kidId: string, from: Date, to: Date): Pro
         s.entries++;
         if (e.outcome === "CORRECT") {
           s.correct++;
-          if (name && !s.examples.includes(name) && s.examples.length < 4) s.examples.push(name);
+          if (name && !hasName(s.examples, name) && s.examples.length < 4) s.examples.push(name);
         }
         if (e.outcome === "PARTIAL") s.partial++;
         if (independent) {
@@ -92,7 +98,7 @@ export async function buildPeriodStats(kidId: string, from: Date, to: Date): Pro
         if (e.centreId || e.centreName) s.atCentre++;
         else s.atHome++;
       }
-      if (independentNow && !independentBefore && name) s.firstTimeIndependent.push(name);
+      if (independentNow && !independentBefore && name && !hasName(s.firstTimeIndependent, name)) s.firstTimeIndependent.push(name);
     }
     if (s.entries === 0) {
       notPractised.push(g.title);

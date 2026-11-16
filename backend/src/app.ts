@@ -35,6 +35,7 @@ import { parentScheduleRoutes } from "./modules/parent-schedule/parentSchedule.r
 import { scheduleRoutes } from "./modules/schedule/schedule.routes";
 import { centresRoutes } from "./modules/centres/centres.routes";
 import { progressUpdatesRoutes, parentProgressUpdatesRoutes } from "./modules/progress-updates/progressUpdates.routes";
+import { iepPlansRoutes } from "./modules/iep-plans/iepPlans.routes";
 import { parentCentresRoutes } from "./modules/parent-centres/parentCentres.routes";
 
 export function createApp() {
@@ -78,6 +79,7 @@ export function createApp() {
   app.use("/api/schedule", scheduleRoutes);
   app.use("/api/companion-messages", staffCompanionRoutes);
   app.use("/api/progress-updates", progressUpdatesRoutes);
+  app.use("/api/iep-plans", iepPlansRoutes);
   app.use("/api/centres", centresRoutes);
   app.use("/api/parent-centres", parentCentresRoutes);
   app.use("/api/manual", manualRoutes);

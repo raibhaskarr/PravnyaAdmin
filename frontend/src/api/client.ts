@@ -41,7 +41,9 @@ import type {
   TherapistInvitation,
   UserRole,
   ProgressUpdate,
-  ProgressUpdateDue
+  ProgressUpdateDue,
+  IepPlan,
+  IepPlanContent
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
@@ -329,6 +331,21 @@ export const api = {
   },
   deleteProgressUpdate(token: string, id: string) {
     return request<void>(`/progress-updates/${id}`, { token, method: "DELETE" });
+  },
+  listIepPlans(token: string, kidId: string) {
+    return request<IepPlan[]>(`/iep-plans?kidId=${kidId}`, { token });
+  },
+  draftIepPlan(token: string, body: { kidId: string; baselineDays: 30 | 90; reviewDate?: string }) {
+    return request<IepPlan>("/iep-plans", { token, method: "POST", body });
+  },
+  editIepPlan(token: string, id: string, body: { title?: string; reviewDate?: string; content?: IepPlanContent }) {
+    return request<IepPlan>(`/iep-plans/${id}`, { token, method: "PATCH", body });
+  },
+  finaliseIepPlan(token: string, id: string) {
+    return request<IepPlan>(`/iep-plans/${id}/finalise`, { token, method: "POST" });
+  },
+  deleteIepPlan(token: string, id: string) {
+    return request<void>(`/iep-plans/${id}`, { token, method: "DELETE" });
   },
   listKidCompanionMessages(token: string, kidId: string) {
     return request<StaffCompanionMessage[]>(`/companion-messages?kidId=${kidId}`, { token });
