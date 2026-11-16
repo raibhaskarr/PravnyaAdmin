@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { UpdatesDueCard } from "./UpdatesDueCard";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
@@ -89,6 +90,7 @@ export function KidsPage() {
   return (
     <div>
       <h1>Kids</h1>
+      <UpdatesDueCard />
 
       {canEdit ? (
         <div className="page-toolbar">

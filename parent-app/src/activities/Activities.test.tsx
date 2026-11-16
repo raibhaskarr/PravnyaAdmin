@@ -141,24 +141,65 @@ describe("<Activities />", () => {
     expect(await screen.findByText("Couldn't load activities. Try again.")).toBeInTheDocument();
   });
 
-  test("tapping a card opens the log form; Back (header) or Cancel return to the list", async () => {
-    const user = userEvent.setup();
-    render(<Activities token="tok" kidId="kid-1" />);
-    await user.click(await screen.findByRole("button", { name: /Asks for help using words/ }));
-    expect(screen.getByText("What specifically happened?")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByText("1 goal waiting on a home try")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /Asks for help using words/ }));
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByText("1 goal waiting on a home try")).toBeInTheDocument();
+  const walkthrough = (over: Partial<import("../api/client").Walkthrough> = {}): import("../api/client").Walkthrough => ({
+    goal: { id: "goal-act", title: "Asks for help using words", skillName: "Requests help", area: "Expressive Language" },
+    item: null,
+    lastAtCentre: { supportLevel: "VERBAL_PROMPT", centreName: CENTRE_A.name, date: d(9) },
+    fromPlan: { authorName: "Speech Therapist", homePractice: ["Pause before opening the snack box"], target: "Asks for help in 4 of 5 chances" },
+    guide: {
+      summary: "Practise asking for help when something is hard to do.",
+      minutes: 5,
+      materials: ["A snack box that's hard to open"],
+      steps: [
+        { title: "Set up the moment", detail: "Hand over the closed box and wait." },
+        { title: "Wait", detail: "Count to five before helping." }
+      ],
+      ifItsHard: ["Wait longer.", "Say \"help\" for them to copy."],
+      success: "They ask for help with a word, with or without a reminder.",
+      keepItFun: ["Praise the try."],
+      stopIf: "Stop if they get upset."
+    },
+    guideKind: "drafted",
+    ...over
   });
 
-  test("logging from a card saves against that goal, then refetches and returns to the list", async () => {
+  test("tapping a card walks through the activity page by page, with the child's details around the steps", async () => {
+    mockApi.getWalkthrough.mockResolvedValue(walkthrough());
+    const user = userEvent.setup();
+    render(<Activities token="tok" kidId="kid-1" kidName="Sam" />);
+    await user.click(await screen.findByRole("button", { name: /Asks for help using words/ }));
+    expect(mockApi.getWalkthrough).toHaveBeenCalledWith("tok", "kid-1", "goal-act");
+
+    expect(await screen.findByText("Practise asking for help when something is hard to do.")).toBeInTheDocument();
+    expect(screen.getByText("A snack box that's hard to open")).toBeInTheDocument();
+    expect(screen.getByText("From Sam's plan, by Speech Therapist")).toBeInTheDocument();
+    expect(screen.getByText("Pause before opening the snack box")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(screen.getByText("Step 1: Set up the moment")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Step 2: Wait")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByText("Step 1: Set up the moment")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("If it's hard")).toBeInTheDocument();
+    expect(screen.getByText(/Sam needed/)).toHaveTextContent("a spoken reminder");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("How you'll know it worked")).toBeInTheDocument();
+    expect(screen.getByText("Stop if they get upset.")).toBeInTheDocument();
+    expect(screen.getByText(/If your therapist suggests something different/)).toBeInTheDocument();
+  });
+
+  test("the last page logs how it went against that goal, then refetches and returns to the list", async () => {
+    mockApi.getWalkthrough.mockResolvedValue(walkthrough());
     const user = userEvent.setup();
     render(<Activities token="tok" kidId="kid-1" />);
     await user.click(await screen.findByRole("button", { name: /Asks for help using words/ }));
+    await user.click(await screen.findByRole("button", { name: "Let's start" }));
+    for (let i = 0; i < 3; i++) await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Log how it went" }));
+    expect(screen.getByText("How did it go?")).toBeInTheDocument();
     // After logging, home has caught up -> the list is empty on refetch.
     mockApi.listGoals.mockResolvedValue([]);
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -166,5 +207,41 @@ describe("<Activities />", () => {
     expect(mockApi.logEvidence).toHaveBeenCalledWith("tok", "kid-1", "goal-act", expect.objectContaining({ outcome: "CORRECT" }));
     expect(await screen.findByText(/Nothing waiting on a home try right now/)).toBeInTheDocument();
     expect(mockApi.listGoals).toHaveBeenCalledTimes(2);
+  });
+
+  test("Not now on the first page, or the header Back, returns to the list; 'Already done it?' jumps to logging", async () => {
+    mockApi.getWalkthrough.mockResolvedValue(walkthrough({ guideKind: "general", fromPlan: null, lastAtCentre: null }));
+    const user = userEvent.setup();
+    render(<Activities token="tok" kidId="kid-1" />);
+    await user.click(await screen.findByRole("button", { name: /Asks for help using words/ }));
+    await user.click(await screen.findByRole("button", { name: "Not now" }));
+    expect(screen.getByText("1 goal waiting on a home try")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Asks for help using words/ }));
+    expect(await screen.findByText(/General steps for any skill/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Already done it/ }));
+    expect(screen.getByText("How did it go?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("Practise asking for help when something is hard to do.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back to activities" }));
+    expect(screen.getByText("1 goal waiting on a home try")).toBeInTheDocument();
+  });
+
+  test("when the child managed on their own at the centre, it says to give them the chance first", async () => {
+    mockApi.getWalkthrough.mockResolvedValue(walkthrough({ lastAtCentre: { supportLevel: "INDEPENDENT", centreName: CENTRE_A.name, date: d(9) } }));
+    const user = userEvent.setup();
+    render(<Activities token="tok" kidId="kid-1" kidName="Sam" />);
+    await user.click(await screen.findByRole("button", { name: /Asks for help using words/ }));
+    await user.click(await screen.findByRole("button", { name: "Let's start" }));
+    for (let i = 0; i < 2; i++) await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText(/Sam did it/)).toHaveTextContent("on their own. Give them the chance to do it without help first.");
+  });
+
+  test("a walkthrough that fails to load says so", async () => {
+    mockApi.getWalkthrough.mockRejectedValue(new ApiError(404, "Goal not found"));
+    const user = userEvent.setup();
+    render(<Activities token="tok" kidId="kid-1" />);
+    await user.click(await screen.findByRole("button", { name: /Asks for help using words/ }));
+    expect(await screen.findByText("Goal not found")).toBeInTheDocument();
   });
 });

@@ -14,6 +14,10 @@ beforeEach(() => {
   mockApi.listGoals.mockResolvedValue([]);
   mockApi.listCompanionMessages.mockResolvedValue([]);
   mockApi.listSchedule.mockResolvedValue([]);
+  mockApi.listUpdates.mockResolvedValue([]);
+  mockApi.listIepPlans.mockResolvedValue([]);
+  mockApi.listSessions.mockResolvedValue([]);
+  mockApi.getPracticeStatus.mockResolvedValue({ perDay: 2, usedToday: 0, remainingToday: 2, inProgressRunId: null, available: false, minutes: null });
   mockApi.login.mockResolvedValue({ token: "tok-login", parent: makeProfile() });
   mockApi.sendVerificationCode.mockResolvedValue({ sent: true });
   mockApi.resetPassword.mockResolvedValue({ token: "tok-reset", parent: makeProfile() });
@@ -94,5 +98,23 @@ describe("App phase switching", () => {
     await user.type(screen.getByLabelText("New password"), "newpass99{Enter}");
     expect(await screen.findByText("Sam")).toBeInTheDocument();
     expect(getStoredToken()).toBe("tok-reset");
+  });
+});
+
+describe("the /delete-account link (listed on Google Play)", () => {
+  test("signed out: explains deletion, then sign-in lands on Profile with the delete option", async () => {
+    window.history.pushState({}, "", "/delete-account");
+    mockApi.listTherapists.mockResolvedValue([]);
+    mockApi.listTherapistInvitations.mockResolvedValue([]);
+    render(<App />);
+    expect(await screen.findByText("Delete your Pravnya account")).toBeInTheDocument();
+    expect(screen.getByText(/You have 30 days to change your mind/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sign in to delete" }));
+    await userEvent.type(screen.getByLabelText("Email"), "parent@test.local");
+    await userEvent.type(screen.getByLabelText("Password"), "pw");
+    await userEvent.click(screen.getByRole("button", { name: /^Sign in$/ }));
+    expect(await screen.findByText("Your account")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete my account" })).toBeInTheDocument();
+    window.history.pushState({}, "", "/");
   });
 });

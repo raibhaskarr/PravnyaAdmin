@@ -39,7 +39,17 @@ import type {
   TenantProfileFields,
   Therapist,
   TherapistInvitation,
-  UserRole
+  UserRole,
+  ProgressUpdate,
+  ProgressUpdateDue,
+  IepPlan,
+  IepPlanContent,
+  GuideContent,
+  HomeGuideDetail,
+  HomeGuideRow,
+  HomeSession,
+  SessionPlan,
+  SessionSchedule
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
@@ -309,6 +319,72 @@ export const api = {
   // Schedule / Companion -- read-only staff views of parent-app data
   listKidSchedule(token: string, kidId: string) {
     return request<ScheduleEntry[]>(`/schedule?kidId=${kidId}`, { token });
+  },
+  listProgressUpdates(token: string, kidId: string) {
+    return request<ProgressUpdate[]>(`/progress-updates?kidId=${kidId}`, { token });
+  },
+  listProgressUpdatesDue(token: string) {
+    return request<ProgressUpdateDue[]>("/progress-updates/due", { token });
+  },
+  draftProgressUpdate(token: string, body: { kidId: string; period: "week" | "month"; language: "en" | "hi" }) {
+    return request<ProgressUpdate>("/progress-updates", { token, method: "POST", body });
+  },
+  editProgressUpdate(token: string, id: string, text: string) {
+    return request<ProgressUpdate>(`/progress-updates/${id}`, { token, method: "PATCH", body: { body: text } });
+  },
+  sendProgressUpdate(token: string, id: string) {
+    return request<ProgressUpdate>(`/progress-updates/${id}/send`, { token, method: "POST" });
+  },
+  deleteProgressUpdate(token: string, id: string) {
+    return request<void>(`/progress-updates/${id}`, { token, method: "DELETE" });
+  },
+  listHomeSessions(token: string, kidId: string) {
+    return request<HomeSession[]>(`/home-sessions?kidId=${kidId}`, { token });
+  },
+  draftHomeSession(token: string, body: { kidId: string; goalIds: string[]; title?: string; language: "en" | "hi"; schedule: SessionSchedule }) {
+    return request<HomeSession>("/home-sessions/draft", { token, method: "POST", body });
+  },
+  editHomeSession(token: string, id: string, body: { title?: string; language?: "en" | "hi"; schedule?: SessionSchedule; plan?: SessionPlan }) {
+    return request<HomeSession>(`/home-sessions/${id}`, { token, method: "PATCH", body });
+  },
+  publishHomeSession(token: string, id: string) {
+    return request<HomeSession>(`/home-sessions/${id}/publish`, { token, method: "POST" });
+  },
+  archiveHomeSession(token: string, id: string) {
+    return request<HomeSession>(`/home-sessions/${id}/archive`, { token, method: "POST" });
+  },
+  deleteHomeSession(token: string, id: string) {
+    return request<void>(`/home-sessions/${id}`, { token, method: "DELETE" });
+  },
+  listHomeGuides(token: string) {
+    return request<HomeGuideRow[]>("/home-guides", { token });
+  },
+  getHomeGuide(token: string, skillId: string) {
+    return request<HomeGuideDetail>(`/home-guides/${skillId}`, { token });
+  },
+  draftHomeGuide(token: string, skillId: string) {
+    return request<{ drafted: boolean }>(`/home-guides/${skillId}/draft`, { token, method: "POST" });
+  },
+  saveHomeGuide(token: string, skillId: string, content: GuideContent, reviewed: boolean) {
+    return request<unknown>(`/home-guides/${skillId}`, { token, method: "PUT", body: { content, reviewed } });
+  },
+  listIepPlans(token: string, kidId: string) {
+    return request<IepPlan[]>(`/iep-plans?kidId=${kidId}`, { token });
+  },
+  draftIepPlan(token: string, body: { kidId: string; baselineDays: 30 | 90; reviewDate?: string }) {
+    return request<IepPlan>("/iep-plans", { token, method: "POST", body });
+  },
+  editIepPlan(token: string, id: string, body: { title?: string; reviewDate?: string; content?: IepPlanContent }) {
+    return request<IepPlan>(`/iep-plans/${id}`, { token, method: "PATCH", body });
+  },
+  finaliseIepPlan(token: string, id: string) {
+    return request<IepPlan>(`/iep-plans/${id}/finalise`, { token, method: "POST" });
+  },
+  shareIepPlan(token: string, id: string) {
+    return request<IepPlan>(`/iep-plans/${id}/share`, { token, method: "POST" });
+  },
+  deleteIepPlan(token: string, id: string) {
+    return request<void>(`/iep-plans/${id}`, { token, method: "DELETE" });
   },
   listKidCompanionMessages(token: string, kidId: string) {
     return request<StaffCompanionMessage[]>(`/companion-messages?kidId=${kidId}`, { token });

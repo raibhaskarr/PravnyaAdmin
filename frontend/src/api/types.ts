@@ -453,3 +453,167 @@ export type Goal = {
   createdAt: string;
   items: GoalItem[];
 };
+
+export type GoalPeriodStats = {
+  goalId: string;
+  goalTitle: string;
+  domain: string;
+  entries: number;
+  correct: number;
+  independent: number;
+  partial: number;
+  atHome: number;
+  atCentre: number;
+  examples: string[];
+  firstTimeIndependent: string[];
+  trend: "up" | "steady" | "down" | null;
+};
+
+export type PeriodStats = { kidName: string; from: string; to: string; totalEntries: number; goals: GoalPeriodStats[]; notPractised: string[] };
+
+export type ProgressUpdate = {
+  id: string;
+  kidId: string;
+  authorName: string;
+  centreName: string;
+  language: "en" | "hi";
+  periodStart: string;
+  periodEnd: string;
+  body: string;
+  stats: PeriodStats;
+  aiDrafted: boolean;
+  status: "DRAFT" | "SENT";
+  sentAt: string | null;
+  emailedAt: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type ProgressUpdateDue = {
+  kidId: string;
+  kidName: string;
+  lastSentAt: string | null;
+  newEntries: number;
+  draftId: string | null;
+  isDue: boolean;
+};
+
+export type IepPlanGoal = {
+  goalId: string;
+  title: string;
+  area: string;
+  baseline: string;
+  target: string;
+  strategies: string[];
+  homePractice: string[];
+};
+
+export type IepPlanContent = { presentLevels: string; strengths: string[]; goals: IepPlanGoal[]; notes: string };
+
+export type IepPlan = {
+  id: string;
+  kidId: string;
+  authorName: string;
+  centreName: string;
+  title: string;
+  baselineFrom: string;
+  baselineTo: string;
+  planStart: string;
+  reviewDate: string;
+  content: IepPlanContent;
+  stats: PeriodStats;
+  aiDrafted: boolean;
+  status: "DRAFT" | "FINAL";
+  finalisedAt: string | null;
+  sharedAt: string | null;
+  emailedAt: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type GuideContent = {
+  summary: string;
+  minutes: number;
+  materials: string[];
+  steps: { title: string; detail: string }[];
+  ifItsHard: string[];
+  success: string;
+  keepItFun: string[];
+  stopIf: string;
+};
+
+export type HomeGuideRow = {
+  skillId: string;
+  skillName: string;
+  area: string;
+  activeGoals: number;
+  guide: { aiDrafted: boolean; reviewedAt: string | null; updatedAt: string } | null;
+};
+
+export type HomeGuideDetail = {
+  skillId: string;
+  skillName: string;
+  area: string;
+  guide: { content: GuideContent; aiDrafted: boolean; reviewedAt: string | null; reviewedBy: { name: string } | null; updatedAt: string } | null;
+  general: GuideContent;
+};
+
+export type SessionActivityType =
+  | "DISCRETE_TRIAL"
+  | "RECEPTIVE_ID"
+  | "EXPRESSIVE_LABEL"
+  | "AAC_LABEL"
+  | "ARTICULATION"
+  | "REQUESTING"
+  | "FOLLOW_DIRECTIONS"
+  | "IMITATION"
+  | "OTHER";
+
+export type SessionActivity = {
+  key: string;
+  goalId: string;
+  goalTitle: string;
+  type: SessionActivityType;
+  items: { goalItemId: string; label: string }[];
+  trialsPerItem: number;
+  setup: string;
+  instruction: string;
+  correctLooksLike: string;
+  prompts: { supportLevel: string; say: string }[];
+  errorCorrection: string;
+  reinforcement: string;
+  modality: string;
+  missesBeforeMovingOn: number;
+};
+
+export type SessionPlan = { intro: string; activities: SessionActivity[]; closing: string };
+export type SessionSchedule = { kind: "once" } | { kind: "weekly"; days: string[]; until: string | null };
+
+export type SessionTry = { activityKey: string; goalItemId: string; itemLabel: string; outcome: "CORRECT" | "INCORRECT"; supportLevel: string; at: string };
+
+export type HomeSessionRun = {
+  id: string;
+  status: "IN_PROGRESS" | "COMPLETED" | "ENDED_EARLY";
+  startedAt: string;
+  endedAt: string | null;
+  summary: string | null;
+  results: SessionTry[];
+};
+
+export type HomeSession = {
+  id: string;
+  kidId: string;
+  authorName: string;
+  title: string;
+  language: "en" | "hi";
+  plan: SessionPlan;
+  schedule: SessionSchedule;
+  aiDrafted: boolean;
+  /** THERAPIST: built here. PRAVNYA: a practice session Pravnya made when the parent asked for one. */
+  source: "THERAPIST" | "PRAVNYA";
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  publishedAt: string | null;
+  createdAt: string;
+  runs: HomeSessionRun[];
+  skippedGoals?: string[];
+};

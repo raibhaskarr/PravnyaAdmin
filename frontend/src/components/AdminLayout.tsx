@@ -24,6 +24,7 @@ function navItemsForRole(role: AuthUser["role"]): NavItem[] {
     return [
       { to: "/admin/tenants", label: "Tenants", icon: "pi pi-building" },
       { to: "/admin/taxonomy", label: "Taxonomy", icon: "pi pi-sitemap" },
+      { to: "/admin/home-guides", label: "Home activity guides", icon: "pi pi-home" },
       { to: "/admin/poc-review", label: "AI Tagging POC", icon: "pi pi-chart-line" },
       { to: "/admin/superadmins", label: "Superadmins", icon: "pi pi-shield" },
       { to: "/manual", label: "Manual", icon: "pi pi-book" }

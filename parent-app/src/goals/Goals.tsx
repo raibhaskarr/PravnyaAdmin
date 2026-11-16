@@ -142,11 +142,14 @@ function GoalDetail({
 export function Goals({
   token,
   kidId,
-  onUploadIep
+  onUploadIep,
+  sharedPlan = null
 }: {
   token: string;
   kidId: string;
   onUploadIep: () => void;
+  /** The newest IEP the care team shared, shown above the goals list. */
+  sharedPlan?: React.ReactNode;
 }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [error, setError] = useState("");
@@ -184,6 +187,7 @@ export function Goals({
       </header>
 
       <main className="mx-auto w-full min-h-0 max-w-2xl flex-1 overflow-y-auto px-5 py-6">
+        {sharedPlan && !selected ? <div className="mb-4">{sharedPlan}</div> : null}
         {error ? (
           <p className="text-sm text-red-600">{error}</p>
         ) : !goals ? (

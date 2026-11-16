@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   api,
   ApiError,
@@ -135,7 +135,21 @@ function ScheduleRow({
   );
 }
 
-export function Profile({ token, kidId, kidName }: { token: string; kidId: string; kidName: string }) {
+export function Profile({
+  token,
+  kidId,
+  kidName,
+  account = null,
+  focusAccount = false
+}: {
+  token: string;
+  kidId: string;
+  kidName: string;
+  account?: React.ReactNode;
+  /** Scroll to "Your account" once loaded -- for parents arriving from the /delete-account link. */
+  focusAccount?: boolean;
+}) {
+  const accountRef = useRef<HTMLDivElement>(null);
   const [therapists, setTherapists] = useState<LinkedTherapist[] | null>(null);
   const [invitations, setInvitations] = useState<TherapistInvitationSummary[] | null>(null);
   const [schedule, setSchedule] = useState<ScheduleSlot[] | null>(null);
@@ -293,6 +307,11 @@ export function Profile({ token, kidId, kidName }: { token: string; kidId: strin
   // EXPIRED kept visible (not just PENDING) so a lapsed invite stays a "Retry" button instead of
   // silently disappearing -- ACCEPTED is redundant with the therapist card above, REVOKED is a
   // dead end with nothing left to do, so neither earns a slot in this list.
+  const loaded = !!therapists && !!invitations && !!schedule;
+  useEffect(() => {
+    if (focusAccount && loaded) accountRef.current?.scrollIntoView?.({ block: "start" });
+  }, [focusAccount, loaded]);
+
   const actionableInvitations = (invitations ?? []).filter((i) => i.status === "PENDING" || i.status === "EXPIRED");
 
   return (
@@ -426,6 +445,11 @@ export function Profile({ token, kidId, kidName }: { token: string; kidId: strin
             </section>
           </div>
         )}
+        {account ? (
+          <div ref={accountRef} className="mt-6">
+            {account}
+          </div>
+        ) : null}
       </main>
     </div>
   );

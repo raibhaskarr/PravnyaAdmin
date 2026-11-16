@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, ApiError } from "../api/client";
@@ -29,6 +29,10 @@ beforeEach(() => {
   mockApi.listGoals.mockResolvedValue([]);
   mockApi.listCompanionMessages.mockResolvedValue([]);
   mockApi.listSchedule.mockResolvedValue([]);
+  mockApi.listUpdates.mockResolvedValue([]);
+  mockApi.listIepPlans.mockResolvedValue([]);
+  mockApi.listSessions.mockResolvedValue([]);
+  mockApi.getPracticeStatus.mockResolvedValue({ perDay: 2, usedToday: 0, remainingToday: 2, inProgressRunId: null, available: false, minutes: null });
   mockApi.listTherapists.mockResolvedValue([]);
   mockApi.listTherapistInvitations.mockResolvedValue([]);
   mockApi.listCentres.mockResolvedValue([]);
@@ -340,5 +344,251 @@ describe("Goals -> IEP upload sub-screen", () => {
     await screen.findByText("Sam");
     await user.click(within(bottomBar()).getByRole("button", { name: /Home/ }));
     expect(mockApi.listGoals).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("progress updates from the care team", () => {
+  const update = (over: Partial<import("../api/client").ProgressUpdate> = {}) => ({
+    id: "upd-1",
+    authorName: "Speech Therapist",
+    centreName: "Sunrise Centre",
+    language: "en" as const,
+    periodStart: "2026-11-09T00:00:00.000Z",
+    periodEnd: "2026-11-16T00:00:00.000Z",
+    body: "Sam had a lovely week.\n\nTry at home\n• Pause before giving a snack.",
+    sentAt: new Date().toISOString(),
+    readAt: null,
+    ...over
+  });
+
+  test("an unread update shows on Home; opening it lists it in full and marks it read", async () => {
+    mockApi.listUpdates.mockResolvedValue([update()]);
+    mockApi.markUpdateRead.mockResolvedValue(update({ readAt: new Date().toISOString() }));
+    renderHome();
+    expect(await screen.findByText("Update from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
+    expect(screen.getByText("New")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Read the update/ }));
+    expect(await screen.findByText("Updates about Sam")).toBeInTheDocument();
+    expect(screen.getByText(/Pause before giving a snack/)).toBeInTheDocument();
+    await waitFor(() => expect(mockApi.markUpdateRead).toHaveBeenCalledWith("tok", "kid-1", "upd-1"));
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByText("Update from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
+    expect(screen.queryByText("New")).not.toBeInTheDocument();
+  });
+
+  test("an old, already-read update no longer shows on Home", async () => {
+    const old = new Date(Date.now() - 20 * 86_400_000).toISOString();
+    mockApi.listUpdates.mockResolvedValue([update({ sentAt: old, readAt: old })]);
+    renderHome();
+    expect(await screen.findByText("Sam")).toBeInTheDocument();
+    await waitFor(() => expect(mockApi.listUpdates).toHaveBeenCalledWith("tok", "kid-1"));
+    expect(screen.queryByText(/Update from Speech Therapist/)).not.toBeInTheDocument();
+  });
+});
+
+describe("IEPs shared by the care team", () => {
+  const plan = (over: Partial<import("../api/client").IepPlan> = {}) => ({
+    id: "iep-1",
+    title: "Individualised Education Plan",
+    authorName: "Speech Therapist",
+    centreName: "Sunrise Centre",
+    planStart: "2026-11-16T00:00:00.000Z",
+    reviewDate: "2027-02-15T00:00:00.000Z",
+    content: {
+      presentLevels: "Sam asks for some things with two words.",
+      strengths: ["Asked for a ball without help for the first time"],
+      goals: [{ goalId: "g-1", title: "Request items with two words", area: "Expressive Language", baseline: "Correct in 7 of 18 attempts.", target: "Asks with two words in 4 of 5 opportunities.", strategies: ["Wait time"], homePractice: ["Pause before giving a snack"] }],
+      notes: ""
+    },
+    sharedAt: new Date().toISOString(),
+    readAt: null,
+    ...over
+  });
+
+  test("an unread plan shows on Home; opening it shows the goals and targets and marks it read", async () => {
+    mockApi.listIepPlans.mockResolvedValue([plan()]);
+    mockApi.markIepPlanRead.mockResolvedValue(plan({ readAt: new Date().toISOString() }));
+    renderHome();
+    expect(await screen.findByText("Sam's plan from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /See the plan/ }));
+    expect(await screen.findByText("Sam's plan")).toBeInTheDocument();
+    expect(screen.getByText("Asks with two words in 4 of 5 opportunities.")).toBeInTheDocument();
+    expect(screen.getByText("Pause before giving a snack")).toBeInTheDocument();
+    await waitFor(() => expect(mockApi.markIepPlanRead).toHaveBeenCalledWith("tok", "kid-1", "iep-1"));
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    await screen.findByText("Sam");
+    expect(screen.queryByText(/Sam's plan from/)).not.toBeInTheDocument();
+  });
+
+  test("a read plan stays reachable from the Goals tab", async () => {
+    mockApi.listIepPlans.mockResolvedValue([plan({ readAt: new Date().toISOString() })]);
+    renderHome();
+    await screen.findByText("Sam");
+    await waitFor(() => expect(mockApi.listIepPlans).toHaveBeenCalledWith("tok", "kid-1"));
+    expect(screen.queryByText(/Sam's plan from/)).not.toBeInTheDocument();
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Goals/ }));
+    expect(await screen.findByText("Sam's plan from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
+  });
+});
+
+describe("your account: download my data, delete my account", () => {
+  async function openAccount() {
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Profile/ }));
+    return screen.findByText("Your account");
+  }
+
+  test("download opens the short-lived export link", async () => {
+    mockApi.dataExportLink.mockResolvedValue({ path: "/api/parent-account/export?token=abc", expiresInMinutes: 5 });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    await openAccount();
+    await userEvent.click(screen.getByRole("button", { name: "Download my data" }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith(expect.stringMatching(/\/api\/parent-account\/export\?token=abc$/)));
+    vi.unstubAllGlobals();
+  });
+
+  test("delete explains what happens, needs the password, then shows the date and a way back", async () => {
+    const date = "2026-12-16T10:00:00.000Z";
+    mockApi.requestAccountDeletion.mockRejectedValueOnce(new ApiError(401, "That password isn't right"));
+    mockApi.requestAccountDeletion.mockResolvedValueOnce({ scheduledPurgeAt: date });
+    await openAccount();
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    expect(screen.getByText(/You have 30 days to change your mind/)).toBeInTheDocument();
+    expect(screen.getByText(/the centre keeps its own therapy records/)).toBeInTheDocument();
+    const confirm = screen.getByRole("button", { name: "Delete my account" });
+    expect(confirm).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText("Enter your password to confirm"), "wrong");
+    await userEvent.click(confirm);
+    expect(await screen.findByText("That password isn't right")).toBeInTheDocument();
+
+    mockApi.me.mockResolvedValue(makeProfile({ scheduledPurgeAt: date }));
+    await userEvent.clear(screen.getByLabelText("Enter your password to confirm"));
+    await userEvent.type(screen.getByLabelText("Enter your password to confirm"), "right");
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    await waitFor(() => expect(mockApi.requestAccountDeletion).toHaveBeenLastCalledWith("tok", "right"));
+    expect(await screen.findByText(/Your account will be deleted on/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Keep my account" })).toBeInTheDocument();
+  });
+
+  test("while deletion is pending, Home shows a banner; Keep my account cancels it", async () => {
+    mockApi.me.mockResolvedValue(makeProfile({ scheduledPurgeAt: "2026-12-16T10:00:00.000Z" }));
+    mockApi.cancelAccountDeletion.mockResolvedValue({ cancelled: true });
+    renderHome();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Your account will be deleted on/);
+    mockApi.me.mockResolvedValue(makeProfile());
+    await userEvent.click(screen.getByRole("button", { name: "Keep my account" }));
+    await waitFor(() => expect(mockApi.cancelAccountDeletion).toHaveBeenCalledWith("tok"));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+});
+
+describe("guided sessions from the therapist", () => {
+  const session = (over: Partial<import("../api/client").HomeSessionSummary> = {}): import("../api/client").HomeSessionSummary => ({
+    id: "s-1",
+    title: "Naming game",
+    authorName: "Speech Therapist",
+    centreName: "Sunrise Centre",
+    schedule: { kind: "weekly", days: ["Mon", "Wed"], until: null },
+    activities: ["Name familiar objects", "Greet familiar adults"],
+    dueToday: true,
+    inProgressRunId: null,
+    lastRun: null,
+    ...over
+  });
+
+  test("a session due today shows on Home and opens the session screen; it's also listed on Activities", async () => {
+    mockApi.listSessions.mockResolvedValue([session()]);
+    mockApi.startSession.mockResolvedValue({
+      runId: "run-1",
+      title: "Naming game",
+      step: { phase: "intro", activityTitle: null, item: null, lines: ["Let's play!"], choices: [{ id: "ready", label: "We're ready" }], progress: { done: 0, total: 4 } },
+      resumed: false
+    });
+    renderHome();
+    expect(await screen.findByText("Today's session for Sam")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Start the session/ }));
+    expect(await screen.findByText("Let's play!")).toBeInTheDocument();
+    expect(mockApi.startSession).toHaveBeenCalledWith("tok", "kid-1", "s-1");
+    expect(screen.getByRole("button", { name: "End" })).toBeInTheDocument();
+  });
+
+  test("Activities lists the therapist's sessions with Start or Continue", async () => {
+    mockApi.listSessions.mockResolvedValue([session({ dueToday: false, inProgressRunId: "run-9", lastRun: { id: "r", status: "COMPLETED", startedAt: "2026-11-10T10:00:00.000Z", endedAt: "2026-11-10T10:12:00.000Z", summary: null } })]);
+    renderHome();
+    await screen.findByText("Sam");
+    expect(await screen.findByText("Today's session for Sam")).toBeInTheDocument();
+    expect(screen.getByText("Continue the session")).toBeInTheDocument();
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByText("Sessions from your therapist")).toBeInTheDocument();
+    expect(screen.getByText("Naming game")).toBeInTheDocument();
+    expect(screen.getByText(/Every Mon, Wed/)).toBeInTheDocument();
+    expect(screen.getByText(/Last done/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+  });
+});
+
+describe("practice sessions with Pravnya", () => {
+  const status = (over: Partial<import("../api/client").PracticeStatus> = {}): import("../api/client").PracticeStatus => ({
+    perDay: 2,
+    usedToday: 0,
+    remainingToday: 2,
+    inProgressRunId: null,
+    available: true,
+    minutes: 13,
+    ...over
+  });
+
+  test("Activities offers one; starting asks Pravnya in the chosen language and opens the session", async () => {
+    try {
+      localStorage.removeItem("pv.practice.language");
+    } catch {
+      // ignore
+    }
+    mockApi.getPracticeStatus.mockResolvedValue(status());
+    mockApi.startPractice.mockResolvedValue({
+      runId: "run-p",
+      title: "Sam के साथ अभ्यास",
+      step: { phase: "intro", activityTitle: null, item: null, lines: ["आज खेलेंगे!"], choices: [{ id: "ready", label: "हम तैयार हैं" }], progress: { done: 0, total: 24 } },
+      resumed: false
+    });
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByText("Practice with Pravnya")).toBeInTheDocument();
+    expect(screen.getByText(/about 13 minutes/)).toBeInTheDocument();
+    expect(screen.getByText("2 of 2 left today")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "हिन्दी" }));
+    await userEvent.click(screen.getByRole("button", { name: "Start practice" }));
+    expect(await screen.findByText("आज खेलेंगे!")).toBeInTheDocument();
+    expect(mockApi.startPractice).toHaveBeenCalledWith("tok", "kid-1", "hi");
+    expect(mockApi.startSession).not.toHaveBeenCalled();
+  });
+
+  test("one left halfway says Continue; after today's two, come back tomorrow; nothing to practise hides it", async () => {
+    mockApi.getPracticeStatus.mockResolvedValue(status({ usedToday: 1, remainingToday: 1, inProgressRunId: "run-p" }));
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByRole("button", { name: "Continue practice" })).toBeInTheDocument();
+    expect(screen.getByText(/You left one halfway/)).toBeInTheDocument();
+    cleanup();
+
+    mockApi.getPracticeStatus.mockResolvedValue(status({ usedToday: 2, remainingToday: 0 }));
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByText(/That's today's 2 practice sessions done/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start practice" })).not.toBeInTheDocument();
+    cleanup();
+
+    mockApi.getPracticeStatus.mockResolvedValue(status({ available: false }));
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    await screen.findByText(/Activities/, { selector: "p" });
+    expect(screen.queryByText("Practice with Pravnya")).not.toBeInTheDocument();
   });
 });

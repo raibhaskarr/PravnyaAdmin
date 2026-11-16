@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type Goal, type GoalItemEvidence } from "../api/client";
 import mark from "../brand/mark.svg";
-import { LogEvidenceForm } from "../goals/LogEvidenceForm";
+import { Walkthrough } from "./Walkthrough";
+import { PracticeCard, SessionCard } from "../sessions/Sessions";
+import type { HomeSessionSummary, PracticeStatus } from "../api/client";
 
 // Faithful port of the admin panel's realActivities.tsx -- "Activities" = confirmation prompts,
 // not practice suggestions. A centre logging evidence for a goal is one data point; it's stronger
@@ -10,9 +12,8 @@ import { LogEvidenceForm } from "../goals/LogEvidenceForm";
 // version's own comment: it decides what to ask, an AI would only phrase it.
 //
 // One real difference from the admin version: there the viewer is a therapist/admin looking at
-// someone else's "to-do" list for a parent. Here the viewer IS the parent, so each card is
-// tappable straight into the same LogEvidenceForm the Goals tab already uses, instead of being a
-// read-only suggestion someone else has to go relay.
+// someone else's "to-do" list for a parent. Here the viewer IS the parent, so each card opens a
+// step-by-step walkthrough of the activity (Walkthrough.tsx) that ends in logging how it went.
 
 function formatDate(date: string | null): string {
   if (!date) return "—";
@@ -101,14 +102,47 @@ function ActivityCard({ candidate, onSelect }: { candidate: ActivityCandidate; o
       <p className="mt-2 text-[0.85rem] leading-relaxed text-[var(--pv-ink-soft)]">
         Confirmed at <b className="font-bold text-[var(--pv-ink)]">{candidate.suggestedCentreName}</b>
         {candidate.suggestedDate ? ` on ${formatDate(candidate.suggestedDate)}` : ""} — try "
-        <b className="font-bold text-[var(--pv-ink)]">{candidate.suggestedItemLabel}</b>" at home and log what happens.
+        <b className="font-bold text-[var(--pv-ink)]">{candidate.suggestedItemLabel}</b>" at home.
       </p>
+      <p className="mt-2 text-[0.9rem] font-semibold text-[var(--pv-green-700)]">Start the activity →</p>
     </button>
   );
 }
 
-export function Activities({ token, kidId }: { token: string; kidId: string }) {
+export function Activities({
+  token,
+  kidId,
+  kidName = "your child",
+  sessions = [],
+  onStartSession,
+  onStartPractice
+}: {
+  token: string;
+  kidId: string;
+  kidName?: string;
+  /** Guided sessions the therapist set, shown above the suggestions. */
+  sessions?: HomeSessionSummary[];
+  onStartSession?: (sessionId: string) => void;
+  /** A practice session Pravnya puts together from the child's goals. */
+  onStartPractice?: (language: "en" | "hi") => void;
+}) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
+  const [practice, setPractice] = useState<PracticeStatus | null>(null);
+  const [practiceLanguage, setPracticeLanguage] = useState<"en" | "hi">(() => {
+    try {
+      return localStorage.getItem("pv.practice.language") === "hi" ? "hi" : "en";
+    } catch {
+      return "en";
+    }
+  });
+  function chooseLanguage(l: "en" | "hi") {
+    setPracticeLanguage(l);
+    try {
+      localStorage.setItem("pv.practice.language", l);
+    } catch {
+      // not remembered; fine
+    }
+  }
   const [error, setError] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
@@ -121,6 +155,13 @@ export function Activities({ token, kidId }: { token: string; kidId: string }) {
 
   useEffect(() => {
     void refetch();
+    if (onStartPractice) {
+      api
+        .getPracticeStatus(token, kidId)
+        .then(setPractice)
+        .catch(() => setPractice(null));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, kidId]);
 
   const candidates = goals ? buildActivityCandidates(goals) : [];
@@ -130,13 +171,13 @@ export function Activities({ token, kidId }: { token: string; kidId: string }) {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--pv-bg)]">
       <header className="flex min-h-16 items-center gap-3 border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
         {selected ? (
-          <button type="button" onClick={() => setSelectedGoalId(null)} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--pv-ink-soft)] transition hover:bg-[var(--pv-border)]">
+          <button type="button" onClick={() => setSelectedGoalId(null)} aria-label="Back to activities" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--pv-ink-soft)] transition hover:bg-[var(--pv-border)]">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         ) : null}
-        <p className="text-[1.05rem] font-semibold text-[var(--pv-ink)]">Activities</p>
+        <p className="text-[1.05rem] font-semibold text-[var(--pv-ink)]">{selected ? "Activity" : "Activities"}</p>
       </header>
 
       <main className="mx-auto w-full min-h-0 max-w-2xl flex-1 overflow-y-auto px-5 py-6">
@@ -147,17 +188,33 @@ export function Activities({ token, kidId }: { token: string; kidId: string }) {
             <img src={mark} alt="" className="h-8 w-8 animate-pulse opacity-60" />
           </div>
         ) : selected ? (
-          <LogEvidenceForm
-            goal={selected.goal}
+          <Walkthrough
+            key={selected.goal.id}
             token={token}
             kidId={kidId}
-            onLogged={() => {
+            kidName={kidName}
+            goal={selected.goal}
+            onDone={() => {
               setSelectedGoalId(null);
               void refetch();
             }}
-            onCancel={() => setSelectedGoalId(null)}
+            onBack={() => setSelectedGoalId(null)}
           />
-        ) : candidates.length === 0 ? (
+        ) : (
+          <div className="flex flex-col gap-6">
+            {practice?.available && onStartPractice ? (
+              <PracticeCard status={practice} kidName={kidName} language={practiceLanguage} onLanguage={chooseLanguage} onStart={() => onStartPractice(practiceLanguage)} />
+            ) : null}
+            {sessions.length > 0 && onStartSession ? (
+              <section className="flex flex-col gap-2.5">
+                <h2 className="text-[0.78rem] font-bold uppercase tracking-wide text-[var(--pv-ink-faint)]">Sessions from your therapist</h2>
+                {sessions.map((s) => (
+                  <SessionCard key={s.id} session={s} onStart={() => onStartSession(s.id)} />
+                ))}
+              </section>
+            ) : null}
+            <section>
+        {candidates.length === 0 ? (
           <p className="text-sm text-[var(--pv-ink-faint)]">
             Nothing waiting on a home try right now -- every goal with centre evidence already has at least as much logged at home.
           </p>
@@ -171,6 +228,9 @@ export function Activities({ token, kidId }: { token: string; kidId: string }) {
                 <ActivityCard key={c.goal.id} candidate={c} onSelect={() => setSelectedGoalId(c.goal.id)} />
               ))}
             </div>
+          </div>
+        )}
+            </section>
           </div>
         )}
       </main>

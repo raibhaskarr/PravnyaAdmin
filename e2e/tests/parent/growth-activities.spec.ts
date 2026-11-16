@@ -43,7 +43,7 @@ test("Growth: a child with nothing logged gets a friendly empty state", async ({
 });
 
 test.describe("Activities", () => {
-  test("a goal confirmed at a centre but not yet tried at home is suggested, and logging a home try counts", async ({ page, request }) => {
+  test("a goal confirmed at a centre but not yet tried at home is suggested, walked through step by step, and logging a home try counts", async ({ page, request }) => {
     const family = await createFamily(request, { goals: 1 });
     const [goal] = await listGoals(request, family.token, family.kidIds[0]);
     const centre = await createCentre(request, family.token, `Bright Steps ${Date.now()}`);
@@ -57,7 +57,15 @@ test.describe("Activities", () => {
     await expect(page.getByText(/Confirmed at/).first()).toContainText(centre.name);
 
     await card.click();
-    await expect(page.getByRole("button", { name: "Back", exact: true })).toBeVisible();
+    // The walkthrough: today's item, then one page per step, ending in the log form.
+    await expect(page.getByRole("button", { name: "Back to activities" })).toBeVisible();
+    await expect(page.getByText("Today, try it with")).toBeVisible();
+    await expect(page.getByText("Ball", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Let's start" }).click();
+    await expect(page.getByText(/^Step 1: /)).toBeVisible();
+    while (await page.getByRole("button", { name: "Next" }).isVisible()) await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.getByText("How you'll know it worked")).toBeVisible();
+    await page.getByRole("button", { name: "Log how it went" }).click();
     await page.getByRole("button", { name: "Did it independently" }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
 

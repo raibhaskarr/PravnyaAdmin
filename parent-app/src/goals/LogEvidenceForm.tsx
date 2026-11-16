@@ -41,8 +41,23 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function LogEvidenceForm({ goal, token, kidId, onLogged, onCancel }: { goal: Goal; token: string; kidId: string; onLogged: () => void; onCancel: () => void }) {
-  const [itemChoice, setItemChoice] = useState<string | null>(null);
+export function LogEvidenceForm({
+  goal,
+  token,
+  kidId,
+  onLogged,
+  onCancel,
+  initialItemId = null
+}: {
+  goal: Goal;
+  token: string;
+  kidId: string;
+  onLogged: () => void;
+  onCancel: () => void;
+  /** Pre-selects the item, e.g. the one an activity walkthrough just practised. */
+  initialItemId?: string | null;
+}) {
+  const [itemChoice, setItemChoice] = useState<string | null>(initialItemId);
   const [newItemText, setNewItemText] = useState("");
   const [logDate, setLogDate] = useState(todayISO());
   const [outcome, setOutcome] = useState("CORRECT");

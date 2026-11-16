@@ -16,6 +16,9 @@ import { KidActivitiesTab } from "./KidActivitiesTab";
 import { KidSupportTeamTab } from "./KidSupportTeamTab";
 import { KidScheduleTab } from "./KidScheduleTab";
 import { KidCompanionTab } from "./KidCompanionTab";
+import { KidUpdatesTab } from "./KidUpdatesTab";
+import { KidIepTab } from "./KidIepTab";
+import { KidHomeSessionsTab } from "./KidHomeSessionsTab";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -191,6 +194,15 @@ export function KidDetailPage() {
         </TabPanel>
         <TabPanel header="Activities">
           <KidActivitiesTab kidId={kid.id} kidLabel={kidLabel} />
+        </TabPanel>
+        <TabPanel header="Updates">
+          <KidUpdatesTab kidId={kid.id} hasParent={!!kid.parentId} canEdit={canEdit} />
+        </TabPanel>
+        <TabPanel header="IEP">
+          <KidIepTab kid={kid} canEdit={canEdit} />
+        </TabPanel>
+        <TabPanel header="Home sessions">
+          <KidHomeSessionsTab kid={kid} canEdit={canEdit} />
         </TabPanel>
         <TabPanel header="Schedule">
           <KidScheduleTab kidId={kid.id} />

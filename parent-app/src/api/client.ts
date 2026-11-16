@@ -4,6 +4,38 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
 
+/** A full URL on the API server, for links the browser opens itself (e.g. the data download). */
+export function apiUrl(path: string) {
+  return `${API_BASE_URL}${path}`;
+}
+
+/** A progress update a therapist wrote and sent to the parent. */
+export type ProgressUpdate = {
+  id: string;
+  authorName: string;
+  centreName: string;
+  language: "en" | "hi";
+  periodStart: string;
+  periodEnd: string;
+  body: string;
+  sentAt: string;
+  readAt: string | null;
+};
+
+export type IepPlanGoal = { goalId: string; title: string; area: string; baseline: string; target: string; strategies: string[]; homePractice: string[] };
+
+export type IepPlan = {
+  id: string;
+  title: string;
+  authorName: string;
+  centreName: string;
+  planStart: string;
+  reviewDate: string;
+  content: { presentLevels: string; strengths: string[]; goals: IepPlanGoal[]; notes: string };
+  sharedAt: string;
+  readAt: string | null;
+};
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -35,6 +67,8 @@ export type ParentProfile = {
   id: string;
   email: string;
   name: string | null;
+  /** Set while the account is waiting to be deleted (30 days after the parent asked). */
+  scheduledPurgeAt?: string | null;
   kids?: {
     id: string;
     firstName: string;
@@ -95,6 +129,72 @@ export type Goal = {
   canonicalSkill: { id: string; name: string; measurementType: string | null; domain: { id: string; name: string } };
   discipline: { id: string; name: string };
   items: GoalItem[];
+};
+
+export type GuideContent = {
+  summary: string;
+  minutes: number;
+  materials: string[];
+  steps: { title: string; detail: string }[];
+  ifItsHard: string[];
+  success: string;
+  keepItFun: string[];
+  stopIf: string;
+};
+
+/** Everything needed to walk a parent through one goal's activity at home. */
+export type Walkthrough = {
+  goal: { id: string; title: string; skillName: string; area: string };
+  item: { goalItemId: string; label: string } | null;
+  lastAtCentre: { supportLevel: string; centreName: string | null; date: string } | null;
+  fromPlan: { authorName: string; homePractice: string[]; target: string } | null;
+  guide: GuideContent;
+  /** reviewed by the Pravnya team, drafted by Pravnya and not yet reviewed, or the general steps. */
+  guideKind: "reviewed" | "drafted" | "general";
+};
+
+export type SessionSchedule = { kind: "once" } | { kind: "weekly"; days: string[]; until: string | null };
+
+/** A guided session a therapist set for the child, as listed for the parent. */
+export type HomeSessionSummary = {
+  id: string;
+  title: string;
+  authorName: string;
+  centreName: string;
+  schedule: SessionSchedule;
+  activities: string[];
+  dueToday: boolean;
+  inProgressRunId: string | null;
+  lastRun: { id: string; status: "COMPLETED" | "ENDED_EARLY"; startedAt: string; endedAt: string | null; summary: string | null } | null;
+};
+
+/** One step of a running session: what Pravnya says and what the parent can answer. */
+export type SessionStep = {
+  phase: "intro" | "setup" | "trial" | "help" | "done";
+  activityTitle: string | null;
+  item: string | null;
+  lines: string[];
+  choices: { id: string; label: string }[];
+  progress: { done: number; total: number };
+};
+
+/** Practice sessions Pravnya makes on request, from the Activities tab. */
+export type PracticeStatus = {
+  perDay: number;
+  usedToday: number;
+  remainingToday: number;
+  inProgressRunId: string | null;
+  /** False when there's nothing to practise yet (no active goals with items). */
+  available: boolean;
+  minutes: number | null;
+};
+
+export type SessionTurnResult = {
+  status: "IN_PROGRESS" | "COMPLETED" | "ENDED_EARLY";
+  step: SessionStep;
+  reply: string | null;
+  logged: { outcome: string; supportLevel: string; itemLabel: string } | null;
+  summary: string | null;
 };
 
 export type CreateEvidenceInput = {
@@ -193,6 +293,15 @@ export const api = {
   login(email: string, password: string) {
     return request<{ token: string; parent: ParentProfile }>("/parent-auth/login", { method: "POST", body: { email, password } });
   },
+  requestAccountDeletion(token: string, password: string) {
+    return request<{ scheduledPurgeAt: string }>("/parent-account/delete", { token, method: "POST", body: { password } });
+  },
+  cancelAccountDeletion(token: string) {
+    return request<{ cancelled: boolean }>("/parent-account/cancel-deletion", { token, method: "POST" });
+  },
+  dataExportLink(token: string) {
+    return request<{ path: string; expiresInMinutes: number }>("/parent-account/export-link", { token, method: "POST" });
+  },
   me(token: string) {
     return request<ParentProfile>("/parent-auth/me", { token });
   },
@@ -287,6 +396,39 @@ export const api = {
   },
   unlinkTherapist(token: string, kidId: string, therapistId: string) {
     return request<void>(`/parent-kids/${kidId}/therapists/${therapistId}`, { token, method: "DELETE" });
+  },
+  listUpdates(token: string, kidId: string) {
+    return request<ProgressUpdate[]>(`/parent-kids/${kidId}/updates`, { token });
+  },
+  markUpdateRead(token: string, kidId: string, updateId: string) {
+    return request<ProgressUpdate>(`/parent-kids/${kidId}/updates/${updateId}/read`, { token, method: "POST" });
+  },
+  listSessions(token: string, kidId: string) {
+    return request<HomeSessionSummary[]>(`/parent-kids/${kidId}/sessions`, { token });
+  },
+  startSession(token: string, kidId: string, sessionId: string) {
+    return request<{ runId: string; title: string; step: SessionStep; resumed: boolean }>(`/parent-kids/${kidId}/sessions/${sessionId}/start`, { token, method: "POST" });
+  },
+  getPracticeStatus(token: string, kidId: string) {
+    return request<PracticeStatus>(`/parent-kids/${kidId}/practice`, { token });
+  },
+  startPractice(token: string, kidId: string, language: "en" | "hi") {
+    return request<{ runId: string; title: string; step: SessionStep; resumed: boolean }>(`/parent-kids/${kidId}/practice/start`, { token, method: "POST", body: { language } });
+  },
+  sessionTurn(token: string, kidId: string, runId: string, input: { choice: string } | { text: string } | { audio: { mimeType: string; base64: string } }) {
+    return request<SessionTurnResult>(`/parent-kids/${kidId}/session-runs/${runId}/turn`, { token, method: "POST", body: input });
+  },
+  endSession(token: string, kidId: string, runId: string) {
+    return request<{ status: string; summary: string | null }>(`/parent-kids/${kidId}/session-runs/${runId}/end`, { token, method: "POST" });
+  },
+  getWalkthrough(token: string, kidId: string, goalId: string) {
+    return request<Walkthrough>(`/parent-kids/${kidId}/goals/${goalId}/walkthrough`, { token });
+  },
+  listIepPlans(token: string, kidId: string) {
+    return request<IepPlan[]>(`/parent-kids/${kidId}/iep-plans`, { token });
+  },
+  markIepPlanRead(token: string, kidId: string, planId: string) {
+    return request<IepPlan>(`/parent-kids/${kidId}/iep-plans/${planId}/read`, { token, method: "POST" });
   },
   listSchedule(token: string, kidId: string) {
     return request<ScheduleSlot[]>(`/parent-kids/${kidId}/schedule`, { token });

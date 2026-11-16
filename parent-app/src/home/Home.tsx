@@ -1,5 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile, type ScheduleSlot } from "../api/client";
+import { UpdateCard, UpdatesView } from "../updates/Updates";
+import { IepPlanCard, IepPlansView } from "../iep/IepPlans";
+import { AccountSection, DeletionBanner } from "../account/Account";
+import { SessionRunner } from "../sessions/SessionRunner";
+import { TodaysSessionCard } from "../sessions/Sessions";
+import { api, ApiError, type CompanionMessage, type Goal, type HomeSessionSummary, type IepPlan, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
@@ -12,7 +17,7 @@ import { computeNudge, NudgeCard } from "./nudges";
 import { computeOpener, OpenerCard } from "./opener";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload";
+type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates" | "iepPlans" | "session";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
@@ -119,11 +124,11 @@ function ThreadMessage({ message }: { message: CompanionMessage }) {
   );
 }
 
-export function Home({ token, onSessionExpired, onSignOut }: { token: string; onSessionExpired: () => void; onSignOut: () => void }) {
+export function Home({ token, onSessionExpired, onSignOut, initialView = "home" }: { token: string; onSessionExpired: () => void; onSignOut: () => void; initialView?: "home" | "profile" }) {
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [error, setError] = useState("");
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<View>("home");
+  const [view, setView] = useState<View>(initialView);
   // Null until the parent actively picks one -- falls back to the first kid below, same as before
   // a switcher existed, so a one-kid account (the common case) behaves exactly as it always did.
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
@@ -133,6 +138,13 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // Drives the schedule-aware opener below -- same ScheduleSlot[] shape Profile.tsx already
   // fetches independently.
   const [schedule, setSchedule] = useState<ScheduleSlot[] | null>(null);
+  // Progress updates the child's therapists have sent (newest first).
+  const [updates, setUpdates] = useState<ProgressUpdate[]>([]);
+  // IEPs the child's therapists have shared (newest first).
+  const [iepPlans, setIepPlans] = useState<IepPlan[]>([]);
+  // Guided sessions the therapist set; the one being run, and the tab to return to afterwards.
+  const [sessions, setSessions] = useState<HomeSessionSummary[]>([]);
+  const [activeSession, setActiveSession] = useState<{ id?: string; practice?: "en" | "hi"; returnTo: View } | null>(null);
   // The real conversation thread, separate from the digest feed above -- persisted server-side
   // (companion.service.ts), fetched fresh whenever the kid changes.
   const [thread, setThread] = useState<CompanionMessage[]>([]);
@@ -173,6 +185,9 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     void api.listGoals(token, kid.id).then(setGoals).catch(() => setGoals([]));
     void api.listCompanionMessages(token, kid.id).then(setThread).catch(() => setThread([]));
     void api.listSchedule(token, kid.id).then(setSchedule).catch(() => setSchedule([]));
+    void api.listUpdates(token, kid.id).then(setUpdates).catch(() => setUpdates([]));
+    void api.listIepPlans(token, kid.id).then(setIepPlans).catch(() => setIepPlans([]));
+    void api.listSessions(token, kid.id).then(setSessions).catch(() => setSessions([]));
   }, [token, kid?.id]);
 
   // useLayoutEffect (not useEffect) -- runs before paint, so the content never visibly flashes at
@@ -245,6 +260,64 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     return <IepUpload token={token} kidId={kid.id} kidName={kidName} onBack={() => setView("goals")} />;
   }
 
+  if (view === "updates" && kid) {
+    return (
+      <UpdatesView
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        updates={updates}
+        onBack={() => setView("home")}
+        onRead={(read) => setUpdates((prev) => prev.map((u) => (u.id === read.id ? read : u)))}
+      />
+    );
+  }
+
+  function startSession(sessionId: string) {
+    setActiveSession({ id: sessionId, returnTo: view });
+    setView("session");
+  }
+
+  function startPractice(language: "en" | "hi") {
+    setActiveSession({ practice: language, returnTo: view });
+    setView("session");
+  }
+
+  if (view === "session" && kid && activeSession) {
+    return (
+      <SessionRunner
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        sessionId={activeSession.id}
+        practiceLanguage={activeSession.practice}
+        onClose={() => {
+          const back = activeSession.returnTo;
+          setActiveSession(null);
+          void api.listSessions(token, kid.id).then(setSessions).catch(() => {});
+          if (back === "home") backToHome();
+          else {
+            setView(back);
+            void api.listGoals(token, kid.id).then(setGoals).catch(() => {});
+          }
+        }}
+      />
+    );
+  }
+
+  if (view === "iepPlans" && kid) {
+    return (
+      <IepPlansView
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        plans={iepPlans}
+        onBack={() => setView("home")}
+        onRead={(read) => setIepPlans((prev) => prev.map((p) => (p.id === read.id ? read : p)))}
+      />
+    );
+  }
+
   if (view === "logSession" && kid) {
     return (
       <LogSession
@@ -276,7 +349,11 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // reload brings the nudge back; this is a real, known limitation, not an oversight.
   const activeNudge = kid && !dismissed.has(kid.id + computeNudge(kid)) ? computeNudge(kid) : null;
   const feed = goals ? buildFeed(goals) : [];
+  // The newest update stays on Home while it's unread, or for two weeks after it was sent.
+  const latestUpdate = updates.find((u) => !u.readAt || Date.now() - new Date(u.sentAt).getTime() < 14 * 86_400_000) ?? null;
   const opener = kid && goals && schedule ? computeOpener(kid.id, goals, schedule) : null;
+  // A session left halfway comes first, then one due today.
+  const todaysSession = sessions.find((s) => s.inProgressRunId) ?? sessions.find((s) => s.dueToday) ?? null;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--pv-bg)] md:flex-row">
@@ -306,11 +383,24 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
       {activeTab === "growth" && kid ? (
         <Growth key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
       ) : activeTab === "activities" && kid ? (
-        <Activities key={kid.id} token={token} kidId={kid.id} />
+        <Activities key={kid.id + sessions.map((x) => x.lastRun?.id ?? "").join()} token={token} kidId={kid.id} kidName={kidName} sessions={sessions} onStartSession={startSession} onStartPractice={startPractice} />
       ) : activeTab === "goals" && kid ? (
-        <Goals key={kid.id} token={token} kidId={kid.id} onUploadIep={() => setView("iepUpload")} />
+        <Goals
+          key={kid.id}
+          token={token}
+          kidId={kid.id}
+          onUploadIep={() => setView("iepUpload")}
+          sharedPlan={iepPlans[0] ? <IepPlanCard plan={iepPlans[0]} kidName={kidName} onOpen={() => setView("iepPlans")} /> : null}
+        />
       ) : activeTab === "profile" && kid ? (
-        <Profile key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
+        <Profile
+          key={kid.id}
+          token={token}
+          kidId={kid.id}
+          kidName={kidName}
+          focusAccount={initialView === "profile"}
+          account={<AccountSection token={token} email={profile.email} scheduledPurgeAt={profile.scheduledPurgeAt ?? null} onChanged={refetch} />}
+        />
       ) : (
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
@@ -338,6 +428,12 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           </button>
         </header>
 
+        {/* Outside the scrolling feed: Home opens scrolled to the bottom, and this must always be seen. */}
+        {profile.scheduledPurgeAt ? (
+          <div className="mx-auto w-full max-w-2xl px-5 pt-3">
+            <DeletionBanner token={token} scheduledPurgeAt={profile.scheduledPurgeAt} onChanged={refetch} />
+          </div>
+        ) : null}
         <main ref={mainRef} className="mx-auto flex w-full min-h-0 max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-5 py-6">
           {activeNudge && kid ? (
             <NudgeCard
@@ -349,6 +445,8 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
               onDismiss={() => setDismissed((prev) => new Set(prev).add(kid.id + activeNudge))}
             />
           ) : null}
+
+          {latestUpdate?.readAt ? <UpdateCard update={latestUpdate} onOpen={() => setView("updates")} /> : null}
 
           {feed.map((item, i) => (
             <FeedCard key={i} item={item} kidName={kidName} onNavigate={setView} />
@@ -371,6 +469,11 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           {thread.map((message) => (
             <ThreadMessage key={message.id} message={message} />
           ))}
+
+          {/* Home opens scrolled to the bottom, so an unread update sits here, right above the composer. */}
+          {latestUpdate && !latestUpdate.readAt ? <UpdateCard update={latestUpdate} onOpen={() => setView("updates")} /> : null}
+          {iepPlans[0] && !iepPlans[0].readAt ? <IepPlanCard plan={iepPlans[0]} kidName={kidName} onOpen={() => setView("iepPlans")} /> : null}
+          {todaysSession ? <TodaysSessionCard session={todaysSession} kidName={kidName} onStart={() => startSession(todaysSession.id)} /> : null}
 
           {opener && kid ? (
             <OpenerCard

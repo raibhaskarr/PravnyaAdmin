@@ -74,6 +74,10 @@ model User {
   sentTherapistInvitations TherapistInvitation[] @relation("InvitationSentBy")
   sentTenantInvitations TenantInvitation[] @relation("TenantInvitationSentBy")
   sentSuperadminInvitations SuperadminInvitation[] @relation("SuperadminInvitationSentBy")
+  progressUpdates ProgressUpdate[]
+  iepPlans IepPlan[]
+  homeSessions HomeSession[]
+  reviewedHomeGuides SkillHomeGuide[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -171,6 +175,10 @@ model Tenant {
   therapistInvitations TherapistInvitation[]
   auditLog   AuditLog[]
   createdParents Parent[]
+  progressUpdates ProgressUpdate[]
+  iepPlans IepPlan[]
+  homeSessions HomeSession[]
+  homeSessionRuns HomeSessionRun[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -265,6 +273,7 @@ model CanonicalSkill {
   measurementType      PocMeasurementType?
   sourceTag            SkillSource         @default(FRAMEWORK)
   items                CanonicalSkillItem[]
+  homeGuide            SkillHomeGuide?
   goals                Goal[]
   pocGoalTags          PocGoalTag[]
   pocLogEvidence       PocLogEvidence[]
@@ -367,6 +376,10 @@ model Kid {
   therapistInvitations TherapistInvitation[]
   companionMessages    CompanionMessage[]
   scheduleSlots        ScheduleSlot[]
+  progressUpdates      ProgressUpdate[]
+  iepPlans      IepPlan[]
+  homeSessions HomeSession[]
+  homeSessionRuns HomeSessionRun[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -409,10 +422,15 @@ model Parent {
   createdByTenantId String?  @db.Uuid
   createdByTenant   Tenant?  @relation(fields: [createdByTenantId], references: [id], onDelete: SetNull)
   therapistInvitations TherapistInvitation[]
+  /// Set when the parent asks to delete their account; cleared if they cancel. After
+  /// scheduledPurgeAt (30 days later) the daily purge deletes the account -- see parentAccount.purge.ts.
+  deletionRequestedAt DateTime?
+  scheduledPurgeAt    DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@index([createdByTenantId])
+  @@index([scheduledPurgeAt])
 }
 
 /// A pending/resolved offer for someone to join as a THERAPIST, created either from the general
@@ -559,9 +577,13 @@ model GoalItemEvidence {
   confidence         Float?
   sourceChildId      String?             @db.Uuid
   sourceLogId        String?             @db.Uuid
+  /// Set when the entry was recorded during a guided home session (one entry per try).
+  sessionRunId       String?             @db.Uuid
+  sessionRun         HomeSessionRun?     @relation(fields: [sessionRunId], references: [id], onDelete: SetNull)
   createdAt          DateTime            @default(now())
 
   @@index([goalItemId, logDate])
+  @@index([sessionRunId])
 }
 
 enum PocEvidenceOutcome {
@@ -839,4 +861,179 @@ model ScheduleSlot {
   updatedAt DateTime @updatedAt
 
   @@index([kidId])
+}
+
+enum ProgressUpdateStatus {
+  DRAFT
+  SENT
+}
+
+/// A therapist's written update to a kid's parent ("This week with Aarav"), shown in the parent app
+/// and emailed. Pravnya drafts it from the period's evidence (stats are computed, never invented by
+/// the model); a staff member edits it and sends it -- nothing reaches a parent without that step.
+model ProgressUpdate {
+  id           String               @id @default(uuid()) @db.Uuid
+  tenantId     String               @db.Uuid
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId        String               @db.Uuid
+  kid          Kid                  @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  /// Who wrote it. Name and centre are snapshots, so a sent update reads the same after a rename.
+  authorUserId String?              @db.Uuid
+  author       User?                @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorName   String
+  centreName   String
+  /// "en" or "hi" -- the language the update is written in.
+  language     String               @default("en")
+  periodStart  DateTime
+  periodEnd    DateTime
+  body         String
+  /// The computed figures the draft was based on (per goal: entries, successes, home/centre), kept
+  /// so staff can see what the wording rests on.
+  stats        Json
+  aiDrafted    Boolean              @default(false)
+  status       ProgressUpdateStatus @default(DRAFT)
+  sentAt       DateTime?
+  emailedAt    DateTime?
+  readAt       DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([kidId, status, sentAt])
+}
+
+enum IepPlanStatus {
+  DRAFT
+  FINAL
+}
+
+/// An Individualised Education Plan written by centre staff. Pravnya drafts it from the kid's
+/// active goals and the figures in their logs over a baseline window; staff edit and finalise it.
+/// A final plan is locked; a new review means a new plan.
+model IepPlan {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId         String        @db.Uuid
+  kid           Kid           @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  /// Name and centre are snapshots, so a final plan reads the same after a rename.
+  authorUserId  String?       @db.Uuid
+  author        User?         @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorName    String
+  centreName    String
+  title         String
+  /// The window of logs the baselines were taken from.
+  baselineFrom  DateTime
+  baselineTo    DateTime
+  planStart     DateTime
+  reviewDate    DateTime
+  /// { presentLevels, strengths[], goals[{goalId, title, area, baseline, target, strategies[], homePractice[]}], notes }
+  content       Json
+  /// The computed figures the baselines rest on (same shape as ProgressUpdate.stats).
+  stats         Json
+  aiDrafted     Boolean       @default(false)
+  status        IepPlanStatus @default(DRAFT)
+  finalisedAt   DateTime?
+  /// Set when staff share a final plan with the parent: it then shows in the parent app.
+  sharedAt      DateTime?
+  emailedAt     DateTime?
+  readAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([kidId, status])
+}
+
+/// How a parent practises a skill at home, step by step -- one per canonical skill, shared by every
+/// child with a goal on it. Pravnya drafts it the first time a parent opens an activity for the
+/// skill; the team reviews and edits it in the admin panel (reviewedAt). The parent app fills in
+/// the child's own item and current level of help around it.
+model SkillHomeGuide {
+  id               String         @id @default(uuid()) @db.Uuid
+  canonicalSkillId String         @unique @db.Uuid
+  canonicalSkill   CanonicalSkill @relation(fields: [canonicalSkillId], references: [id], onDelete: Cascade)
+  /// { summary, minutes, materials[], steps[{title, detail}], ifItsHard[], success, keepItFun[], stopIf }
+  content          Json
+  aiDrafted        Boolean        @default(true)
+  reviewedAt       DateTime?
+  reviewedById     String?        @db.Uuid
+  reviewedBy       User?          @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+enum HomeSessionStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+/// Who made the session: a therapist, or Pravnya on the parent's request (a one-off practice
+/// session picked from the child's goals and recent progress).
+enum HomeSessionSource {
+  THERAPIST
+  PRAVNYA
+}
+
+enum HomeSessionRunStatus {
+  IN_PROGRESS
+  COMPLETED
+  ENDED_EARLY
+}
+
+/// A guided practice session a therapist sets for a child to do at home with a parent. Built from
+/// the child's goals and skill items (optionally drafted by Pravnya), then published. In the parent
+/// app Pravnya runs it step by step from this plan; every try is logged as GoalItemEvidence.
+model HomeSession {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @db.Uuid
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId        String            @db.Uuid
+  kid          Kid               @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  authorUserId String?           @db.Uuid
+  author       User?             @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorName   String
+  centreName   String
+  title        String
+  /// "en" or "hi": the language Pravnya speaks during the session.
+  language     String            @default("en")
+  /// { intro, activities[{ key, goalId, goalTitle, type, items[{goalItemId,label}], trialsPerItem, setup,
+  ///   instruction, correctLooksLike, prompts[{supportLevel, say}], errorCorrection, reinforcement,
+  ///   modality, missesBeforeMovingOn }], closing }
+  plan         Json
+  /// { kind: "once" } or { kind: "weekly", days: ["Mon", ...], until: "YYYY-MM-DD" | null }
+  schedule     Json
+  aiDrafted    Boolean           @default(false)
+  source       HomeSessionSource @default(THERAPIST)
+  status       HomeSessionStatus @default(DRAFT)
+  publishedAt  DateTime?
+  runs         HomeSessionRun[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([kidId, status])
+  @@index([kidId, source, createdAt])
+}
+
+/// One time a parent did a session. Only the structured results are kept -- never what was said.
+model HomeSessionRun {
+  id               String               @id @default(uuid()) @db.Uuid
+  sessionId        String               @db.Uuid
+  session          HomeSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tenantId         String               @db.Uuid
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId            String               @db.Uuid
+  kid              Kid                  @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  status           HomeSessionRunStatus @default(IN_PROGRESS)
+  /// Where the session is: { activity, item, trial, phase, missesInARow, awaitingHelpChoice }
+  state            Json
+  /// Per try: [{ activityKey, goalItemId, itemLabel, outcome, supportLevel, at }]
+  results          Json                 @default("[]")
+  summary          String?
+  startedAt        DateTime             @default(now())
+  endedAt          DateTime?
+  summaryEmailedAt DateTime?
+  evidence         GoalItemEvidence[]
+
+  @@index([sessionId, startedAt])
+  @@index([kidId, startedAt])
 }
