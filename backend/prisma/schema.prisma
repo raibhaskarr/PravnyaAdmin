@@ -76,6 +76,7 @@ model User {
   sentSuperadminInvitations SuperadminInvitation[] @relation("SuperadminInvitationSentBy")
   progressUpdates ProgressUpdate[]
   iepPlans IepPlan[]
+  reviewedHomeGuides SkillHomeGuide[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -269,6 +270,7 @@ model CanonicalSkill {
   measurementType      PocMeasurementType?
   sourceTag            SkillSource         @default(FRAMEWORK)
   items                CanonicalSkillItem[]
+  homeGuide            SkillHomeGuide?
   goals                Goal[]
   pocGoalTags          PocGoalTag[]
   pocLogEvidence       PocLogEvidence[]
@@ -930,4 +932,22 @@ model IepPlan {
   updatedAt     DateTime      @updatedAt
 
   @@index([kidId, status])
+}
+
+/// How a parent practises a skill at home, step by step -- one per canonical skill, shared by every
+/// child with a goal on it. Pravnya drafts it the first time a parent opens an activity for the
+/// skill; the team reviews and edits it in the admin panel (reviewedAt). The parent app fills in
+/// the child's own item and current level of help around it.
+model SkillHomeGuide {
+  id               String         @id @default(uuid()) @db.Uuid
+  canonicalSkillId String         @unique @db.Uuid
+  canonicalSkill   CanonicalSkill @relation(fields: [canonicalSkillId], references: [id], onDelete: Cascade)
+  /// { summary, minutes, materials[], steps[{title, detail}], ifItsHard[], success, keepItFun[], stopIf }
+  content          Json
+  aiDrafted        Boolean        @default(true)
+  reviewedAt       DateTime?
+  reviewedById     String?        @db.Uuid
+  reviewedBy       User?          @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }

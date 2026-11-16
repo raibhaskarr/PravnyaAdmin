@@ -35,6 +35,7 @@ import { parentScheduleRoutes } from "./modules/parent-schedule/parentSchedule.r
 import { scheduleRoutes } from "./modules/schedule/schedule.routes";
 import { centresRoutes } from "./modules/centres/centres.routes";
 import { progressUpdatesRoutes, parentProgressUpdatesRoutes } from "./modules/progress-updates/progressUpdates.routes";
+import { homeGuidesRoutes, parentWalkthroughRoutes } from "./modules/home-guides/homeGuides.routes";
 import { parentAccountRoutes } from "./modules/parent-account/parentAccount.routes";
 import { iepPlansRoutes, parentIepPlansRoutes } from "./modules/iep-plans/iepPlans.routes";
 import { parentCentresRoutes } from "./modules/parent-centres/parentCentres.routes";
@@ -103,6 +104,8 @@ export function createApp() {
   app.use("/api/parent-kids", parentProgressUpdatesRoutes);
   app.use("/api/parent-kids", parentIepPlansRoutes);
   app.use("/api/parent-account", parentAccountRoutes);
+  app.use("/api/parent-kids", parentWalkthroughRoutes);
+  app.use("/api/home-guides", homeGuidesRoutes);
 
   // Test-only: lets E2E tests (a separate process) read emails the memory provider captured, e.g.
   // a parent's sign-up verification code. Never registered outside NODE_ENV=test.

@@ -43,7 +43,10 @@ import type {
   ProgressUpdate,
   ProgressUpdateDue,
   IepPlan,
-  IepPlanContent
+  IepPlanContent,
+  GuideContent,
+  HomeGuideDetail,
+  HomeGuideRow
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
@@ -331,6 +334,18 @@ export const api = {
   },
   deleteProgressUpdate(token: string, id: string) {
     return request<void>(`/progress-updates/${id}`, { token, method: "DELETE" });
+  },
+  listHomeGuides(token: string) {
+    return request<HomeGuideRow[]>("/home-guides", { token });
+  },
+  getHomeGuide(token: string, skillId: string) {
+    return request<HomeGuideDetail>(`/home-guides/${skillId}`, { token });
+  },
+  draftHomeGuide(token: string, skillId: string) {
+    return request<{ drafted: boolean }>(`/home-guides/${skillId}/draft`, { token, method: "POST" });
+  },
+  saveHomeGuide(token: string, skillId: string, content: GuideContent, reviewed: boolean) {
+    return request<unknown>(`/home-guides/${skillId}`, { token, method: "PUT", body: { content, reviewed } });
   },
   listIepPlans(token: string, kidId: string) {
     return request<IepPlan[]>(`/iep-plans?kidId=${kidId}`, { token });

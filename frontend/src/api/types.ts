@@ -530,3 +530,30 @@ export type IepPlan = {
   readAt: string | null;
   createdAt: string;
 };
+
+export type GuideContent = {
+  summary: string;
+  minutes: number;
+  materials: string[];
+  steps: { title: string; detail: string }[];
+  ifItsHard: string[];
+  success: string;
+  keepItFun: string[];
+  stopIf: string;
+};
+
+export type HomeGuideRow = {
+  skillId: string;
+  skillName: string;
+  area: string;
+  activeGoals: number;
+  guide: { aiDrafted: boolean; reviewedAt: string | null; updatedAt: string } | null;
+};
+
+export type HomeGuideDetail = {
+  skillId: string;
+  skillName: string;
+  area: string;
+  guide: { content: GuideContent; aiDrafted: boolean; reviewedAt: string | null; reviewedBy: { name: string } | null; updatedAt: string } | null;
+  general: GuideContent;
+};

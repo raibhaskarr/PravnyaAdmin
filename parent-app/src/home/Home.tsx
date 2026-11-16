@@ -343,7 +343,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
       {activeTab === "growth" && kid ? (
         <Growth key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
       ) : activeTab === "activities" && kid ? (
-        <Activities key={kid.id} token={token} kidId={kid.id} />
+        <Activities key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
       ) : activeTab === "goals" && kid ? (
         <Goals
           key={kid.id}

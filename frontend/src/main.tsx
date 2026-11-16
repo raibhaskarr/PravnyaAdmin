@@ -10,6 +10,7 @@ import { AcceptTenantInvitePage } from "./pages/AcceptTenantInvitePage";
 import { AcceptSuperadminInvitePage } from "./pages/AcceptSuperadminInvitePage";
 import { TenantsPage } from "./pages/admin/TenantsPage";
 import { TenantDetailPage } from "./pages/admin/TenantDetailPage";
+import { HomeGuidesPage } from "./pages/admin/HomeGuidesPage";
 import { TaxonomyPage } from "./pages/admin/TaxonomyPage";
 import { PocReviewPage } from "./pages/admin/PocReviewPage";
 import { SuperadminsPage } from "./pages/admin/SuperadminsPage";
@@ -42,6 +43,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/admin/tenants" element={<TenantsPage />} />
               <Route path="/admin/tenants/:tenantId" element={<TenantDetailPage />} />
               <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
+              <Route path="/admin/home-guides" element={<HomeGuidesPage />} />
               <Route path="/admin/poc-review" element={<PocReviewPage />} />
               <Route path="/admin/superadmins" element={<SuperadminsPage />} />
               <Route path="/admin/account" element={<AccountPage />} />

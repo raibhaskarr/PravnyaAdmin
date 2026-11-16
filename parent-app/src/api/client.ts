@@ -131,6 +131,28 @@ export type Goal = {
   items: GoalItem[];
 };
 
+export type GuideContent = {
+  summary: string;
+  minutes: number;
+  materials: string[];
+  steps: { title: string; detail: string }[];
+  ifItsHard: string[];
+  success: string;
+  keepItFun: string[];
+  stopIf: string;
+};
+
+/** Everything needed to walk a parent through one goal's activity at home. */
+export type Walkthrough = {
+  goal: { id: string; title: string; skillName: string; area: string };
+  item: { goalItemId: string; label: string } | null;
+  lastAtCentre: { supportLevel: string; centreName: string | null; date: string } | null;
+  fromPlan: { authorName: string; homePractice: string[]; target: string } | null;
+  guide: GuideContent;
+  /** reviewed by the Pravnya team, drafted by Pravnya and not yet reviewed, or the general steps. */
+  guideKind: "reviewed" | "drafted" | "general";
+};
+
 export type CreateEvidenceInput = {
   goalItemId?: string;
   newItemCustomText?: string;
@@ -336,6 +358,9 @@ export const api = {
   },
   markUpdateRead(token: string, kidId: string, updateId: string) {
     return request<ProgressUpdate>(`/parent-kids/${kidId}/updates/${updateId}/read`, { token, method: "POST" });
+  },
+  getWalkthrough(token: string, kidId: string, goalId: string) {
+    return request<Walkthrough>(`/parent-kids/${kidId}/goals/${goalId}/walkthrough`, { token });
   },
   listIepPlans(token: string, kidId: string) {
     return request<IepPlan[]>(`/parent-kids/${kidId}/iep-plans`, { token });
