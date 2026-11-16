@@ -4,6 +4,19 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
 
+/** A progress update a therapist wrote and sent to the parent. */
+export type ProgressUpdate = {
+  id: string;
+  authorName: string;
+  centreName: string;
+  language: "en" | "hi";
+  periodStart: string;
+  periodEnd: string;
+  body: string;
+  sentAt: string;
+  readAt: string | null;
+};
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -287,6 +300,12 @@ export const api = {
   },
   unlinkTherapist(token: string, kidId: string, therapistId: string) {
     return request<void>(`/parent-kids/${kidId}/therapists/${therapistId}`, { token, method: "DELETE" });
+  },
+  listUpdates(token: string, kidId: string) {
+    return request<ProgressUpdate[]>(`/parent-kids/${kidId}/updates`, { token });
+  },
+  markUpdateRead(token: string, kidId: string, updateId: string) {
+    return request<ProgressUpdate>(`/parent-kids/${kidId}/updates/${updateId}/read`, { token, method: "POST" });
   },
   listSchedule(token: string, kidId: string) {
     return request<ScheduleSlot[]>(`/parent-kids/${kidId}/schedule`, { token });

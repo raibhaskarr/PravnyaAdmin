@@ -453,3 +453,44 @@ export type Goal = {
   createdAt: string;
   items: GoalItem[];
 };
+
+export type GoalPeriodStats = {
+  goalTitle: string;
+  domain: string;
+  entries: number;
+  correct: number;
+  independent: number;
+  partial: number;
+  atHome: number;
+  atCentre: number;
+  examples: string[];
+  firstTimeIndependent: string[];
+  trend: "up" | "steady" | "down" | null;
+};
+
+export type ProgressUpdate = {
+  id: string;
+  kidId: string;
+  authorName: string;
+  centreName: string;
+  language: "en" | "hi";
+  periodStart: string;
+  periodEnd: string;
+  body: string;
+  stats: { kidName: string; from: string; to: string; totalEntries: number; goals: GoalPeriodStats[]; notPractised: string[] };
+  aiDrafted: boolean;
+  status: "DRAFT" | "SENT";
+  sentAt: string | null;
+  emailedAt: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type ProgressUpdateDue = {
+  kidId: string;
+  kidName: string;
+  lastSentAt: string | null;
+  newEntries: number;
+  draftId: string | null;
+  isDue: boolean;
+};

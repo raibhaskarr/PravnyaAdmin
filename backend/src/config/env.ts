@@ -43,6 +43,8 @@ const envSchema = z.object({
   EMAIL_FROM_NAME: z.string().default("PravnyaAdmin"),
   EMAIL_FROM_ADDRESS: z.string().default("no-reply@pravnya.com"),
   APP_BASE_URL: z.string().optional(),
+  // The parent app's address, linked from emails sent to parents (progress updates).
+  PARENT_APP_URL: z.string().default("https://app.pravnya.com"),
   // Home tenant for every self-registered (B2C/retail) parent's kids -- "Pravnix Labs Pvt Ltd" in
   // production. Optional here so existing environments/CI without it configured still boot; the
   // parent-kids endpoint itself throws a clear error if a kid-creation call arrives and this is

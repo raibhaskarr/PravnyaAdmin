@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile, type ScheduleSlot } from "../api/client";
+import { UpdateCard, UpdatesView } from "../updates/Updates";
+import { api, ApiError, type CompanionMessage, type Goal, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
@@ -12,7 +13,7 @@ import { computeNudge, NudgeCard } from "./nudges";
 import { computeOpener, OpenerCard } from "./opener";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload";
+type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
@@ -133,6 +134,8 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // Drives the schedule-aware opener below -- same ScheduleSlot[] shape Profile.tsx already
   // fetches independently.
   const [schedule, setSchedule] = useState<ScheduleSlot[] | null>(null);
+  // Progress updates the child's therapists have sent (newest first).
+  const [updates, setUpdates] = useState<ProgressUpdate[]>([]);
   // The real conversation thread, separate from the digest feed above -- persisted server-side
   // (companion.service.ts), fetched fresh whenever the kid changes.
   const [thread, setThread] = useState<CompanionMessage[]>([]);
@@ -173,6 +176,7 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     void api.listGoals(token, kid.id).then(setGoals).catch(() => setGoals([]));
     void api.listCompanionMessages(token, kid.id).then(setThread).catch(() => setThread([]));
     void api.listSchedule(token, kid.id).then(setSchedule).catch(() => setSchedule([]));
+    void api.listUpdates(token, kid.id).then(setUpdates).catch(() => setUpdates([]));
   }, [token, kid?.id]);
 
   // useLayoutEffect (not useEffect) -- runs before paint, so the content never visibly flashes at
@@ -245,6 +249,19 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
     return <IepUpload token={token} kidId={kid.id} kidName={kidName} onBack={() => setView("goals")} />;
   }
 
+  if (view === "updates" && kid) {
+    return (
+      <UpdatesView
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        updates={updates}
+        onBack={() => setView("home")}
+        onRead={(read) => setUpdates((prev) => prev.map((u) => (u.id === read.id ? read : u)))}
+      />
+    );
+  }
+
   if (view === "logSession" && kid) {
     return (
       <LogSession
@@ -276,6 +293,8 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
   // reload brings the nudge back; this is a real, known limitation, not an oversight.
   const activeNudge = kid && !dismissed.has(kid.id + computeNudge(kid)) ? computeNudge(kid) : null;
   const feed = goals ? buildFeed(goals) : [];
+  // The newest update stays on Home while it's unread, or for two weeks after it was sent.
+  const latestUpdate = updates.find((u) => !u.readAt || Date.now() - new Date(u.sentAt).getTime() < 14 * 86_400_000) ?? null;
   const opener = kid && goals && schedule ? computeOpener(kid.id, goals, schedule) : null;
 
   return (
@@ -350,6 +369,8 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
             />
           ) : null}
 
+          {latestUpdate?.readAt ? <UpdateCard update={latestUpdate} onOpen={() => setView("updates")} /> : null}
+
           {feed.map((item, i) => (
             <FeedCard key={i} item={item} kidName={kidName} onNavigate={setView} />
           ))}
@@ -371,6 +392,9 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           {thread.map((message) => (
             <ThreadMessage key={message.id} message={message} />
           ))}
+
+          {/* Home opens scrolled to the bottom, so an unread update sits here, right above the composer. */}
+          {latestUpdate && !latestUpdate.readAt ? <UpdateCard update={latestUpdate} onOpen={() => setView("updates")} /> : null}
 
           {opener && kid ? (
             <OpenerCard

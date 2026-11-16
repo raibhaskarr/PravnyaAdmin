@@ -74,6 +74,7 @@ model User {
   sentTherapistInvitations TherapistInvitation[] @relation("InvitationSentBy")
   sentTenantInvitations TenantInvitation[] @relation("TenantInvitationSentBy")
   sentSuperadminInvitations SuperadminInvitation[] @relation("SuperadminInvitationSentBy")
+  progressUpdates ProgressUpdate[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -171,6 +172,7 @@ model Tenant {
   therapistInvitations TherapistInvitation[]
   auditLog   AuditLog[]
   createdParents Parent[]
+  progressUpdates ProgressUpdate[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -367,6 +369,7 @@ model Kid {
   therapistInvitations TherapistInvitation[]
   companionMessages    CompanionMessage[]
   scheduleSlots        ScheduleSlot[]
+  progressUpdates      ProgressUpdate[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -839,4 +842,42 @@ model ScheduleSlot {
   updatedAt DateTime @updatedAt
 
   @@index([kidId])
+}
+
+enum ProgressUpdateStatus {
+  DRAFT
+  SENT
+}
+
+/// A therapist's written update to a kid's parent ("This week with Aarav"), shown in the parent app
+/// and emailed. Pravnya drafts it from the period's evidence (stats are computed, never invented by
+/// the model); a staff member edits it and sends it -- nothing reaches a parent without that step.
+model ProgressUpdate {
+  id           String               @id @default(uuid()) @db.Uuid
+  tenantId     String               @db.Uuid
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId        String               @db.Uuid
+  kid          Kid                  @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  /// Who wrote it. Name and centre are snapshots, so a sent update reads the same after a rename.
+  authorUserId String?              @db.Uuid
+  author       User?                @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorName   String
+  centreName   String
+  /// "en" or "hi" -- the language the update is written in.
+  language     String               @default("en")
+  periodStart  DateTime
+  periodEnd    DateTime
+  body         String
+  /// The computed figures the draft was based on (per goal: entries, successes, home/centre), kept
+  /// so staff can see what the wording rests on.
+  stats        Json
+  aiDrafted    Boolean              @default(false)
+  status       ProgressUpdateStatus @default(DRAFT)
+  sentAt       DateTime?
+  emailedAt    DateTime?
+  readAt       DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([kidId, status, sentAt])
 }

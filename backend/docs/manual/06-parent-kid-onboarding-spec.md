@@ -175,6 +175,27 @@ kid-scoped read (Goals, Kids) already uses — Tenant Admin/Viewer see any kid i
 Therapist only kids they're linked to via `KidTherapist`. Staff can see what a parent scheduled and
 asked Pravnya; they can't create, edit, or reply from this view.
 
+## Update: Progress updates to parents have shipped
+
+Staff can send a parent a written update about their child (`backend/src/modules/progress-updates/`,
+admin Kid detail > **Updates** tab, parent app Home). The flow is draft, then edit, then send:
+
+- **Draft.** A therapist or admin picks a period (last 7 or 30 days) and a language (English or
+  Hindi). `progressStats.ts` computes the figures from the period's evidence: entries, correct,
+  independent, centre vs home, first-time-independent items, and trend vs the previous period.
+  The AI only words those figures (`progress-update-draft`). Its prompt forbids new facts,
+  diagnoses, predictions and comparisons. If the AI is unavailable, a plain template renders the
+  same figures, so drafting never fails. The figures are stored on the update (`stats`) and shown
+  next to the text.
+- **Edit and send.** Staff edit the text freely. Sending publishes it to the parent app and
+  emails the parent; an email failure doesn't undo the send (`emailedAt` records delivery). A sent
+  update is locked: it can't be edited or deleted.
+- **Access.** Same as other kid-scoped data (`assertCanAccessKid`): admins see their tenant's
+  kids, therapists only linked kids, and viewers can read but not write. Parents see only sent
+  updates for their own kids, and opening them sets `readAt`, which staff can see.
+- **Due list.** The Kids page lists kids who have a parent account, have new entries, and haven't
+  had an update in 7 days.
+
 ## Deferred — parent-facing app (original scope cut, see update above)
 
 - ~~**Parent login** — no `passwordHash`, no JWT issuance, no invite-acceptance flow for parents.~~

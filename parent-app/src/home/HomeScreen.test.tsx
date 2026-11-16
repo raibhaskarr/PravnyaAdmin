@@ -29,6 +29,7 @@ beforeEach(() => {
   mockApi.listGoals.mockResolvedValue([]);
   mockApi.listCompanionMessages.mockResolvedValue([]);
   mockApi.listSchedule.mockResolvedValue([]);
+  mockApi.listUpdates.mockResolvedValue([]);
   mockApi.listTherapists.mockResolvedValue([]);
   mockApi.listTherapistInvitations.mockResolvedValue([]);
   mockApi.listCentres.mockResolvedValue([]);
@@ -340,5 +341,44 @@ describe("Goals -> IEP upload sub-screen", () => {
     await screen.findByText("Sam");
     await user.click(within(bottomBar()).getByRole("button", { name: /Home/ }));
     expect(mockApi.listGoals).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("progress updates from the care team", () => {
+  const update = (over: Partial<import("../api/client").ProgressUpdate> = {}) => ({
+    id: "upd-1",
+    authorName: "Speech Therapist",
+    centreName: "Sunrise Centre",
+    language: "en" as const,
+    periodStart: "2026-11-09T00:00:00.000Z",
+    periodEnd: "2026-11-16T00:00:00.000Z",
+    body: "Sam had a lovely week.\n\nTry at home\n• Pause before giving a snack.",
+    sentAt: new Date().toISOString(),
+    readAt: null,
+    ...over
+  });
+
+  test("an unread update shows on Home; opening it lists it in full and marks it read", async () => {
+    mockApi.listUpdates.mockResolvedValue([update()]);
+    mockApi.markUpdateRead.mockResolvedValue(update({ readAt: new Date().toISOString() }));
+    renderHome();
+    expect(await screen.findByText("Update from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
+    expect(screen.getByText("New")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Read the update/ }));
+    expect(await screen.findByText("Updates about Sam")).toBeInTheDocument();
+    expect(screen.getByText(/Pause before giving a snack/)).toBeInTheDocument();
+    await waitFor(() => expect(mockApi.markUpdateRead).toHaveBeenCalledWith("tok", "kid-1", "upd-1"));
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByText("Update from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
+    expect(screen.queryByText("New")).not.toBeInTheDocument();
+  });
+
+  test("an old, already-read update no longer shows on Home", async () => {
+    const old = new Date(Date.now() - 20 * 86_400_000).toISOString();
+    mockApi.listUpdates.mockResolvedValue([update({ sentAt: old, readAt: old })]);
+    renderHome();
+    expect(await screen.findByText("Sam")).toBeInTheDocument();
+    await waitFor(() => expect(mockApi.listUpdates).toHaveBeenCalledWith("tok", "kid-1"));
+    expect(screen.queryByText(/Update from Speech Therapist/)).not.toBeInTheDocument();
   });
 });

@@ -39,7 +39,9 @@ import type {
   TenantProfileFields,
   Therapist,
   TherapistInvitation,
-  UserRole
+  UserRole,
+  ProgressUpdate,
+  ProgressUpdateDue
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
@@ -309,6 +311,24 @@ export const api = {
   // Schedule / Companion -- read-only staff views of parent-app data
   listKidSchedule(token: string, kidId: string) {
     return request<ScheduleEntry[]>(`/schedule?kidId=${kidId}`, { token });
+  },
+  listProgressUpdates(token: string, kidId: string) {
+    return request<ProgressUpdate[]>(`/progress-updates?kidId=${kidId}`, { token });
+  },
+  listProgressUpdatesDue(token: string) {
+    return request<ProgressUpdateDue[]>("/progress-updates/due", { token });
+  },
+  draftProgressUpdate(token: string, body: { kidId: string; period: "week" | "month"; language: "en" | "hi" }) {
+    return request<ProgressUpdate>("/progress-updates", { token, method: "POST", body });
+  },
+  editProgressUpdate(token: string, id: string, text: string) {
+    return request<ProgressUpdate>(`/progress-updates/${id}`, { token, method: "PATCH", body: { body: text } });
+  },
+  sendProgressUpdate(token: string, id: string) {
+    return request<ProgressUpdate>(`/progress-updates/${id}/send`, { token, method: "POST" });
+  },
+  deleteProgressUpdate(token: string, id: string) {
+    return request<void>(`/progress-updates/${id}`, { token, method: "DELETE" });
   },
   listKidCompanionMessages(token: string, kidId: string) {
     return request<StaffCompanionMessage[]>(`/companion-messages?kidId=${kidId}`, { token });
