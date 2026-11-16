@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { UpdateCard, UpdatesView } from "../updates/Updates";
 import { IepPlanCard, IepPlansView } from "../iep/IepPlans";
+import { AccountSection, DeletionBanner } from "../account/Account";
 import { api, ApiError, type CompanionMessage, type Goal, type IepPlan, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
@@ -121,11 +122,11 @@ function ThreadMessage({ message }: { message: CompanionMessage }) {
   );
 }
 
-export function Home({ token, onSessionExpired, onSignOut }: { token: string; onSessionExpired: () => void; onSignOut: () => void }) {
+export function Home({ token, onSessionExpired, onSignOut, initialView = "home" }: { token: string; onSessionExpired: () => void; onSignOut: () => void; initialView?: "home" | "profile" }) {
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [error, setError] = useState("");
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<View>("home");
+  const [view, setView] = useState<View>(initialView);
   // Null until the parent actively picks one -- falls back to the first kid below, same as before
   // a switcher existed, so a one-kid account (the common case) behaves exactly as it always did.
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
@@ -352,7 +353,14 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           sharedPlan={iepPlans[0] ? <IepPlanCard plan={iepPlans[0]} kidName={kidName} onOpen={() => setView("iepPlans")} /> : null}
         />
       ) : activeTab === "profile" && kid ? (
-        <Profile key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
+        <Profile
+          key={kid.id}
+          token={token}
+          kidId={kid.id}
+          kidName={kidName}
+          focusAccount={initialView === "profile"}
+          account={<AccountSection token={token} email={profile.email} scheduledPurgeAt={profile.scheduledPurgeAt ?? null} onChanged={refetch} />}
+        />
       ) : (
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3.5">
@@ -380,6 +388,12 @@ export function Home({ token, onSessionExpired, onSignOut }: { token: string; on
           </button>
         </header>
 
+        {/* Outside the scrolling feed: Home opens scrolled to the bottom, and this must always be seen. */}
+        {profile.scheduledPurgeAt ? (
+          <div className="mx-auto w-full max-w-2xl px-5 pt-3">
+            <DeletionBanner token={token} scheduledPurgeAt={profile.scheduledPurgeAt} onChanged={refetch} />
+          </div>
+        ) : null}
         <main ref={mainRef} className="mx-auto flex w-full min-h-0 max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-5 py-6">
           {activeNudge && kid ? (
             <NudgeCard

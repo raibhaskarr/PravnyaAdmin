@@ -111,7 +111,7 @@ export const parentAuthService = {
   },
 
   async me(parentId: string) {
-    const parent = await prisma.parent.findUniqueOrThrow({
+    const parent = await prisma.parent.findUnique({
       where: { id: parentId },
       // selfReportedTherapies/selfReportedScheduleDays added for Home's "what's still missing"
       // nudge -- it needs to know what's already on file without a second round-trip per kid.
@@ -129,6 +129,8 @@ export const parentAuthService = {
         }
       }
     });
-    return { ...parentPublicShape(parent), kids: parent.kids };
+    // A token can outlive its account (deleted after the grace period): treat it as signed out.
+    if (!parent) throw new AppError(401, "UNAUTHORIZED", "This account no longer exists");
+    return { ...parentPublicShape(parent), scheduledPurgeAt: parent.scheduledPurgeAt, kids: parent.kids };
   }
 };

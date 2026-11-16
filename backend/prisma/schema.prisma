@@ -415,10 +415,15 @@ model Parent {
   createdByTenantId String?  @db.Uuid
   createdByTenant   Tenant?  @relation(fields: [createdByTenantId], references: [id], onDelete: SetNull)
   therapistInvitations TherapistInvitation[]
+  /// Set when the parent asks to delete their account; cleared if they cancel. After
+  /// scheduledPurgeAt (30 days later) the daily purge deletes the account -- see parentAccount.purge.ts.
+  deletionRequestedAt DateTime?
+  scheduledPurgeAt    DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@index([createdByTenantId])
+  @@index([scheduledPurgeAt])
 }
 
 /// A pending/resolved offer for someone to join as a THERAPIST, created either from the general

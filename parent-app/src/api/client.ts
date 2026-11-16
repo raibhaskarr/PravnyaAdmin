@@ -4,6 +4,11 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
 
+/** A full URL on the API server, for links the browser opens itself (e.g. the data download). */
+export function apiUrl(path: string) {
+  return `${API_BASE_URL}${path}`;
+}
+
 /** A progress update a therapist wrote and sent to the parent. */
 export type ProgressUpdate = {
   id: string;
@@ -62,6 +67,8 @@ export type ParentProfile = {
   id: string;
   email: string;
   name: string | null;
+  /** Set while the account is waiting to be deleted (30 days after the parent asked). */
+  scheduledPurgeAt?: string | null;
   kids?: {
     id: string;
     firstName: string;
@@ -219,6 +226,15 @@ export const api = {
   },
   login(email: string, password: string) {
     return request<{ token: string; parent: ParentProfile }>("/parent-auth/login", { method: "POST", body: { email, password } });
+  },
+  requestAccountDeletion(token: string, password: string) {
+    return request<{ scheduledPurgeAt: string }>("/parent-account/delete", { token, method: "POST", body: { password } });
+  },
+  cancelAccountDeletion(token: string) {
+    return request<{ cancelled: boolean }>("/parent-account/cancel-deletion", { token, method: "POST" });
+  },
+  dataExportLink(token: string) {
+    return request<{ path: string; expiresInMinutes: number }>("/parent-account/export-link", { token, method: "POST" });
   },
   me(token: string) {
     return request<ParentProfile>("/parent-auth/me", { token });

@@ -428,3 +428,57 @@ describe("IEPs shared by the care team", () => {
     expect(await screen.findByText("Sam's plan from Speech Therapist · Sunrise Centre")).toBeInTheDocument();
   });
 });
+
+describe("your account: download my data, delete my account", () => {
+  async function openAccount() {
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Profile/ }));
+    return screen.findByText("Your account");
+  }
+
+  test("download opens the short-lived export link", async () => {
+    mockApi.dataExportLink.mockResolvedValue({ path: "/api/parent-account/export?token=abc", expiresInMinutes: 5 });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    await openAccount();
+    await userEvent.click(screen.getByRole("button", { name: "Download my data" }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith(expect.stringMatching(/\/api\/parent-account\/export\?token=abc$/)));
+    vi.unstubAllGlobals();
+  });
+
+  test("delete explains what happens, needs the password, then shows the date and a way back", async () => {
+    const date = "2026-12-16T10:00:00.000Z";
+    mockApi.requestAccountDeletion.mockRejectedValueOnce(new ApiError(401, "That password isn't right"));
+    mockApi.requestAccountDeletion.mockResolvedValueOnce({ scheduledPurgeAt: date });
+    await openAccount();
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    expect(screen.getByText(/You have 30 days to change your mind/)).toBeInTheDocument();
+    expect(screen.getByText(/the centre keeps its own therapy records/)).toBeInTheDocument();
+    const confirm = screen.getByRole("button", { name: "Delete my account" });
+    expect(confirm).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText("Enter your password to confirm"), "wrong");
+    await userEvent.click(confirm);
+    expect(await screen.findByText("That password isn't right")).toBeInTheDocument();
+
+    mockApi.me.mockResolvedValue(makeProfile({ scheduledPurgeAt: date }));
+    await userEvent.clear(screen.getByLabelText("Enter your password to confirm"));
+    await userEvent.type(screen.getByLabelText("Enter your password to confirm"), "right");
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    await waitFor(() => expect(mockApi.requestAccountDeletion).toHaveBeenLastCalledWith("tok", "right"));
+    expect(await screen.findByText(/Your account will be deleted on/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Keep my account" })).toBeInTheDocument();
+  });
+
+  test("while deletion is pending, Home shows a banner; Keep my account cancels it", async () => {
+    mockApi.me.mockResolvedValue(makeProfile({ scheduledPurgeAt: "2026-12-16T10:00:00.000Z" }));
+    mockApi.cancelAccountDeletion.mockResolvedValue({ cancelled: true });
+    renderHome();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Your account will be deleted on/);
+    mockApi.me.mockResolvedValue(makeProfile());
+    await userEvent.click(screen.getByRole("button", { name: "Keep my account" }));
+    await waitFor(() => expect(mockApi.cancelAccountDeletion).toHaveBeenCalledWith("tok"));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+});
