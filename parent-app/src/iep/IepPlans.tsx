@@ -106,7 +106,7 @@ function PlanBody({ plan }: { plan: IepPlan }) {
 
 /** Every shared plan for this child: the newest in full, older ones on tap. Opening marks unread ones read. */
 export function IepPlansView({ token, kidId, kidName, plans, onBack, onRead }: { token: string; kidId: string; kidName: string; plans: IepPlan[]; onBack: () => void; onRead: (p: IepPlan) => void }) {
-  const [openId, setOpenId] = useState(plans[0]?.id ?? null);
+  const [openId, setOpenId] = useState<string | null>(plans[0]?.id ?? null);
   useEffect(() => {
     for (const p of plans) if (!p.readAt) void api.markIepPlanRead(token, kidId, p.id).then(onRead).catch(() => {});
     // Only on open: marking read changes `plans`, which mustn't re-trigger this.
