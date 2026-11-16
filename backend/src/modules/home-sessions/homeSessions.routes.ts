@@ -12,6 +12,7 @@ import {
   parentRunParamsSchema,
   parentSessionParamsSchema,
   sessionParamsSchema,
+  startPracticeSchema,
   turnSchema
 } from "./homeSessions.schemas";
 
@@ -66,6 +67,17 @@ parentHomeSessionsRoutes.get(
   "/:kidId/sessions",
   validateRequest({ params: parentKidParamsSchema }),
   asyncHandler(async (req, res) => res.json(await homeSessionsService.listForParent(req.parent!.id, req.params.kidId)))
+);
+// Practice sessions Pravnya puts together from the child's goals (at most a couple a day).
+parentHomeSessionsRoutes.get(
+  "/:kidId/practice",
+  validateRequest({ params: parentKidParamsSchema }),
+  asyncHandler(async (req, res) => res.json(await homeSessionsService.practiceStatus(req.parent!.id, req.params.kidId)))
+);
+parentHomeSessionsRoutes.post(
+  "/:kidId/practice/start",
+  validateRequest({ params: parentKidParamsSchema, body: startPracticeSchema }),
+  asyncHandler(async (req, res) => res.json(await homeSessionsService.startPractice(req.parent!.id, req.params.kidId, req.body)))
 );
 parentHomeSessionsRoutes.post(
   "/:kidId/sessions/:sessionId/start",

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, ApiError } from "../api/client";
@@ -32,6 +32,7 @@ beforeEach(() => {
   mockApi.listUpdates.mockResolvedValue([]);
   mockApi.listIepPlans.mockResolvedValue([]);
   mockApi.listSessions.mockResolvedValue([]);
+  mockApi.getPracticeStatus.mockResolvedValue({ perDay: 2, usedToday: 0, remainingToday: 2, inProgressRunId: null, available: false, minutes: null });
   mockApi.listTherapists.mockResolvedValue([]);
   mockApi.listTherapistInvitations.mockResolvedValue([]);
   mockApi.listCentres.mockResolvedValue([]);
@@ -526,5 +527,68 @@ describe("guided sessions from the therapist", () => {
     expect(screen.getByText(/Every Mon, Wed/)).toBeInTheDocument();
     expect(screen.getByText(/Last done/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+  });
+});
+
+describe("practice sessions with Pravnya", () => {
+  const status = (over: Partial<import("../api/client").PracticeStatus> = {}): import("../api/client").PracticeStatus => ({
+    perDay: 2,
+    usedToday: 0,
+    remainingToday: 2,
+    inProgressRunId: null,
+    available: true,
+    minutes: 13,
+    ...over
+  });
+
+  test("Activities offers one; starting asks Pravnya in the chosen language and opens the session", async () => {
+    try {
+      localStorage.removeItem("pv.practice.language");
+    } catch {
+      // ignore
+    }
+    mockApi.getPracticeStatus.mockResolvedValue(status());
+    mockApi.startPractice.mockResolvedValue({
+      runId: "run-p",
+      title: "Sam के साथ अभ्यास",
+      step: { phase: "intro", activityTitle: null, item: null, lines: ["आज खेलेंगे!"], choices: [{ id: "ready", label: "हम तैयार हैं" }], progress: { done: 0, total: 24 } },
+      resumed: false
+    });
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByText("Practice with Pravnya")).toBeInTheDocument();
+    expect(screen.getByText(/about 13 minutes/)).toBeInTheDocument();
+    expect(screen.getByText("2 of 2 left today")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "हिन्दी" }));
+    await userEvent.click(screen.getByRole("button", { name: "Start practice" }));
+    expect(await screen.findByText("आज खेलेंगे!")).toBeInTheDocument();
+    expect(mockApi.startPractice).toHaveBeenCalledWith("tok", "kid-1", "hi");
+    expect(mockApi.startSession).not.toHaveBeenCalled();
+  });
+
+  test("one left halfway says Continue; after today's two, come back tomorrow; nothing to practise hides it", async () => {
+    mockApi.getPracticeStatus.mockResolvedValue(status({ usedToday: 1, remainingToday: 1, inProgressRunId: "run-p" }));
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByRole("button", { name: "Continue practice" })).toBeInTheDocument();
+    expect(screen.getByText(/You left one halfway/)).toBeInTheDocument();
+    cleanup();
+
+    mockApi.getPracticeStatus.mockResolvedValue(status({ usedToday: 2, remainingToday: 0 }));
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByText(/That's today's 2 practice sessions done/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start practice" })).not.toBeInTheDocument();
+    cleanup();
+
+    mockApi.getPracticeStatus.mockResolvedValue(status({ available: false }));
+    renderHome();
+    await screen.findByText("Sam");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    await screen.findByText(/Activities/, { selector: "p" });
+    expect(screen.queryByText("Practice with Pravnya")).not.toBeInTheDocument();
   });
 });

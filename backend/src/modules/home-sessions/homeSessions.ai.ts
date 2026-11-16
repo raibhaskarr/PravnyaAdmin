@@ -82,13 +82,13 @@ function draftSchema(goals: GoalForDraft[]) {
   });
 }
 
-export async function draftPlanWithAi(kidName: string, goals: GoalForDraft[], language: Language, tenantId: string): Promise<Plan | null> {
+export async function draftPlanWithAi(kidName: string, goals: GoalForDraft[], language: Language, tenantId: string, featureId = "home-session-draft"): Promise<Plan | null> {
   const result = await orchestrator.executeStructured({
-    name: "pravnyaadmin.home-session-draft",
+    name: `pravnyaadmin.${featureId}`,
     request: {
       systemPrompt: DRAFT_PROMPT,
       messages: [{ role: "user", content: [{ type: "text", text: `${languageLine(language)}\n\n${JSON.stringify({ childFirstName: kidName, goals }, null, 1)}` }] }],
-      executionContext: createExecutionContext({ productId: "pravnyaadmin", tenantId, featureId: "home-session-draft" })
+      executionContext: createExecutionContext({ productId: "pravnyaadmin", tenantId, featureId })
     },
     schema: draftSchema(goals),
     maxRepairAttempts: 1
@@ -118,7 +118,198 @@ export function guessType(names: string): Activity["type"] {
   return rules.find(([re]) => re.test(n))?.[1] ?? "DISCRETE_TRIAL";
 }
 
-/** When the AI can't draft: a sound, general plan from the goals that the therapist then edits. */
+type Wording = { setup: string; instruction: string; correctLooksLike: string; prompts: { supportLevel: Activity["prompts"][number]["supportLevel"]; say: string }[]; modality: Activity["modality"] };
+
+/** Sound default wording for each kind of activity, so a plan reads well even without the AI. */
+function wordingFor(type: Activity["type"], hi: boolean): Wording {
+  const W: Record<Activity["type"], [Wording, Wording]> = {
+    RECEPTIVE_ID: [
+      {
+        setup: "Put {item} and one or two other things on the table in front of your child. Mix up where {item} sits each time.",
+        instruction: "Say: \"Show me {item}.\" (or \"Touch {item}\")",
+        correctLooksLike: "Your child touches, points to or gives you {item} within about 5 seconds.",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "Look at or point towards {item} and say it again." },
+          { supportLevel: "PHYSICAL_PROMPT", say: "Gently guide their hand to {item}." }
+        ],
+        modality: "GESTURAL"
+      },
+      {
+        setup: "{item} और एक-दो दूसरी चीज़ें बच्चे के सामने रखिए। हर बार {item} की जगह बदलिए।",
+        instruction: "कहिए: \"{item} दिखाओ।\"",
+        correctLooksLike: "बच्चा करीब 5 सेकंड में {item} को छूए, उसकी ओर इशारा करे या आपको दे।",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "{item} की ओर देखिए या इशारा कीजिए और फिर से कहिए।" },
+          { supportLevel: "PHYSICAL_PROMPT", say: "हल्के से बच्चे का हाथ {item} तक ले जाइए।" }
+        ],
+        modality: "GESTURAL"
+      }
+    ],
+    EXPRESSIVE_LABEL: [
+      {
+        setup: "Keep {item} (or a picture of it) out of sight, ready to show.",
+        instruction: "Hold up {item} and ask: \"What's this?\"",
+        correctLooksLike: "Your child says the word (or a clear try at it) within about 5 seconds.",
+        prompts: [
+          { supportLevel: "VERBAL_PROMPT", say: "Say the first sound of the word." },
+          { supportLevel: "VERBAL_PROMPT", say: "Say the whole word and let them copy you." }
+        ],
+        modality: "VERBAL"
+      },
+      {
+        setup: "{item} (या उसकी तस्वीर) छुपाकर पास रखिए।",
+        instruction: "{item} दिखाइए और पूछिए: \"यह क्या है?\"",
+        correctLooksLike: "बच्चा करीब 5 सेकंड में शब्द बोले (या साफ़ कोशिश करे)।",
+        prompts: [
+          { supportLevel: "VERBAL_PROMPT", say: "शब्द की पहली आवाज़ बोलिए।" },
+          { supportLevel: "VERBAL_PROMPT", say: "पूरा शब्द बोलिए और दोहराने दीजिए।" }
+        ],
+        modality: "VERBAL"
+      }
+    ],
+    AAC_LABEL: [
+      {
+        setup: "Keep your child's AAC device or board in front of them, switched on, with {item} close by.",
+        instruction: "Show {item} and ask: \"What's this? Tell me on your talker.\" Wait, without insisting on speech.",
+        correctLooksLike: "Your child finds and presses the word for {item} within about 5-10 seconds.",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "Point to the page or button where {item} is." },
+          { supportLevel: "VISUAL_PROMPT", say: "Press {item} on the device yourself, then give them a turn." },
+          { supportLevel: "PHYSICAL_PROMPT", say: "Gently guide their finger to the button." }
+        ],
+        modality: "AAC"
+      },
+      {
+        setup: "बच्चे का AAC डिवाइस या बोर्ड चालू करके सामने रखिए, और {item} पास रखिए।",
+        instruction: "{item} दिखाइए और पूछिए: \"यह क्या है? डिवाइस पर बताओ।\" बोलने पर ज़ोर मत दीजिए।",
+        correctLooksLike: "बच्चा करीब 5-10 सेकंड में {item} का बटन ढूंढकर दबाए।",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "उस पेज या बटन की ओर इशारा कीजिए जहाँ {item} है।" },
+          { supportLevel: "VISUAL_PROMPT", say: "पहले खुद डिवाइस पर {item} दबाइए, फिर बच्चे की बारी।" },
+          { supportLevel: "PHYSICAL_PROMPT", say: "हल्के से बच्चे की उंगली बटन तक ले जाइए।" }
+        ],
+        modality: "AAC"
+      }
+    ],
+    ARTICULATION: [
+      {
+        setup: "Sit face to face at your child's eye level, so they can see your mouth.",
+        instruction: "Say \"{item}\" clearly, then: \"Your turn!\"",
+        correctLooksLike: "Your child says {item} with the target sound clear enough to understand.",
+        prompts: [
+          { supportLevel: "VISUAL_PROMPT", say: "Point to your mouth and say the sound slowly." },
+          { supportLevel: "VERBAL_PROMPT", say: "Say it in parts, slowly, and let them copy each part." }
+        ],
+        modality: "VERBAL"
+      },
+      {
+        setup: "बच्चे की आँखों की ऊँचाई पर आमने-सामने बैठिए, ताकि वह आपका मुँह देख सके।",
+        instruction: "साफ़ बोलिए \"{item}\", फिर: \"अब तुम्हारी बारी!\"",
+        correctLooksLike: "बच्चा {item} बोले और लक्ष्य वाली आवाज़ समझ में आए।",
+        prompts: [
+          { supportLevel: "VISUAL_PROMPT", say: "अपने मुँह की ओर इशारा करके आवाज़ धीरे से बोलिए।" },
+          { supportLevel: "VERBAL_PROMPT", say: "टुकड़ों में धीरे बोलिए और हर टुकड़ा दोहराने दीजिए।" }
+        ],
+        modality: "VERBAL"
+      }
+    ],
+    REQUESTING: [
+      {
+        setup: "Keep {item} where your child can see it but can't reach it.",
+        instruction: "Hold up {item}, look at your child expectantly and wait. Don't name it first.",
+        correctLooksLike: "Your child asks for {item} (a word, a sign or the device) within about 5 seconds. Hand it over right away.",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "Hold {item} a little closer and raise your eyebrows." },
+          { supportLevel: "VERBAL_PROMPT", say: "Say the word for {item} and wait for them to copy it." }
+        ],
+        modality: "VERBAL"
+      },
+      {
+        setup: "{item} ऐसी जगह रखिए जहाँ बच्चा देख सके पर पहुँच न सके।",
+        instruction: "{item} दिखाइए, उम्मीद से बच्चे की ओर देखिए और इंतज़ार कीजिए। पहले नाम मत बोलिए।",
+        correctLooksLike: "बच्चा करीब 5 सेकंड में {item} माँगे (शब्द, इशारा या डिवाइस से)। तुरंत दे दीजिए।",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "{item} थोड़ा पास लाइए और भौंहें उठाकर इंतज़ार कीजिए।" },
+          { supportLevel: "VERBAL_PROMPT", say: "{item} का शब्द बोलिए और दोहराने का इंतज़ार कीजिए।" }
+        ],
+        modality: "VERBAL"
+      }
+    ],
+    FOLLOW_DIRECTIONS: [
+      {
+        setup: "Get your child's attention first: say their name and wait for a look.",
+        instruction: "Say it once, simply: \"{item}.\"",
+        correctLooksLike: "Your child starts doing it within about 5 seconds, without a repeat.",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "Point or show what to do while you say it again." },
+          { supportLevel: "PHYSICAL_PROMPT", say: "Gently help them do it, then praise." }
+        ],
+        modality: "NOT_APPLICABLE"
+      },
+      {
+        setup: "पहले बच्चे का ध्यान लीजिए: नाम लेकर उसके देखने का इंतज़ार कीजिए।",
+        instruction: "एक बार, सीधे कहिए: \"{item}।\"",
+        correctLooksLike: "बच्चा करीब 5 सेकंड में, बिना दोहराए, करना शुरू करे।",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "दोबारा कहते हुए इशारे से दिखाइए क्या करना है।" },
+          { supportLevel: "PHYSICAL_PROMPT", say: "हल्के से करने में मदद कीजिए, फिर तारीफ़ कीजिए।" }
+        ],
+        modality: "NOT_APPLICABLE"
+      }
+    ],
+    IMITATION: [
+      {
+        setup: "Sit face to face. Get your child's attention with their name or a fun sound.",
+        instruction: "Say \"Do this!\" and show {item}.",
+        correctLooksLike: "Your child copies {item} within about 5 seconds.",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "Show it again, slower and bigger." },
+          { supportLevel: "PHYSICAL_PROMPT", say: "Gently help them copy it." }
+        ],
+        modality: "GESTURAL"
+      },
+      {
+        setup: "आमने-सामने बैठिए। नाम या कोई मज़ेदार आवाज़ से ध्यान लीजिए।",
+        instruction: "कहिए \"ऐसे करो!\" और {item} करके दिखाइए।",
+        correctLooksLike: "बच्चा करीब 5 सेकंड में {item} की नकल करे।",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "फिर से, धीरे और बड़ा करके दिखाइए।" },
+          { supportLevel: "PHYSICAL_PROMPT", say: "हल्के से नकल करने में मदद कीजिए।" }
+        ],
+        modality: "GESTURAL"
+      }
+    ],
+    DISCRETE_TRIAL: [
+      {
+        setup: "Sit face to face, put distractions away, and keep what you need for {item} within reach.",
+        instruction: "Get their attention, then give one short, clear instruction for {item}. Use the same words each time.",
+        correctLooksLike: "Your child does {item} within about 5 seconds.",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "Point to or show what to do." },
+          { supportLevel: "VERBAL_PROMPT", say: "Show the right response and let them copy you." },
+          { supportLevel: "PHYSICAL_PROMPT", say: "Gently guide their hands to help." }
+        ],
+        modality: "NOT_APPLICABLE"
+      },
+      {
+        setup: "आमने-सामने बैठिए, ध्यान भटकाने वाली चीज़ें हटाइए, और {item} के लिए ज़रूरी चीज़ें पास रखिए।",
+        instruction: "ध्यान लीजिए, फिर {item} के लिए एक छोटा, साफ़ निर्देश दीजिए। हर बार वही शब्द।",
+        correctLooksLike: "बच्चा करीब 5 सेकंड में {item} करे।",
+        prompts: [
+          { supportLevel: "GESTURAL_PROMPT", say: "इशारे से दिखाइए क्या करना है।" },
+          { supportLevel: "VERBAL_PROMPT", say: "सही जवाब करके दिखाइए और दोहराने दीजिए।" },
+          { supportLevel: "PHYSICAL_PROMPT", say: "हल्के से हाथ पकड़कर मदद कीजिए।" }
+        ],
+        modality: "NOT_APPLICABLE"
+      }
+    ],
+    OTHER: [] as unknown as [Wording, Wording]
+  };
+  W.OTHER = W.DISCRETE_TRIAL;
+  return W[type][hi ? 1 : 0];
+}
+
+/** When the AI can't draft: sound wording for each kind of activity, from the goals. */
 export function templatePlan(kidName: string, goals: GoalForDraft[], language: Language): Plan {
   const hi = language === "hi";
   return {
@@ -128,6 +319,7 @@ export function templatePlan(kidName: string, goals: GoalForDraft[], language: L
     closing: hi ? "शाबाश! आज के लिए इतना ही। अब कुछ ऐसा कीजिए जो बच्चे को पसंद हो।" : "Well done, both of you! That's it for today. Finish with something your child enjoys.",
     activities: goals.map((g) => {
       const type = guessType(`${g.title} ${g.skill} ${g.area}`);
+      const w = wordingFor(type, hi);
       return {
         key: randomUUID(),
         goalId: g.id,
@@ -135,19 +327,13 @@ export function templatePlan(kidName: string, goals: GoalForDraft[], language: L
         type,
         items: g.items.slice(0, 3),
         trialsPerItem: 3,
-        setup: hi
-          ? "बच्चे के सामने बैठिए, ध्यान भटकाने वाली चीज़ें हटा दीजिए, और ज़रूरी चीज़ें पास रखिए।"
-          : "Sit face to face, put distractions away, and keep what you need within reach.",
-        instruction: hi ? "{item} के लिए अपना छोटा, साफ़ निर्देश दीजिए।" : "Give your short, clear instruction for {item}.",
-        correctLooksLike: hi ? "बच्चा 3-5 सेकंड में सही जवाब दे।" : "Your child responds correctly within 3-5 seconds.",
-        prompts: [
-          { supportLevel: "GESTURAL_PROMPT", say: hi ? "उंगली से {item} की ओर इशारा कीजिए।" : "Point to or gesture towards {item}." },
-          { supportLevel: "VERBAL_PROMPT", say: hi ? "सही जवाब बोलकर दिखाइए और दोहराने दीजिए।" : "Say or show the right answer and let them copy you." },
-          { supportLevel: "PHYSICAL_PROMPT", say: hi ? "हल्के से हाथ पकड़कर मदद कीजिए।" : "Gently guide their hands to help." }
-        ],
-        errorCorrection: hi ? "शांति से सही जवाब दिखाइए, मदद से दोहराने दीजिए, फिर आगे बढ़िए।" : "Calmly show the right answer, help them copy it, then move on.",
-        reinforcement: hi ? "तुरंत तारीफ़ कीजिए और कोई पसंदीदा चीज़ दीजिए।" : "Praise right away and give something they love.",
-        modality: "VERBAL",
+        setup: w.setup,
+        instruction: w.instruction,
+        correctLooksLike: w.correctLooksLike,
+        prompts: w.prompts,
+        errorCorrection: hi ? "शांति से सही जवाब दिखाइए, मदद से दोहराने दीजिए, फिर आगे बढ़िए। \"नहीं\" या डाँट नहीं।" : "Calmly show the right answer, help them copy it, then move on. No \"no!\" or scolding.",
+        reinforcement: hi ? "तुरंत तारीफ़ कीजिए (\"शाबाश, तुमने कर दिखाया!\") और कोई पसंदीदा चीज़ दीजिए।" : "Praise right away (\"Yes, you did it!\") and give something they love.",
+        modality: w.modality,
         missesBeforeMovingOn: 2
       };
     })

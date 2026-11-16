@@ -110,6 +110,11 @@ const P = {
   }
 };
 
+/** "{item}" in the plan's wording becomes the item (or, before the tries start, the list of items). */
+export function fillItem(text: string, item: string) {
+  return text.replace(/\{item\}/g, item);
+}
+
 export function totalTrials(plan: Plan) {
   return plan.activities.reduce((n, a) => n + a.items.length * a.trialsPerItem, 0);
 }
@@ -144,7 +149,13 @@ export function view(s: RunState): StepView {
         phase: "setup",
         activityTitle: act.goalTitle,
         item: null,
-        lines: [...fb, p.activity(s.a + 1, s.plan.activities.length, act.goalTitle), act.setup, p.correctWhen(act.correctLooksLike), p.reward(act.reinforcement)],
+        lines: [
+          ...fb,
+          p.activity(s.a + 1, s.plan.activities.length, act.goalTitle),
+          fillItem(act.setup, act.items.map((x) => x.label).join(", ")),
+          p.correctWhen(fillItem(act.correctLooksLike, act.items.map((x) => x.label).join(" / "))),
+          p.reward(act.reinforcement)
+        ],
         choices: [
           { id: "ready", label: p.readyActivity },
           { id: "skip", label: p.skip }
@@ -157,7 +168,7 @@ export function view(s: RunState): StepView {
         phase: "trial",
         activityTitle: act.goalTitle,
         item,
-        lines: [...fb, p.tryOf(item, s.t + 1, act.trialsPerItem), act.instruction.replace(/\{item\}/g, item), p.wait, p.ifHelp(act.prompts[0].say.replace(/\{item\}/g, item))],
+        lines: [...fb, p.tryOf(item, s.t + 1, act.trialsPerItem), fillItem(act.instruction, item), p.wait, p.ifHelp(fillItem(act.prompts[0].say, item))],
         choices: [
           { id: "own", label: p.own(s.kidName) },
           { id: "help", label: p.help },

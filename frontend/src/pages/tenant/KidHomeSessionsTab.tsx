@@ -337,6 +337,22 @@ function SessionCard({ session, goals, canEdit, onChanged }: { session: HomeSess
   );
 }
 
+/** A practice session Pravnya made when the parent asked (from Activities): read-only, with its report. */
+function PracticeCard({ session }: { session: HomeSession }) {
+  const run = session.runs[0];
+  return (
+    <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+      <span>
+        <Tag value="Made by Pravnya" severity="info" /> <strong>{new Date(session.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</strong>{" "}
+        <span className="hint-text">
+          · {session.language === "hi" ? "Hindi" : "English"} · {session.plan.activities.map((a) => `${a.goalTitle} (${a.items.map((i) => i.label).join(", ")})`).join(" · ")}
+        </span>
+      </span>
+      {run ? <RunReport run={run} plan={session.plan} /> : null}
+    </div>
+  );
+}
+
 export function KidHomeSessionsTab({ kid, canEdit }: { kid: Kid; canEdit: boolean }) {
   const { token } = useAuth();
   const [sessions, setSessions] = useState<HomeSession[] | null>(null);
@@ -373,7 +389,9 @@ export function KidHomeSessionsTab({ kid, canEdit }: { kid: Kid; canEdit: boolea
   }
 
   if (!sessions) return <p className="empty-state">Loading...</p>;
-  const withSkipped = sessions.map((s) => (lastDraft && s.id === lastDraft.id ? { ...s, skippedGoals: lastDraft.skippedGoals } : s));
+  const withSkipped = sessions.filter((s) => s.source !== "PRAVNYA").map((s) => (lastDraft && s.id === lastDraft.id ? { ...s, skippedGoals: lastDraft.skippedGoals } : s));
+  // Only ones the parent actually did something in.
+  const practice = sessions.filter((s) => s.source === "PRAVNYA" && s.runs.some((r) => r.results.length > 0));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", maxWidth: 960 }}>
@@ -407,6 +425,15 @@ export function KidHomeSessionsTab({ kid, canEdit }: { kid: Kid; canEdit: boolea
       {withSkipped.length === 0 ? <p className="empty-state">No home sessions yet.</p> : null}
       {withSkipped.map((s) => (
         <SessionCard key={s.id + s.status + s.runs.length} session={s} goals={goals} canEdit={canEdit} onChanged={load} />
+      ))}
+      <h3 style={{ margin: "0.8rem 0 0" }}>Practice sessions the parent did with Pravnya</h3>
+      <span className="hint-text">
+        From the app's Activities, a parent can ask Pravnya for a 10-15 minute practice session (at most 2 a day). Pravnya picks 1-3 of this child's active goals and the items most in need of
+        practice: worked on at the centre lately, not yet done on their own, not practised at home this week. Every try is in the child's log.
+      </span>
+      {practice.length === 0 ? <p className="empty-state">None yet.</p> : null}
+      {practice.map((s) => (
+        <PracticeCard key={s.id + s.runs.length} session={s} />
       ))}
     </div>
   );

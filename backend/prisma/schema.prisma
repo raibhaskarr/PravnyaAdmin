@@ -967,6 +967,13 @@ enum HomeSessionStatus {
   ARCHIVED
 }
 
+/// Who made the session: a therapist, or Pravnya on the parent's request (a one-off practice
+/// session picked from the child's goals and recent progress).
+enum HomeSessionSource {
+  THERAPIST
+  PRAVNYA
+}
+
 enum HomeSessionRunStatus {
   IN_PROGRESS
   COMPLETED
@@ -996,6 +1003,7 @@ model HomeSession {
   /// { kind: "once" } or { kind: "weekly", days: ["Mon", ...], until: "YYYY-MM-DD" | null }
   schedule     Json
   aiDrafted    Boolean           @default(false)
+  source       HomeSessionSource @default(THERAPIST)
   status       HomeSessionStatus @default(DRAFT)
   publishedAt  DateTime?
   runs         HomeSessionRun[]
@@ -1003,6 +1011,7 @@ model HomeSession {
   updatedAt    DateTime          @updatedAt
 
   @@index([kidId, status])
+  @@index([kidId, source, createdAt])
 }
 
 /// One time a parent did a session. Only the structured results are kept -- never what was said.

@@ -17,6 +17,7 @@ beforeEach(() => {
   mockApi.listUpdates.mockResolvedValue([]);
   mockApi.listIepPlans.mockResolvedValue([]);
   mockApi.listSessions.mockResolvedValue([]);
+  mockApi.getPracticeStatus.mockResolvedValue({ perDay: 2, usedToday: 0, remainingToday: 2, inProgressRunId: null, available: false, minutes: null });
   mockApi.login.mockResolvedValue({ token: "tok-login", parent: makeProfile() });
   mockApi.sendVerificationCode.mockResolvedValue({ sent: true });
   mockApi.resetPassword.mockResolvedValue({ token: "tok-reset", parent: makeProfile() });

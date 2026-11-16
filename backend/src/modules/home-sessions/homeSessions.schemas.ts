@@ -81,6 +81,7 @@ export const editSessionSchema = z
 export const parentKidParamsSchema = z.object({ kidId: z.string().uuid() });
 export const parentSessionParamsSchema = z.object({ kidId: z.string().uuid(), sessionId: z.string().uuid() });
 export const parentRunParamsSchema = z.object({ kidId: z.string().uuid(), runId: z.string().uuid() });
+export const startPracticeSchema = z.object({ language: z.enum(LANGUAGES).default("en") });
 export const turnSchema = z
   .object({
     /** A tapped button (an id from the step's choices). */

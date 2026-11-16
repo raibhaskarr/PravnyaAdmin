@@ -178,6 +178,17 @@ export type SessionStep = {
   progress: { done: number; total: number };
 };
 
+/** Practice sessions Pravnya makes on request, from the Activities tab. */
+export type PracticeStatus = {
+  perDay: number;
+  usedToday: number;
+  remainingToday: number;
+  inProgressRunId: string | null;
+  /** False when there's nothing to practise yet (no active goals with items). */
+  available: boolean;
+  minutes: number | null;
+};
+
 export type SessionTurnResult = {
   status: "IN_PROGRESS" | "COMPLETED" | "ENDED_EARLY";
   step: SessionStep;
@@ -397,6 +408,12 @@ export const api = {
   },
   startSession(token: string, kidId: string, sessionId: string) {
     return request<{ runId: string; title: string; step: SessionStep; resumed: boolean }>(`/parent-kids/${kidId}/sessions/${sessionId}/start`, { token, method: "POST" });
+  },
+  getPracticeStatus(token: string, kidId: string) {
+    return request<PracticeStatus>(`/parent-kids/${kidId}/practice`, { token });
+  },
+  startPractice(token: string, kidId: string, language: "en" | "hi") {
+    return request<{ runId: string; title: string; step: SessionStep; resumed: boolean }>(`/parent-kids/${kidId}/practice/start`, { token, method: "POST", body: { language } });
   },
   sessionTurn(token: string, kidId: string, runId: string, input: { choice: string } | { text: string } | { audio: { mimeType: string; base64: string } }) {
     return request<SessionTurnResult>(`/parent-kids/${kidId}/session-runs/${runId}/turn`, { token, method: "POST", body: input });

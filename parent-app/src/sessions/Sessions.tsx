@@ -1,4 +1,4 @@
-import type { HomeSessionSummary, SessionSchedule } from "../api/client";
+import type { HomeSessionSummary, PracticeStatus, SessionSchedule } from "../api/client";
 
 function when(s: SessionSchedule) {
   if (s.kind === "once") return "Once";
@@ -53,5 +53,68 @@ export function TodaysSessionCard({ session, kidName, onStart }: { session: Home
       </p>
       <p className="mt-2 text-sm font-semibold text-[var(--pv-green-700)]">{session.inProgressRunId ? "Continue the session" : "Start the session"}</p>
     </button>
+  );
+}
+
+/**
+ * Activities: ask Pravnya for a 10-15 minute practice session picked from the child's goals.
+ * At most a couple a day; one left halfway can be continued.
+ */
+export function PracticeCard({
+  status,
+  kidName,
+  language,
+  onLanguage,
+  onStart
+}: {
+  status: PracticeStatus;
+  kidName: string;
+  language: "en" | "hi";
+  onLanguage: (l: "en" | "hi") => void;
+  onStart: () => void;
+}) {
+  const doneForToday = status.remainingToday === 0 && !status.inProgressRunId;
+  return (
+    <div className="rounded-2xl border border-[var(--pv-green-700)] bg-[var(--pv-surface)] p-4">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--pv-green-100)] text-sm">✨</span>
+        <p className="text-[1rem] font-semibold text-[var(--pv-ink)]">Practice with Pravnya</p>
+      </div>
+      <p className="text-[0.92rem] leading-relaxed text-[var(--pv-ink-soft)]">
+        Pravnya picks a few of {kidName}'s goals, mostly what they're working on at the centre, and guides you through
+        {status.minutes ? ` about ${status.minutes} minutes` : " 10-15 minutes"} of practice, one try at a time.
+      </p>
+      {doneForToday ? (
+        <p className="mt-3 rounded-xl bg-[var(--pv-green-100)] px-3 py-2 text-[0.9rem] text-[var(--pv-ink)]">
+          That's today's {status.perDay} practice sessions done. Short, regular practice works best, so come back tomorrow!
+        </p>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1 rounded-full border border-[var(--pv-border)] p-0.5 text-sm" role="group" aria-label="Session language">
+            {(["en", "hi"] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                aria-pressed={language === l}
+                disabled={!!status.inProgressRunId}
+                onClick={() => onLanguage(l)}
+                className={`rounded-full px-3 py-1 ${language === l ? "bg-[var(--pv-green-700)] font-semibold text-white" : "text-[var(--pv-ink-soft)]"}`}
+              >
+                {l === "en" ? "English" : "हिन्दी"}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={onStart} className="rounded-2xl bg-[var(--pv-green-700)] px-4 py-2 text-[0.95rem] font-semibold text-white">
+            {status.inProgressRunId ? "Continue practice" : "Start practice"}
+          </button>
+        </div>
+      )}
+      {!doneForToday ? (
+        <p className="mt-2 text-xs text-[var(--pv-ink-faint)]">
+          {status.inProgressRunId ? "You left one halfway. " : ""}
+          {status.remainingToday} of {status.perDay} left today
+        </p>
+      ) : null}
+    </div>
   );
 }

@@ -11,6 +11,7 @@ import { invitationEmailService } from "../therapist-invitations/invitationEmail
 import { draftPlanWithAi, interpretTurn, templatePlan, type GoalForDraft } from "./homeSessions.ai";
 import { apply, InvalidChoice, startState, summarize, view, type Language, type RunState, type TrialRecord } from "./homeSessions.engine";
 import type { Plan, Schedule } from "./homeSessions.schemas";
+import { loadCandidates, pickPractice, PRACTICE_PER_DAY } from "./homeSessions.practice";
 
 const DAY = 86_400_000;
 const RESUME_WITHIN_MS = 12 * 60 * 60_000;
@@ -115,6 +116,20 @@ async function logTry(runId: string, record: TrialRecord) {
   }
 }
 
+/** Today's practice sessions (Pravnya's) for a child: one with tries, or still going, counts. */
+async function practiceToday(kidId: string, now = new Date()) {
+  const sessions = await prisma.homeSession.findMany({
+    where: { kidId, source: "PRAVNYA", createdAt: { gte: new Date(now.getTime() - 36 * 60 * 60_000) } },
+    orderBy: { createdAt: "desc" },
+    include: { runs: { orderBy: { startedAt: "desc" }, select: { id: true, status: true, startedAt: true, results: true, summary: true } } }
+  });
+  const today = todayInIndia(now).date;
+  const todays = sessions.filter((s) => todayInIndia(s.createdAt).date === today);
+  const counted = todays.filter((s) => s.runs.some((r) => r.status === "IN_PROGRESS" || (r.results as unknown[]).length > 0));
+  const open = sessions.flatMap((s) => s.runs).find((r) => r.status === "IN_PROGRESS" && now.getTime() - r.startedAt.getTime() < RESUME_WITHIN_MS) ?? null;
+  return { used: counted.length, open, lastGoalIds: sessions[0] ? (sessions[0].plan as unknown as Plan).activities.map((a) => a.goalId) : [] };
+}
+
 const runSummaryFields = { id: true, status: true, startedAt: true, endedAt: true, summary: true } as const;
 
 // ---------- Staff ----------
@@ -183,6 +198,7 @@ export const homeSessionsService = {
   async edit(user: AuthUser, id: string, input: { title?: string; language?: Language; schedule?: Schedule; plan?: Plan }) {
     const session = await findForStaff(user, id);
     if (session.status === "ARCHIVED") throw conflict("This session is archived", "ARCHIVED");
+    if (session.source === "PRAVNYA") throw conflict("Practice sessions made by Pravnya can't be edited", "MADE_BY_PRAVNYA");
     if (input.plan) await assertPlanBelongsToKid(session.kidId, input.plan);
     return prisma.homeSession.update({
       where: { id },
@@ -213,7 +229,7 @@ export const homeSessionsService = {
   async listForParent(parentId: string, kidId: string) {
     await assertOwnsKid(parentId, kidId);
     const sessions = await prisma.homeSession.findMany({
-      where: { kidId, status: "ACTIVE" },
+      where: { kidId, status: "ACTIVE", source: "THERAPIST" },
       orderBy: { publishedAt: "desc" },
       include: { runs: { orderBy: { startedAt: "desc" }, select: runSummaryFields } }
     });
@@ -239,6 +255,7 @@ export const homeSessionsService = {
     const session = await prisma.homeSession.findFirst({ where: { id: sessionId, kidId, status: "ACTIVE" }, include: { kid: { select: { firstName: true } } } });
     if (!session) throw notFound("Session not found");
     const open = await prisma.homeSessionRun.findFirst({ where: { sessionId, status: "IN_PROGRESS", startedAt: { gt: new Date(Date.now() - RESUME_WITHIN_MS) } }, orderBy: { startedAt: "desc" } });
+    if (!open && session.source === "PRAVNYA") throw conflict("This practice session is over. Start a new one from Activities.", "PRACTICE_OVER");
     const run =
       open ??
       (await prisma.homeSessionRun.create({
@@ -251,6 +268,80 @@ export const homeSessionsService = {
         }
       }));
     return { runId: run.id, title: session.title, step: view(run.state as unknown as RunState), resumed: !!open };
+  },
+
+  /** What the Activities tab shows for practice sessions: how many are left today, one to continue. */
+  async practiceStatus(parentId: string, kidId: string) {
+    await assertOwnsKid(parentId, kidId);
+    const [today, candidates] = await Promise.all([practiceToday(kidId), loadCandidates(kidId)]);
+    const pick = pickPractice(candidates, today.lastGoalIds);
+    return {
+      perDay: PRACTICE_PER_DAY,
+      usedToday: today.used,
+      remainingToday: Math.max(0, PRACTICE_PER_DAY - today.used),
+      inProgressRunId: today.open?.id ?? null,
+      available: pick !== null,
+      minutes: pick?.minutes ?? null
+    };
+  },
+
+  /**
+   * Pravnya puts a practice session together from the child's goals and recent progress, and starts
+   * it. Continues the one in progress, if any; at most PRACTICE_PER_DAY a day.
+   */
+  async startPractice(parentId: string, kidId: string, input: { language: Language }) {
+    const kid = await assertOwnsKid(parentId, kidId);
+    const today = await practiceToday(kidId);
+    if (today.open) {
+      const run = await prisma.homeSessionRun.findUniqueOrThrow({ where: { id: today.open.id }, include: { session: { select: { title: true } } } });
+      return { runId: run.id, title: run.session.title, step: view(run.state as unknown as RunState), resumed: true };
+    }
+    if (today.used >= PRACTICE_PER_DAY) {
+      throw conflict(
+        input.language === "hi"
+          ? `आज के ${PRACTICE_PER_DAY} अभ्यास सत्र हो गए। कल फिर मिलते हैं!`
+          : `That's today's ${PRACTICE_PER_DAY} practice sessions done. Short, regular practice works best, so come back tomorrow!`,
+        "DAILY_LIMIT"
+      );
+    }
+    const pick = pickPractice(await loadCandidates(kidId), today.lastGoalIds);
+    if (!pick) throw badRequest("There's nothing to practise yet. Once your therapist adds goals with items, Pravnya can make a session.", "NO_GOALS");
+
+    const kidRow = await prisma.kid.findUniqueOrThrow({ where: { id: kid.id }, select: { firstName: true, tenant: { select: { name: true } } } });
+    const ai = await draftPlanWithAi(kidRow.firstName, pick.goals, input.language, kid.tenantId, "practice-session-draft");
+    const base = ai ?? templatePlan(kidRow.firstName, pick.goals, input.language);
+    // The picker decides the items, the order and the number of tries; the AI only writes the wording.
+    const byGoal = new Map(base.activities.map((a) => [a.goalId, a]));
+    const plan: Plan = {
+      intro: base.intro,
+      closing: base.closing,
+      activities: pick.goals
+        .map((g) => {
+          const a = byGoal.get(g.id) ?? templatePlan(kidRow.firstName, [g], input.language).activities[0];
+          return { ...a, goalTitle: g.title, items: g.items, trialsPerItem: g.trialsPerItem };
+        })
+    };
+    const session = await prisma.homeSession.create({
+      data: {
+        tenantId: kid.tenantId,
+        kidId: kid.id,
+        authorUserId: null,
+        authorName: "Pravnya",
+        centreName: kidRow.tenant.name,
+        title: input.language === "hi" ? `${kidRow.firstName} के साथ अभ्यास` : `Practice with ${kidRow.firstName}`,
+        language: input.language,
+        plan: plan as unknown as Prisma.InputJsonValue,
+        schedule: { kind: "once" },
+        aiDrafted: ai !== null,
+        source: "PRAVNYA",
+        status: "ACTIVE",
+        publishedAt: new Date()
+      }
+    });
+    const run = await prisma.homeSessionRun.create({
+      data: { sessionId: session.id, tenantId: kid.tenantId, kidId, state: startState(plan, input.language, kidRow.firstName) as unknown as Prisma.InputJsonValue }
+    });
+    return { runId: run.id, title: session.title, step: view(run.state as unknown as RunState), resumed: false, minutes: pick.minutes };
   },
 
   async current(parentId: string, kidId: string, runId: string) {

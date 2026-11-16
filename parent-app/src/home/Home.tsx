@@ -144,7 +144,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   const [iepPlans, setIepPlans] = useState<IepPlan[]>([]);
   // Guided sessions the therapist set; the one being run, and the tab to return to afterwards.
   const [sessions, setSessions] = useState<HomeSessionSummary[]>([]);
-  const [activeSession, setActiveSession] = useState<{ id: string; returnTo: View } | null>(null);
+  const [activeSession, setActiveSession] = useState<{ id?: string; practice?: "en" | "hi"; returnTo: View } | null>(null);
   // The real conversation thread, separate from the digest feed above -- persisted server-side
   // (companion.service.ts), fetched fresh whenever the kid changes.
   const [thread, setThread] = useState<CompanionMessage[]>([]);
@@ -278,6 +278,11 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
     setView("session");
   }
 
+  function startPractice(language: "en" | "hi") {
+    setActiveSession({ practice: language, returnTo: view });
+    setView("session");
+  }
+
   if (view === "session" && kid && activeSession) {
     return (
       <SessionRunner
@@ -285,6 +290,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
         kidId={kid.id}
         kidName={kidName}
         sessionId={activeSession.id}
+        practiceLanguage={activeSession.practice}
         onClose={() => {
           const back = activeSession.returnTo;
           setActiveSession(null);
@@ -377,7 +383,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
       {activeTab === "growth" && kid ? (
         <Growth key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
       ) : activeTab === "activities" && kid ? (
-        <Activities key={kid.id + sessions.map((x) => x.lastRun?.id ?? "").join()} token={token} kidId={kid.id} kidName={kidName} sessions={sessions} onStartSession={startSession} />
+        <Activities key={kid.id + sessions.map((x) => x.lastRun?.id ?? "").join()} token={token} kidId={kid.id} kidName={kidName} sessions={sessions} onStartSession={startSession} onStartPractice={startPractice} />
       ) : activeTab === "goals" && kid ? (
         <Goals
           key={kid.id}

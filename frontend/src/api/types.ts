@@ -609,6 +609,8 @@ export type HomeSession = {
   plan: SessionPlan;
   schedule: SessionSchedule;
   aiDrafted: boolean;
+  /** THERAPIST: built here. PRAVNYA: a practice session Pravnya made when the parent asked for one. */
+  source: "THERAPIST" | "PRAVNYA";
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   publishedAt: string | null;
   createdAt: string;

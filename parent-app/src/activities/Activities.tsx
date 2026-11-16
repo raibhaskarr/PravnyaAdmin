@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type Goal, type GoalItemEvidence } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Walkthrough } from "./Walkthrough";
-import { SessionCard } from "../sessions/Sessions";
-import type { HomeSessionSummary } from "../api/client";
+import { PracticeCard, SessionCard } from "../sessions/Sessions";
+import type { HomeSessionSummary, PracticeStatus } from "../api/client";
 
 // Faithful port of the admin panel's realActivities.tsx -- "Activities" = confirmation prompts,
 // not practice suggestions. A centre logging evidence for a goal is one data point; it's stronger
@@ -114,7 +114,8 @@ export function Activities({
   kidId,
   kidName = "your child",
   sessions = [],
-  onStartSession
+  onStartSession,
+  onStartPractice
 }: {
   token: string;
   kidId: string;
@@ -122,8 +123,26 @@ export function Activities({
   /** Guided sessions the therapist set, shown above the suggestions. */
   sessions?: HomeSessionSummary[];
   onStartSession?: (sessionId: string) => void;
+  /** A practice session Pravnya puts together from the child's goals. */
+  onStartPractice?: (language: "en" | "hi") => void;
 }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
+  const [practice, setPractice] = useState<PracticeStatus | null>(null);
+  const [practiceLanguage, setPracticeLanguage] = useState<"en" | "hi">(() => {
+    try {
+      return localStorage.getItem("pv.practice.language") === "hi" ? "hi" : "en";
+    } catch {
+      return "en";
+    }
+  });
+  function chooseLanguage(l: "en" | "hi") {
+    setPracticeLanguage(l);
+    try {
+      localStorage.setItem("pv.practice.language", l);
+    } catch {
+      // not remembered; fine
+    }
+  }
   const [error, setError] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
@@ -136,6 +155,13 @@ export function Activities({
 
   useEffect(() => {
     void refetch();
+    if (onStartPractice) {
+      api
+        .getPracticeStatus(token, kidId)
+        .then(setPractice)
+        .catch(() => setPractice(null));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, kidId]);
 
   const candidates = goals ? buildActivityCandidates(goals) : [];
@@ -176,6 +202,9 @@ export function Activities({
           />
         ) : (
           <div className="flex flex-col gap-6">
+            {practice?.available && onStartPractice ? (
+              <PracticeCard status={practice} kidName={kidName} language={practiceLanguage} onLanguage={chooseLanguage} onStart={() => onStartPractice(practiceLanguage)} />
+            ) : null}
             {sessions.length > 0 && onStartSession ? (
               <section className="flex flex-col gap-2.5">
                 <h2 className="text-[0.78rem] font-bold uppercase tracking-wide text-[var(--pv-ink-faint)]">Sessions from your therapist</h2>

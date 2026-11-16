@@ -44,12 +44,16 @@ export function SessionRunner({
   kidId,
   kidName,
   sessionId,
+  practiceLanguage,
   onClose
 }: {
   token: string;
   kidId: string;
   kidName: string;
-  sessionId: string;
+  /** A session the therapist set... */
+  sessionId?: string;
+  /** ...or a practice session Pravnya puts together now, in this language. */
+  practiceLanguage?: "en" | "hi";
   onClose: () => void;
 }) {
   const [runId, setRunId] = useState<string | null>(null);
@@ -83,8 +87,7 @@ export function SessionRunner({
   }
 
   useEffect(() => {
-    api
-      .startSession(token, kidId, sessionId)
+    (practiceLanguage ? api.startPractice(token, kidId, practiceLanguage) : api.startSession(token, kidId, sessionId!))
       .then((r) => {
         setRunId(r.runId);
         setTitle(r.title);
@@ -100,7 +103,7 @@ export function SessionRunner({
     };
     // Start once per session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, kidId, sessionId]);
+  }, [token, kidId, sessionId, practiceLanguage]);
 
   useLayoutEffect(() => {
     endRef.current?.scrollIntoView?.({ block: "end" });
@@ -214,7 +217,7 @@ export function SessionRunner({
         {!step && !error ? (
           <div className="flex flex-col items-center gap-3 py-10">
             <img src={mark} alt="" className="h-8 w-8 animate-pulse opacity-60" />
-            <p className="text-sm text-[var(--pv-ink-faint)]">Starting the session...</p>
+            <p className="text-sm text-[var(--pv-ink-faint)]">{practiceLanguage ? `Pravnya is picking what to practise with ${kidName}...` : "Starting the session..."}</p>
           </div>
         ) : null}
         {bubbles.map((b, i) =>
@@ -238,7 +241,7 @@ export function SessionRunner({
         {summary ? (
           <div className="rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-green-100)] px-4 py-3">
             <p className="whitespace-pre-line text-[0.98rem] leading-relaxed text-[var(--pv-ink)]">{summary}</p>
-            <p className="mt-2 text-sm text-[var(--pv-ink-soft)]">Saved to {kidName}'s progress, and sent to the therapist.</p>
+            <p className="mt-2 text-sm text-[var(--pv-ink-soft)]">{practiceLanguage ? `Saved to ${kidName}'s progress, where your therapist can see it too.` : `Saved to ${kidName}'s progress, and sent to the therapist.`}</p>
           </div>
         ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
