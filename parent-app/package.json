@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:android": "tsc -b && vite build --mode android && cap sync android"
   },
   "dependencies": {
     "@capacitor-mlkit/document-scanner": "^8.2.2",
