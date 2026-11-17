@@ -372,6 +372,18 @@ describe("<LogSession /> -- voice mode", () => {
     expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
   });
 
+  test("in the Android app, a refused microphone points to the phone's Settings", async () => {
+    mockCanScan.mockReturnValue(true);
+    getUserMedia.mockRejectedValue(new DOMException("denied", "NotAllowedError"));
+    const { user } = renderLog();
+    await user.click(screen.getByRole("button", { name: "Voice" }));
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    expect(
+      await screen.findByText("Pravnya can't use the microphone. Open your phone's Settings > Apps > Pravnya > Permissions, allow Microphone, then try again.")
+    ).toBeInTheDocument();
+    mockCanScan.mockReturnValue(false);
+  });
+
   test("Start over after a voice review clears the recording", async () => {
     const { user, container } = renderLog();
     await record(user);

@@ -93,7 +93,7 @@ export function LogSession({
   const [mode, setMode] = useState<InputMode>("text");
   const [freeText, setFreeText] = useState(initialText ?? "");
 
-  const scanner = canScanDocuments();
+  const inAndroidApp = canScanDocuments();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
 
@@ -164,7 +164,11 @@ export function LogSession({
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
     } catch {
-      setError("Couldn't access the microphone -- check your browser's microphone permission and try again.");
+      setError(
+        inAndroidApp
+          ? "Pravnya can't use the microphone. Open your phone's Settings > Apps > Pravnya > Permissions, allow Microphone, then try again."
+          : "Couldn't access the microphone -- check your browser's microphone permission and try again."
+      );
     }
   }
 
@@ -319,9 +323,9 @@ export function LogSession({
             {mode === "photo" ? (
               <div>
                 <span className="mb-1.5 block text-[0.95rem] font-medium text-[var(--pv-ink-soft)]">
-                  {scanner ? "Scan a note or worksheet" : "A photo of a note or worksheet"}
+                  {inAndroidApp ? "Scan a note or worksheet" : "A photo of a note or worksheet"}
                 </span>
-                {scanner ? (
+                {inAndroidApp ? (
                   <>
                     <button
                       type="button"
@@ -338,7 +342,7 @@ export function LogSession({
                   <img src={photoPreviewUrl} alt="Preview" className="mt-3 max-h-72 w-full rounded-xl object-contain" />
                 ) : (
                   <p className="mt-2 text-sm text-[var(--pv-ink-faint)]">
-                    {scanner
+                    {inAndroidApp
                       ? "Point the camera at the page -- the scanner crops and straightens it so the AI can read it easily."
                       : "Snap a photo of a handwritten or printed note from a therapist -- the AI will read it directly."}
                   </p>
