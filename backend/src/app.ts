@@ -50,6 +50,8 @@ export function createApp() {
   // route (registered before the general parser below) rather than raising the global limit for
   // every other route's small CRUD bodies.
   app.use("/api/ai/extract-evidence", express.json({ limit: "25mb" }));
+  // The parent app's "Log with AI" (photo or voice) posts the same kind of body.
+  app.use("/api/parent-kids/:kidId/goals/extract-evidence", express.json({ limit: "25mb" }));
   // A multi-page IEP PDF or a full-resolution photo of one can run several MB -- same scoped-limit
   // approach as extract-evidence above, not a global bump.
   app.use("/api/iep/extract", express.json({ limit: "20mb" }));
