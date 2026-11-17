@@ -288,6 +288,17 @@ describe("parent goals", () => {
       assert.deepEqual(res.body, { candidates: [] });
     });
 
+    test("a full-size phone photo (several MB) isn't refused as too large", async () => {
+      const w = await world();
+      setTestAiResponse("extract-evidence-from-note", { hasEvidence: false, evidence: [] });
+      const photo = Buffer.alloc(4_500_000, 7).toString("base64"); // ~6 MB once encoded, over the general 2 MB limit
+      const res = await api()
+        .post(path(w.kidA.id))
+        .set(bearer(w.a.token))
+        .send({ media: { kind: "image", mimeType: "image/jpeg", base64: photo } });
+      assert.equal(res.status, 200);
+    });
+
     test("an AI answer pointing at another family's goal is discarded, not returned", async () => {
       const w = await world();
       setTestAiResponse("extract-evidence-from-note", { hasEvidence: true, evidence: [candidate(w.goalB.goal.id)] });

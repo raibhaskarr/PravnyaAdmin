@@ -3,6 +3,7 @@ import { api, ApiError, type Centre, type EvidenceCandidate } from "../api/clien
 import mark from "../brand/mark.svg";
 import { CentrePicker } from "../components/CentrePicker";
 import { PrimaryButton } from "../onboarding/components";
+import { shrinkPhoto } from "./shrinkPhoto";
 
 // Faithful port of the admin panel's AI-assisted "Log a session" (AiAssistedLogForm.tsx +
 // LogSessionPage.tsx), minus the "Pick a goal" mode and kid-picker -- manual logging already has a
@@ -179,9 +180,10 @@ export function LogSession({
         mode === "text"
           ? await api.extractEvidence(token, kidId, { freeText: freeText.trim() })
           : mode === "photo"
-            ? await api.extractEvidence(token, kidId, {
-                media: { kind: "image", mimeType: photoFile!.type || "image/jpeg", base64: await readAsBase64(photoFile!) }
-              })
+            ? await (async () => {
+                const photo = await shrinkPhoto(photoFile!);
+                return api.extractEvidence(token, kidId, { media: { kind: "image", mimeType: photo.type || "image/jpeg", base64: await readAsBase64(photo) } });
+              })()
             : await api.extractEvidence(token, kidId, {
                 media: { kind: "audio", mimeType: audioBlob!.type || "audio/webm", base64: await readAsBase64(audioBlob!) }
               });
@@ -193,7 +195,15 @@ export function LogSession({
       setApproved(new Set(result.candidates.map((_, i) => i)));
       if (result.candidates.length === 0) setError(`Nothing matched ${kidName}'s current goals -- try again, or log it manually from Goals.`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't review this right now.");
+      setError(
+        err instanceof ApiError && err.status === 413
+          ? mode === "voice"
+            ? "That recording is too long. Try a shorter one (a minute or two)."
+            : "That photo is too large to send. Try taking it again a little closer, or write it instead."
+          : err instanceof ApiError
+            ? err.message
+            : "Couldn't review this right now."
+      );
     } finally {
       setReviewing(false);
     }
