@@ -3,6 +3,7 @@ import { api, ApiError, type Centre, type EvidenceCandidate } from "../api/clien
 import mark from "../brand/mark.svg";
 import { CentrePicker } from "../components/CentrePicker";
 import { PrimaryButton } from "../onboarding/components";
+import { canScanDocuments, scanDocument } from "./scanDocument";
 import { shrinkPhoto } from "./shrinkPhoto";
 
 // Faithful port of the admin panel's AI-assisted "Log a session" (AiAssistedLogForm.tsx +
@@ -92,6 +93,7 @@ export function LogSession({
   const [mode, setMode] = useState<InputMode>("text");
   const [freeText, setFreeText] = useState(initialText ?? "");
 
+  const scanner = canScanDocuments();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
 
@@ -125,11 +127,21 @@ export function LogSession({
     setSavedCount(0);
   }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
+  function setPhoto(file: File | null) {
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
     setPhotoFile(file);
     setPhotoPreviewUrl(file ? URL.createObjectURL(file) : null);
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setPhoto(e.target.files?.[0] ?? null);
+  }
+
+  async function handleScan() {
+    setError("");
+    const outcome = await scanDocument();
+    if (outcome.kind === "scanned") setPhoto(outcome.file);
+    else if (outcome.kind === "unavailable") setError("The scanner couldn't open on this phone -- take an ordinary photo instead.");
   }
 
   async function startRecording() {
@@ -306,13 +318,29 @@ export function LogSession({
 
             {mode === "photo" ? (
               <div>
-                <span className="mb-1.5 block text-[0.95rem] font-medium text-[var(--pv-ink-soft)]">A photo of a note or worksheet</span>
+                <span className="mb-1.5 block text-[0.95rem] font-medium text-[var(--pv-ink-soft)]">
+                  {scanner ? "Scan a note or worksheet" : "A photo of a note or worksheet"}
+                </span>
+                {scanner ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleScan}
+                      className="mb-2 rounded-2xl border border-[var(--pv-green-500)] px-5 py-3 text-[0.98rem] font-semibold text-[var(--pv-green-700)] transition"
+                    >
+                      {photoFile ? "Scan again" : "Scan the note"}
+                    </button>
+                    <span className="mb-1 block text-sm text-[var(--pv-ink-faint)]">Or take an ordinary photo:</span>
+                  </>
+                ) : null}
                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="block w-full text-[0.95rem] text-[var(--pv-ink-soft)]" />
                 {photoPreviewUrl ? (
                   <img src={photoPreviewUrl} alt="Preview" className="mt-3 max-h-72 w-full rounded-xl object-contain" />
                 ) : (
                   <p className="mt-2 text-sm text-[var(--pv-ink-faint)]">
-                    Snap a photo of a handwritten or printed note from a therapist -- the AI will read it directly.
+                    {scanner
+                      ? "Point the camera at the page -- the scanner crops and straightens it so the AI can read it easily."
+                      : "Snap a photo of a handwritten or printed note from a therapist -- the AI will read it directly."}
                   </p>
                 )}
               </div>

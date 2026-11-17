@@ -5,9 +5,13 @@ import { api, ApiError, type EvidenceCandidate } from "../api/client";
 import { deferred } from "../test/apiMock";
 import { CENTRE_A, makeEvidenceCandidate } from "../test/fixtures";
 import { LogSession } from "./LogSession";
+import { canScanDocuments, scanDocument } from "./scanDocument";
 
 vi.mock("../api/client", async (orig) => (await import("../test/apiMock")).mockedClient(orig));
 const mockApi = vi.mocked(api);
+vi.mock("./scanDocument", () => ({ canScanDocuments: vi.fn(() => false), scanDocument: vi.fn() }));
+const mockCanScan = vi.mocked(canScanDocuments);
+const mockScan = vi.mocked(scanDocument);
 
 // --- browser APIs jsdom doesn't implement -------------------------------------------------------
 let urlCounter = 0;
@@ -258,6 +262,44 @@ describe("<LogSession /> -- photo mode", () => {
     await user.click(review());
     await screen.findByText(/Found 2 pieces/);
     expect(mockApi.extractEvidence).toHaveBeenCalledWith("tok", "kid-1", { media: { kind: "image", mimeType: "image/jpeg", base64: "aW1n" } });
+  });
+
+  describe("in the Android app, with the document scanner", () => {
+    beforeEach(() => mockCanScan.mockReturnValue(true));
+
+    test("Scan the note -> the scanned page is previewed and sent", async () => {
+      mockScan.mockResolvedValue({ kind: "scanned", file: new File(["img"], "scan.jpg", { type: "image/jpeg" }) });
+      const { user } = renderLog();
+      await user.click(screen.getByRole("button", { name: "Photo" }));
+      expect(screen.getByText("Scan a note or worksheet")).toBeInTheDocument();
+      expect(screen.getByText(/the scanner crops and straightens it/)).toBeInTheDocument();
+      expect(screen.getByText("Or take an ordinary photo:")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Scan the note" }));
+      expect(await screen.findByRole("img", { name: "Preview" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Scan again" })).toBeInTheDocument();
+      await user.click(review());
+      await screen.findByText(/Found 2 pieces/);
+      expect(mockApi.extractEvidence).toHaveBeenCalledWith("tok", "kid-1", { media: { kind: "image", mimeType: "image/jpeg", base64: "aW1n" } });
+    });
+
+    test("backing out of the scanner changes nothing; a scanner that can't open says to take a photo", async () => {
+      mockScan.mockResolvedValueOnce({ kind: "cancelled" }).mockResolvedValueOnce({ kind: "unavailable" });
+      const { user } = renderLog();
+      await user.click(screen.getByRole("button", { name: "Photo" }));
+      await user.click(screen.getByRole("button", { name: "Scan the note" }));
+      expect(screen.queryByRole("img", { name: "Preview" })).not.toBeInTheDocument();
+      expect(review()).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Scan the note" }));
+      expect(await screen.findByText("The scanner couldn't open on this phone -- take an ordinary photo instead.")).toBeInTheDocument();
+      expect(photoInput()).toBeInTheDocument();
+    });
+  });
+
+  test("in a browser there's no Scan button, just the camera", async () => {
+    mockCanScan.mockReturnValue(false);
+    const { user } = renderLog();
+    await user.click(screen.getByRole("button", { name: "Photo" }));
+    expect(screen.queryByRole("button", { name: "Scan the note" })).not.toBeInTheDocument();
   });
 
   test("switching modes clears an error and returns Write's text intact", async () => {
