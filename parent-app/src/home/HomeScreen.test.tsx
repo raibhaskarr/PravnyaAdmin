@@ -504,7 +504,7 @@ describe("guided sessions from the therapist", () => {
     mockApi.startSession.mockResolvedValue({
       runId: "run-1",
       title: "Naming game",
-      step: { phase: "intro", activityTitle: null, item: null, lines: ["Let's play!"], choices: [{ id: "ready", label: "We're ready" }], progress: { done: 0, total: 4 } },
+      step: { phase: "intro", activityTitle: null, activityLabel: null, feedback: null, guide: null, report: null, item: null, lines: ["Let's play!"], choices: [{ id: "ready", label: "We're ready" }], progress: { done: 0, total: 4 } },
       resumed: false
     });
     renderHome();
@@ -551,7 +551,7 @@ describe("practice sessions with Pravnya", () => {
     mockApi.startPractice.mockResolvedValue({
       runId: "run-p",
       title: "Sam के साथ अभ्यास",
-      step: { phase: "intro", activityTitle: null, item: null, lines: ["आज खेलेंगे!"], choices: [{ id: "ready", label: "हम तैयार हैं" }], progress: { done: 0, total: 24 } },
+      step: { phase: "intro", activityTitle: null, activityLabel: null, feedback: null, guide: null, report: null, item: null, lines: ["आज खेलेंगे!"], choices: [{ id: "ready", label: "हम तैयार हैं" }], progress: { done: 0, total: 24 } },
       resumed: false
     });
     renderHome();

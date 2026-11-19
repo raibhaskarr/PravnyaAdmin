@@ -168,12 +168,34 @@ export type HomeSessionSummary = {
   lastRun: { id: string; status: "COMPLETED" | "ENDED_EARLY"; startedAt: string; endedAt: string | null; summary: string | null } | null;
 };
 
-/** One step of a running session: what Pravnya says and what the parent can answer. */
+/** How one activity is done: Pravnya explains it before the parent and child do it together. */
+export type SessionGuide = {
+  setup: string;
+  say: string;
+  countsWhen: string;
+  helps: string[];
+  ifMiss: string;
+  reward: string;
+  plan: string;
+  moveOn: string;
+};
+
+/** own = did it on their own, help = with help, notyet = didn't get it, none = not done. */
+export type TryMark = "own" | "help" | "notyet" | "none";
+export type SessionReport = { items: { goalItemId: string; tries: TryMark[] }[]; help: string | null };
+
+/** One step of a running session: intro, explain an activity, report how it went, or done. */
 export type SessionStep = {
-  phase: "intro" | "setup" | "trial" | "help" | "done";
+  phase: "intro" | "explain" | "report" | "done";
   activityTitle: string | null;
+  activityLabel: string | null;
+  /** How the last activity went, said before this step. */
+  feedback: string | null;
   item: string | null;
+  /** What Pravnya says, in order (read aloud). */
   lines: string[];
+  guide: SessionGuide | null;
+  report: { items: { goalItemId: string; label: string }[]; triesPerItem: number; helps: { id: string; label: string }[] } | null;
   choices: { id: string; label: string }[];
   progress: { done: number; total: number };
 };
@@ -193,7 +215,7 @@ export type SessionTurnResult = {
   status: "IN_PROGRESS" | "COMPLETED" | "ENDED_EARLY";
   step: SessionStep;
   reply: string | null;
-  logged: { outcome: string; supportLevel: string; itemLabel: string } | null;
+  logged: { outcome: string; supportLevel: string; itemLabel: string }[];
   summary: string | null;
 };
 
@@ -415,8 +437,12 @@ export const api = {
   startPractice(token: string, kidId: string, language: "en" | "hi") {
     return request<{ runId: string; title: string; step: SessionStep; resumed: boolean }>(`/parent-kids/${kidId}/practice/start`, { token, method: "POST", body: { language } });
   },
-  sessionTurn(token: string, kidId: string, runId: string, input: { choice: string } | { text: string } | { audio: { mimeType: string; base64: string } }) {
+  sessionTurn(token: string, kidId: string, runId: string, input: { choice: string } | { text: string } | { audio: { mimeType: string; base64: string } } | { report: SessionReport }) {
     return request<SessionTurnResult>(`/parent-kids/${kidId}/session-runs/${runId}/turn`, { token, method: "POST", body: input });
+  },
+  /** "Ball 2 of 3, cup with help" -> a filled-in report to check. Nothing is saved. */
+  sessionReportDraft(token: string, kidId: string, runId: string, input: { text: string } | { audio: { mimeType: string; base64: string } }) {
+    return request<{ report: SessionReport | null; reply: string }>(`/parent-kids/${kidId}/session-runs/${runId}/report-draft`, { token, method: "POST", body: input });
   },
   endSession(token: string, kidId: string, runId: string) {
     return request<{ status: string; summary: string | null }>(`/parent-kids/${kidId}/session-runs/${runId}/end`, { token, method: "POST" });

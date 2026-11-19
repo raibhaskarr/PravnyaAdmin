@@ -60,3 +60,57 @@ button,
 input {
   font-family: inherit;
 }
+
+/* Pravnya, the on-screen guide in home sessions (sessions/PravnyaGuide.tsx). */
+.pv-guide {
+  position: relative;
+  flex: none;
+}
+.pv-guide svg {
+  position: relative;
+  animation: pv-guide-float 4s ease-in-out infinite;
+}
+.pv-guide__halo {
+  position: absolute;
+  inset: 6%;
+  border-radius: 9999px;
+  background: var(--pv-green-500);
+  opacity: 0;
+}
+.pv-guide--talking .pv-guide__halo,
+.pv-guide--listening .pv-guide__halo {
+  animation: pv-guide-halo 1.6s ease-out infinite;
+}
+.pv-guide__eyes {
+  transform-origin: 60px 55px;
+  animation: pv-guide-blink 5s infinite;
+}
+.pv-guide__mouth {
+  transform-origin: 60px 82px;
+  animation: pv-guide-talk 0.32s ease-in-out infinite alternate;
+}
+.pv-guide--cheer svg {
+  animation: pv-guide-bounce 0.9s ease-in-out 2;
+}
+@keyframes pv-guide-float {
+  50% { transform: translateY(-3px); }
+}
+@keyframes pv-guide-halo {
+  0% { transform: scale(0.95); opacity: 0.35; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+@keyframes pv-guide-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+@keyframes pv-guide-talk {
+  from { transform: scaleY(0.35); }
+  to { transform: scaleY(1); }
+}
+@keyframes pv-guide-bounce {
+  30% { transform: translateY(-10px) rotate(-4deg); }
+  60% { transform: translateY(0) rotate(3deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pv-guide svg, .pv-guide__halo, .pv-guide__eyes, .pv-guide__mouth { animation: none !important; }
+}

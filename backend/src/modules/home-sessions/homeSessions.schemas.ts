@@ -82,6 +82,13 @@ export const parentKidParamsSchema = z.object({ kidId: z.string().uuid() });
 export const parentSessionParamsSchema = z.object({ kidId: z.string().uuid(), sessionId: z.string().uuid() });
 export const parentRunParamsSchema = z.object({ kidId: z.string().uuid(), runId: z.string().uuid() });
 export const startPracticeSchema = z.object({ language: z.enum(LANGUAGES).default("en") });
+const voice = z.object({ mimeType: z.string().max(60), base64: z.string().min(1).max(4_000_000) });
+export const TRY_MARKS = ["own", "help", "notyet", "none"] as const;
+export const reportSchema = z.object({
+  items: z.array(z.object({ goalItemId: z.string().uuid(), tries: z.array(z.enum(TRY_MARKS)).max(10) })).max(10),
+  /** The help mostly given, when any try was "with help". */
+  help: z.enum(HELP_LEVELS).nullable().default(null)
+});
 export const turnSchema = z
   .object({
     /** A tapped button (an id from the step's choices). */
@@ -89,6 +96,12 @@ export const turnSchema = z
     /** Typed by the parent. Interpreted, never stored. */
     text: z.string().trim().min(1).max(1000).optional(),
     /** A short voice reply. Interpreted, never stored. */
-    audio: z.object({ mimeType: z.string().max(60), base64: z.string().min(1).max(4_000_000) }).optional()
+    audio: voice.optional(),
+    /** Every try of the current activity, marked on the report screen. */
+    report: reportSchema.optional()
   })
-  .refine((v) => [v.choice, v.text, v.audio].filter((x) => x !== undefined).length === 1, "Send exactly one of choice, text or audio");
+  .refine((v) => [v.choice, v.text, v.audio, v.report].filter((x) => x !== undefined).length === 1, "Send exactly one of choice, text, audio or report");
+/** "Ball 2 of 3, cup with help", typed or said, turned into a filled-in report for the parent to check. */
+export const reportDraftSchema = z
+  .object({ text: z.string().trim().min(1).max(1000).optional(), audio: voice.optional() })
+  .refine((v) => [v.text, v.audio].filter((x) => x !== undefined).length === 1, "Send text or audio");

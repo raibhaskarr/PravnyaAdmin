@@ -11,6 +11,7 @@ import {
   parentKidParamsSchema,
   parentRunParamsSchema,
   parentSessionParamsSchema,
+  reportDraftSchema,
   sessionParamsSchema,
   startPracticeSchema,
   turnSchema
@@ -93,6 +94,11 @@ parentHomeSessionsRoutes.post(
   "/:kidId/session-runs/:runId/turn",
   validateRequest({ params: parentRunParamsSchema, body: turnSchema }),
   asyncHandler(async (req, res) => res.json(await homeSessionsService.turn(req.parent!.id, req.params.kidId, req.params.runId, req.body)))
+);
+parentHomeSessionsRoutes.post(
+  "/:kidId/session-runs/:runId/report-draft",
+  validateRequest({ params: parentRunParamsSchema, body: reportDraftSchema }),
+  asyncHandler(async (req, res) => res.json(await homeSessionsService.reportDraft(req.parent!.id, req.params.kidId, req.params.runId, req.body)))
 );
 parentHomeSessionsRoutes.post(
   "/:kidId/session-runs/:runId/end",

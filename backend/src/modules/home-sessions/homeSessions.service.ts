@@ -8,8 +8,8 @@ import { badRequest, conflict, notFound } from "../../common/errors/AppError";
 import { buildPeriodStats } from "../progress-updates/progressStats";
 import { authorFor } from "../progress-updates/progressUpdates.service";
 import { invitationEmailService } from "../therapist-invitations/invitationEmail.service";
-import { draftPlanWithAi, interpretTurn, templatePlan, type GoalForDraft } from "./homeSessions.ai";
-import { apply, InvalidChoice, startState, summarize, view, type Language, type RunState, type TrialRecord } from "./homeSessions.engine";
+import { draftPlanWithAi, interpretReport, interpretTurn, templatePlan, type GoalForDraft } from "./homeSessions.ai";
+import { apply, applyReport, InvalidChoice, normalize, startState, summarize, view, type Language, type Report, type RunState, type TrialRecord } from "./homeSessions.engine";
 import type { Plan, Schedule } from "./homeSessions.schemas";
 import { loadCandidates, pickPractice, PRACTICE_PER_DAY } from "./homeSessions.practice";
 
@@ -351,46 +351,67 @@ export const homeSessionsService = {
     return { runId, status: run.status, step: view(run.state as unknown as RunState), summary: run.summary };
   },
 
-  async turn(parentId: string, kidId: string, runId: string, input: { choice?: string; text?: string; audio?: { mimeType: string; base64: string } }) {
+  async turn(parentId: string, kidId: string, runId: string, input: { choice?: string; text?: string; audio?: { mimeType: string; base64: string }; report?: Report }) {
     await assertOwnsKid(parentId, kidId);
     const run = await prisma.homeSessionRun.findFirst({ where: { id: runId, kidId } });
     if (!run) throw notFound("Session not found");
     if (run.status !== "IN_PROGRESS") throw conflict("This session has already ended", "ENDED");
-    const state = run.state as unknown as RunState;
+    const state = normalize(run.state as unknown as RunState);
     const step = view(state);
 
     let choice = input.choice ?? null;
     let reply: string | null = null;
-    if (!choice) {
+    if (!choice && !input.report) {
       const activity = state.plan.activities[state.a] ?? null;
       const understood = await interpretTurn(step, { kidName: state.kidName, language: state.language, activity }, { text: input.text, audio: input.audio }, run.tenantId);
       if (!understood) {
         reply = state.language === "hi" ? "माफ़ कीजिए, मैं समझ नहीं पाई। कृपया नीचे का कोई बटन दबाइए।" : "Sorry, I couldn't follow that. Please tap one of the buttons below.";
-        return { status: run.status, step, reply, logged: null, summary: null };
+        return { status: run.status, step, reply, logged: [], summary: null };
       }
       reply = understood.reply;
-      if (understood.intent === "answer") return { status: run.status, step, reply, logged: null, summary: null };
+      if (understood.intent === "answer") return { status: run.status, step, reply, logged: [], summary: null };
       choice = understood.choice;
     }
 
-    let next: ReturnType<typeof apply>;
+    let nextState: RunState;
+    let records: TrialRecord[] = [];
     try {
-      next = apply(state, choice);
+      if (input.report) ({ state: nextState, records } = applyReport(state, input.report));
+      else nextState = apply(state, choice!).state;
     } catch (e) {
       if (e instanceof InvalidChoice) throw badRequest(e.message);
       throw e;
     }
-    const results = [...(run.results as unknown as TrialRecord[]), ...(next.record ? [next.record] : [])];
-    await prisma.homeSessionRun.update({ where: { id: runId }, data: { state: next.state as unknown as Prisma.InputJsonValue, results: results as unknown as Prisma.InputJsonValue } });
-    if (next.record) await logTry(runId, next.record);
+    const results = [...(run.results as unknown as TrialRecord[]), ...records];
+    await prisma.homeSessionRun.update({ where: { id: runId }, data: { state: nextState as unknown as Prisma.InputJsonValue, results: results as unknown as Prisma.InputJsonValue } });
+    for (const record of records) await logTry(runId, record);
     let status: string = run.status;
     let summary: string | null = null;
-    if (next.state.phase === "done") {
+    if (nextState.phase === "done") {
       await finishRun(runId, "COMPLETED");
       status = "COMPLETED";
-      summary = summarize(next.state.plan, results, next.state.language);
+      summary = summarize(nextState.plan, results, nextState.language);
     }
-    return { status, step: view(next.state), reply, logged: next.record, summary };
+    return { status, step: view(nextState), reply, logged: records, summary };
+  },
+
+  /** Fills in the report from what the parent typed or said. Nothing is saved: the parent checks it and sends it as a turn. */
+  async reportDraft(parentId: string, kidId: string, runId: string, input: { text?: string; audio?: { mimeType: string; base64: string } }) {
+    await assertOwnsKid(parentId, kidId);
+    const run = await prisma.homeSessionRun.findFirst({ where: { id: runId, kidId } });
+    if (!run) throw notFound("Session not found");
+    if (run.status !== "IN_PROGRESS") throw conflict("This session has already ended", "ENDED");
+    const state = normalize(run.state as unknown as RunState);
+    const step = view(state);
+    if (step.phase !== "report" || !step.report) throw badRequest("There's nothing to report right now");
+    const draft = await interpretReport(step.report, { kidName: state.kidName, language: state.language, activityTitle: step.activityTitle ?? "" }, input, run.tenantId);
+    if (!draft) {
+      return {
+        report: null,
+        reply: state.language === "hi" ? "माफ़ कीजिए, मैं समझ नहीं पाई। कृपया हर कोशिश पर निशान लगाइए।" : "Sorry, I couldn't follow that. Please mark the tries instead."
+      };
+    }
+    return draft;
   },
 
   async end(parentId: string, kidId: string, runId: string) {

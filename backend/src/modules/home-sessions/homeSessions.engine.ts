@@ -1,21 +1,24 @@
 import type { Activity, Plan } from "./homeSessions.schemas";
 
-// The session runs from the therapist's plan, not from the model: this file decides every step
-// (which activity, item and try comes next, when to move on). The AI only interprets what a parent
-// types or says into one of these choices, and answers side questions (homeSessions.ai.ts).
+// The session runs from the therapist's plan, not from the model: this file decides every step.
+// Each activity is explain -> (the parent and child do it, phone down) -> report: the parent marks
+// every try in one go. The AI only turns what a parent types or says into a choice or a filled-in
+// report for the parent to check, and answers side questions (homeSessions.ai.ts).
 
 export type Language = "en" | "hi";
-export type Phase = "intro" | "setup" | "trial" | "help" | "done";
+export type Phase = "intro" | "explain" | "report" | "done";
+/** Runs started before the explain/report flow; they carry on from the current activity. */
+type LegacyPhase = "setup" | "trial" | "help";
 
 export type RunState = {
   plan: Plan;
   language: Language;
   kidName: string;
-  phase: Phase;
+  phase: Phase | LegacyPhase;
   a: number; // activity
-  i: number; // item within the activity
-  t: number; // try within the item
-  misses: number; // misses in a row on this item
+  i?: number; // legacy
+  t?: number; // legacy
+  misses?: number; // legacy
   feedback: string | null; // shown at the top of the next step
 };
 
@@ -31,11 +34,40 @@ export type TrialRecord = {
 };
 
 export type Choice = { id: string; label: string };
+
+/** How one activity is done, laid out for the explain card (and kept on the report screen). */
+export type Guide = {
+  setup: string;
+  say: string;
+  countsWhen: string;
+  helps: string[];
+  ifMiss: string;
+  reward: string;
+  /** "Ball, Cup: 3 tries each" */
+  plan: string;
+  moveOn: string;
+};
+
+export type TryMark = "own" | "help" | "notyet" | "none";
+export type ReportForm = {
+  items: { goalItemId: string; label: string }[];
+  triesPerItem: number;
+  /** The kinds of help this activity uses, least first (asked when any try was "with help"). */
+  helps: Choice[];
+};
+export type Report = { items: { goalItemId: string; tries: TryMark[] }[]; help: string | null };
+
 export type StepView = {
   phase: Phase;
   activityTitle: string | null;
+  /** "Activity 1 of 3" */
+  activityLabel: string | null;
+  /** How the last activity went (or that it was skipped), said before this step. */
+  feedback: string | null;
   item: string | null;
   lines: string[];
+  guide: Guide | null;
+  report: ReportForm | null;
   choices: Choice[];
   progress: { done: number; total: number };
 };
@@ -61,49 +93,51 @@ const HELP_LABEL: Record<Language, Record<string, string>> = {
 
 const P = {
   en: {
-    introTail: "Tap \"We're ready\" when you're both sitting together.",
+    introTail: "For each activity I'll explain what to do. Then put the phone down and play together, and tell me afterwards how it went.",
     ready: "We're ready",
-    readyActivity: "Ready",
+    start: "Got it, let's start",
     skip: "Skip this activity",
-    own: (k: string) => `${k} did it on their own`,
-    help: "With help",
-    notYet: "Not yet",
-    back: "Back",
-    activity: (n: number, total: number, title: string) => `Activity ${n} of ${total}: ${title}`,
+    activity: (n: number, total: number) => `Activity ${n} of ${total}`,
+    helpLine: (s: string) => `If they need help: ${s}`,
+    plan: (items: string, n: number) => (n === 1 ? `${items}: 1 try each` : `${items}: ${n} tries each`),
+    moveOn: (n: number) => `If an item is missed ${n === 1 ? "once" : `${n} times in a row`}, move on to the next one.`,
+    say: (s: string) => `Each try: ${s}`,
+    countsWhen: (s: string) => `It counts when: ${s}`,
+    ifMiss: (s: string) => `If they miss: ${s}`,
     reward: (r: string) => `Reward right after each good try: ${r}`,
-    correctWhen: (c: string) => `It counts when: ${c}`,
-    tryOf: (item: string, t: number, total: number) => `${item}: try ${t} of ${total}`,
-    wait: "Then wait quietly for about 5 seconds.",
-    ifHelp: (s: string) => `If they need help: ${s}`,
-    whatHelp: "What help did you give?",
-    great: (r: string) => `Great! Reward it right away: ${r}`,
-    goodHelp: "Good. Reward it, and next time try a little less help.",
-    movingOn: "That one's hard right now. Let's move on to the next one.",
+    reportAsk: (title: string) => `How did "${title}" go?`,
+    reportHow: "Mark each try, or just tell me, like \"ball 2 of 3, cup with help\".",
+    allOwn: (k: string) => `Wonderful, ${k} did every try on their own!`,
+    mostlyOwn: "Good work! Keep the rewards quick and happy.",
+    helped: "Good. Next time, try a little less help.",
+    hard: "Those were hard today, and that's fine. Next time, give help sooner so it ends on a success.",
     skipped: "Skipped. On to the next activity.",
+    notDone: "No tries marked, so I've skipped this one.",
     summaryTitle: "How it went:",
     summaryLine: (title: string, n: number, own: number, help: number, miss: number) => `${title}: ${n} tries, ${own} on their own, ${help} with help, ${miss} not yet.`,
     nothingLogged: "No tries were logged."
   },
   hi: {
-    introTail: "जब आप दोनों साथ बैठ जाएं, तो \"हम तैयार हैं\" दबाइए।",
+    introTail: "हर गतिविधि से पहले मैं बताऊँगी कि क्या करना है। फिर फ़ोन रखकर साथ में खेलिए, और बाद में बताइए कि कैसा रहा।",
     ready: "हम तैयार हैं",
-    readyActivity: "तैयार",
+    start: "समझ गए, शुरू करें",
     skip: "यह गतिविधि छोड़ें",
-    own: (k: string) => `${k} ने खुद किया`,
-    help: "मदद से किया",
-    notYet: "अभी नहीं",
-    back: "वापस",
-    activity: (n: number, total: number, title: string) => `गतिविधि ${n} / ${total}: ${title}`,
+    activity: (n: number, total: number) => `गतिविधि ${n} / ${total}`,
+    helpLine: (s: string) => `अगर मदद चाहिए: ${s}`,
+    plan: (items: string, n: number) => `${items}: हर एक ${n} बार`,
+    moveOn: (n: number) => `अगर कोई चीज़ लगातार ${n} बार न हो, तो अगली पर चलिए।`,
+    say: (s: string) => `हर कोशिश: ${s}`,
+    countsWhen: (s: string) => `सही तब माना जाएगा जब: ${s}`,
+    ifMiss: (s: string) => `अगर न हो पाए: ${s}`,
     reward: (r: string) => `हर अच्छी कोशिश के तुरंत बाद इनाम: ${r}`,
-    correctWhen: (c: string) => `सही तब माना जाएगा जब: ${c}`,
-    tryOf: (item: string, t: number, total: number) => `${item}: कोशिश ${t} / ${total}`,
-    wait: "फिर करीब 5 सेकंड चुपचाप इंतज़ार कीजिए।",
-    ifHelp: (s: string) => `अगर मदद चाहिए: ${s}`,
-    whatHelp: "आपने क्या मदद दी?",
-    great: (r: string) => `बहुत बढ़िया! तुरंत इनाम दीजिए: ${r}`,
-    goodHelp: "अच्छा। इनाम दीजिए, और अगली बार थोड़ी कम मदद से कोशिश कीजिए।",
-    movingOn: "यह अभी मुश्किल है। अगले पर चलते हैं।",
+    reportAsk: (title: string) => `"${title}" कैसा रहा?`,
+    reportHow: "हर कोशिश पर निशान लगाइए, या बस बताइए, जैसे \"बॉल 3 में से 2, कप मदद से\"।",
+    allOwn: (k: string) => `बहुत बढ़िया, ${k} ने हर कोशिश खुद की!`,
+    mostlyOwn: "अच्छा काम! इनाम जल्दी और खुशी से देते रहिए।",
+    helped: "अच्छा। अगली बार थोड़ी कम मदद से कोशिश कीजिए।",
+    hard: "आज ये मुश्किल थे, कोई बात नहीं। अगली बार जल्दी मदद दीजिए ताकि अंत सफलता पर हो।",
     skipped: "छोड़ दिया। अगली गतिविधि पर चलते हैं।",
+    notDone: "कोई कोशिश नहीं लगी, इसलिए यह गतिविधि छोड़ दी।",
     summaryTitle: "कैसा रहा:",
     summaryLine: (title: string, n: number, own: number, help: number, miss: number) => `${title}: ${n} कोशिशें, ${own} खुद से, ${help} मदद से, ${miss} अभी नहीं।`,
     nothingLogged: "कोई कोशिश दर्ज नहीं हुई।"
@@ -119,76 +153,85 @@ export function totalTrials(plan: Plan) {
   return plan.activities.reduce((n, a) => n + a.items.length * a.trialsPerItem, 0);
 }
 
-function position(s: RunState) {
-  let done = 0;
-  for (let x = 0; x < s.a && x < s.plan.activities.length; x++) done += s.plan.activities[x].items.length * s.plan.activities[x].trialsPerItem;
-  const act = s.plan.activities[s.a];
-  if (act && (s.phase === "trial" || s.phase === "help")) done += s.i * act.trialsPerItem + s.t;
-  return Math.min(done, totalTrials(s.plan));
+function triesBefore(plan: Plan, a: number) {
+  return plan.activities.slice(0, a).reduce((n, x) => n + x.items.length * x.trialsPerItem, 0);
 }
 
 export function startState(plan: Plan, language: Language, kidName: string): RunState {
-  return { plan, language, kidName, phase: "intro", a: 0, i: 0, t: 0, misses: 0, feedback: null };
+  return { plan, language, kidName, phase: "intro", a: 0, feedback: null };
+}
+
+/** A run saved by the old one-try-at-a-time flow picks up at the explain step of its activity. */
+export function normalize(s: RunState): RunState & { phase: Phase } {
+  if (s.phase === "setup" || s.phase === "trial" || s.phase === "help") return { plan: s.plan, language: s.language, kidName: s.kidName, phase: "explain", a: s.a, feedback: s.feedback };
+  return s as RunState & { phase: Phase };
+}
+
+function guideFor(act: Activity, language: Language): Guide {
+  const p = P[language];
+  const all = act.items.map((x) => x.label).join(", ");
+  return {
+    setup: fillItem(act.setup, all),
+    say: fillItem(act.instruction, all),
+    countsWhen: fillItem(act.correctLooksLike, act.items.map((x) => x.label).join(" / ")),
+    helps: act.prompts.map((h) => `${HELP_LABEL[language][h.supportLevel]}: ${fillItem(h.say, all)}`),
+    ifMiss: fillItem(act.errorCorrection, all),
+    reward: act.reinforcement,
+    plan: p.plan(all, act.trialsPerItem),
+    moveOn: p.moveOn(act.missesBeforeMovingOn)
+  };
 }
 
 function helpChoices(act: Activity, language: Language): Choice[] {
   const levels = [...new Set(act.prompts.map((p) => p.supportLevel))];
-  return levels.map((l) => ({ id: `help:${l}`, label: HELP_LABEL[language][l] }));
+  return levels.map((l) => ({ id: l, label: HELP_LABEL[language][l] }));
 }
 
-export function view(s: RunState): StepView {
+export function view(state: RunState): StepView {
+  const s = normalize(state);
   const p = P[s.language];
   const act = s.plan.activities[s.a];
-  const progress = { done: s.phase === "done" ? totalTrials(s.plan) : position(s), total: totalTrials(s.plan) };
+  const total = totalTrials(s.plan);
+  const progress = { done: s.phase === "done" ? total : Math.min(triesBefore(s.plan, s.a), total), total };
   const fb = s.feedback ? [s.feedback] : [];
+  const none = { activityTitle: null, activityLabel: null, item: null, guide: null, report: null, feedback: s.feedback };
   switch (s.phase) {
     case "intro":
-      return { phase: "intro", activityTitle: null, item: null, lines: [s.plan.intro, p.introTail], choices: [{ id: "ready", label: p.ready }], progress };
-    case "setup":
+      return { ...none, phase: "intro", lines: [s.plan.intro, p.introTail], choices: [{ id: "ready", label: p.ready }], progress };
+    case "explain": {
+      const g = guideFor(act, s.language);
       return {
-        phase: "setup",
+        phase: "explain",
         activityTitle: act.goalTitle,
+        activityLabel: p.activity(s.a + 1, s.plan.activities.length),
+        feedback: s.feedback,
         item: null,
-        lines: [
-          ...fb,
-          p.activity(s.a + 1, s.plan.activities.length, act.goalTitle),
-          fillItem(act.setup, act.items.map((x) => x.label).join(", ")),
-          p.correctWhen(fillItem(act.correctLooksLike, act.items.map((x) => x.label).join(" / "))),
-          p.reward(act.reinforcement)
-        ],
+        // What Pravnya reads aloud, in order.
+        lines: [...fb, `${p.activity(s.a + 1, s.plan.activities.length)}: ${act.goalTitle}.`, g.setup, p.say(g.say), p.countsWhen(g.countsWhen), p.helpLine(g.helps[0]), p.ifMiss(g.ifMiss), p.reward(g.reward), `${g.plan}. ${g.moveOn}`],
+        guide: g,
+        report: null,
         choices: [
-          { id: "ready", label: p.readyActivity },
-          { id: "skip", label: p.skip }
-        ],
-        progress
-      };
-    case "trial": {
-      const item = act.items[s.i].label;
-      return {
-        phase: "trial",
-        activityTitle: act.goalTitle,
-        item,
-        lines: [...fb, p.tryOf(item, s.t + 1, act.trialsPerItem), fillItem(act.instruction, item), p.wait, p.ifHelp(fillItem(act.prompts[0].say, item))],
-        choices: [
-          { id: "own", label: p.own(s.kidName) },
-          { id: "help", label: p.help },
-          { id: "notyet", label: p.notYet },
+          { id: "start", label: p.start },
           { id: "skip", label: p.skip }
         ],
         progress
       };
     }
-    case "help":
+    case "report":
       return {
-        phase: "help",
+        phase: "report",
         activityTitle: act.goalTitle,
-        item: act.items[s.i].label,
-        lines: [p.whatHelp],
-        choices: [...helpChoices(act, s.language), { id: "back", label: p.back }],
+        activityLabel: p.activity(s.a + 1, s.plan.activities.length),
+        feedback: null,
+        item: null,
+        lines: [p.reportAsk(act.goalTitle), p.reportHow],
+        guide: guideFor(act, s.language),
+        report: { items: act.items, triesPerItem: act.trialsPerItem, helps: helpChoices(act, s.language) },
+        choices: [{ id: "skip", label: p.skip }],
         progress
       };
     case "done":
-      return { phase: "done", activityTitle: null, item: null, lines: [...fb, s.plan.closing], choices: [], progress };
+      return { ...none, phase: "done", lines: [...fb, s.plan.closing], choices: [], progress };
   }
 }
 
@@ -197,50 +240,67 @@ export function choiceIds(s: RunState) {
   return view(s).choices.map((c) => c.id);
 }
 
-function nextActivity(s: RunState): RunState {
+function nextActivity(s: RunState, feedback: string | null): RunState {
   const a = s.a + 1;
-  if (a >= s.plan.activities.length) return { ...s, phase: "done", a, i: 0, t: 0, misses: 0 };
-  return { ...s, phase: "setup", a, i: 0, t: 0, misses: 0 };
-}
-
-function advance(s: RunState, movedOn: boolean): RunState {
-  const act = s.plan.activities[s.a];
-  if (!movedOn && s.t + 1 < act.trialsPerItem) return { ...s, phase: "trial", t: s.t + 1 };
-  if (s.i + 1 < act.items.length) return { ...s, phase: "trial", i: s.i + 1, t: 0, misses: 0 };
-  return nextActivity(s);
+  return { ...s, phase: a >= s.plan.activities.length ? "done" : "explain", a, feedback };
 }
 
 export class InvalidChoice extends Error {}
 
-/** Applies one choice. Returns the new state and, for a try, the record to log. */
-export function apply(s: RunState, choice: string, now = new Date()): { state: RunState; record: TrialRecord | null } {
+/** Applies a tapped choice (ready, start, skip). Tries are only ever logged through a report. */
+export function apply(state: RunState, choice: string): { state: RunState } {
+  const s = normalize(state);
   if (!choiceIds(s).includes(choice)) throw new InvalidChoice(`"${choice}" isn't an option right now`);
+  const clear = { ...s, feedback: null };
+  if (s.phase === "intro") return { state: { ...clear, phase: "explain" } };
+  if (choice === "skip") return { state: nextActivity(clear, P[s.language].skipped) };
+  return { state: { ...clear, phase: "report" } }; // start
+}
+
+/** Checks a report against the current activity: known items, no more tries than planned, a known help. */
+export function checkReport(state: RunState, report: Report): string | null {
+  const s = normalize(state);
+  if (s.phase !== "report") return "There's nothing to report right now";
+  const act = s.plan.activities[s.a];
+  const ids = new Set(act.items.map((i) => i.goalItemId));
+  if (report.items.some((r) => !ids.has(r.goalItemId))) return "That item isn't part of this activity";
+  if (new Set(report.items.map((r) => r.goalItemId)).size !== report.items.length) return "Each item can only be reported once";
+  if (report.items.some((r) => r.tries.length > act.trialsPerItem)) return `At most ${act.trialsPerItem} tries per item`;
+  if (report.help && !act.prompts.some((p) => p.supportLevel === report.help)) return "That kind of help isn't part of this activity";
+  return null;
+}
+
+/** Applies the parent's report for the current activity: one record per marked try, then on to the next activity. */
+export function applyReport(state: RunState, report: Report, now = new Date()): { state: RunState; records: TrialRecord[] } {
+  const problem = checkReport(state, report);
+  if (problem) throw new InvalidChoice(problem);
+  const s = normalize(state);
   const p = P[s.language];
   const act = s.plan.activities[s.a];
-  const clear = { ...s, feedback: null };
-
-  if (s.phase === "intro") return { state: { ...clear, phase: "setup" }, record: null };
-  if (choice === "skip") return { state: { ...nextActivity(clear), feedback: p.skipped }, record: null };
-  if (s.phase === "setup") return { state: { ...clear, phase: "trial" }, record: null };
-  if (choice === "help") return { state: { ...clear, phase: "help" }, record: null };
-  if (choice === "back") return { state: { ...clear, phase: "trial" }, record: null };
-
-  const item = act.items[s.i];
-  const base = { activityKey: act.key, goalId: act.goalId, goalItemId: item.goalItemId, itemLabel: item.label, modality: act.modality, at: now.toISOString() };
-  if (choice === "own") {
-    const next = advance({ ...clear, misses: 0 }, false);
-    return { state: { ...next, feedback: p.great(act.reinforcement) }, record: { ...base, outcome: "CORRECT", supportLevel: "INDEPENDENT" } };
+  const records: TrialRecord[] = [];
+  // In the plan's item order, so the therapist's report reads naturally.
+  for (const item of act.items) {
+    const marks = report.items.find((r) => r.goalItemId === item.goalItemId)?.tries ?? [];
+    for (const mark of marks) {
+      if (mark === "none") continue;
+      records.push({
+        activityKey: act.key,
+        goalId: act.goalId,
+        goalItemId: item.goalItemId,
+        itemLabel: item.label,
+        outcome: mark === "notyet" ? "INCORRECT" : "CORRECT",
+        supportLevel: mark === "own" ? "INDEPENDENT" : mark === "help" ? (report.help ?? "UNKNOWN") : "UNKNOWN",
+        modality: act.modality,
+        // A millisecond apart so they keep their order.
+        at: new Date(now.getTime() + records.length).toISOString()
+      });
+    }
   }
-  if (choice.startsWith("help:")) {
-    const next = advance({ ...clear, misses: 0 }, false);
-    return { state: { ...next, feedback: p.goodHelp }, record: { ...base, outcome: "CORRECT", supportLevel: choice.slice(5) } };
-  }
-  // notyet
-  const misses = s.misses + 1;
-  const movedOn = misses >= act.missesBeforeMovingOn;
-  const next = advance({ ...clear, misses }, movedOn);
-  const feedback = [act.errorCorrection.replace(/\{item\}/g, item.label), movedOn ? p.movingOn : null].filter(Boolean).join(" ");
-  return { state: { ...next, feedback }, record: { ...base, outcome: "INCORRECT", supportLevel: "UNKNOWN" } };
+  if (!records.length) return { state: nextActivity(s, p.notDone), records };
+  const own = records.filter((r) => r.supportLevel === "INDEPENDENT").length;
+  const miss = records.filter((r) => r.outcome === "INCORRECT").length;
+  const feedback = own === records.length ? p.allOwn(s.kidName) : miss > records.length / 2 ? p.hard : own >= records.length / 2 ? p.mostlyOwn : p.helped;
+  return { state: nextActivity(s, feedback), records };
 }
 
 /** Plain-language summary of a run, per activity. */

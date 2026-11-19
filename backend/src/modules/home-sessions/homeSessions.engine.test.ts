@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, test } from "node:test";
-import { apply, InvalidChoice, startState, summarize, view, type RunState, type TrialRecord } from "./homeSessions.engine";
+import { apply, applyReport, InvalidChoice, normalize, startState, summarize, view, type Report, type RunState, type TryMark } from "./homeSessions.engine";
 import { isDueToday } from "./homeSessions.service";
 import { guessType } from "./homeSessions.ai";
 import type { Activity, Plan } from "./homeSessions.schemas";
@@ -32,82 +32,112 @@ const activity = (over: Partial<Activity> = {}): Activity => ({
 
 const plan = (activities: Activity[]): Plan => ({ intro: "Let's play!", activities, closing: "Well done!" });
 
-function run(s: RunState, choices: string[]) {
-  const records: TrialRecord[] = [];
-  for (const c of choices) {
-    const r = apply(s, c);
-    s = r.state;
-    if (r.record) records.push(r.record);
-  }
-  return { s, records };
+function toReport(s: RunState, marks: Record<string, TryMark[]>, help: string | null = null): Report {
+  const act = s.plan.activities[s.a];
+  return { items: act.items.map((i) => ({ goalItemId: i.goalItemId, tries: marks[i.label] ?? [] })), help };
 }
 
-describe("session engine", () => {
-  test("intro -> setup -> tries per item in order, with the item filled in", () => {
+describe("session engine: explain -> do -> report", () => {
+  test("intro -> explain with the whole activity laid out -> report form", () => {
     const a = activity();
     let s = startState(plan([a]), "en", "Aarav");
     assert.deepEqual(view(s).choices.map((c) => c.id), ["ready"]);
     s = apply(s, "ready").state;
-    assert.equal(view(s).phase, "setup");
-    assert.match(view(s).lines.join(" "), /Activity 1 of 1: Labels objects/);
-    s = apply(s, "ready").state;
-    const v = view(s);
-    assert.equal(v.phase, "trial");
-    assert.equal(v.item, "Ball");
-    assert.ok(v.lines.includes("Hold up the Ball and ask \"What's this?\""));
-    assert.deepEqual(v.progress, { done: 0, total: 6 });
-    assert.equal(v.choices[0].label, "Aarav did it on their own");
+    const ex = view(s);
+    assert.equal(ex.phase, "explain");
+    assert.equal(ex.activityLabel, "Activity 1 of 1");
+    assert.equal(ex.guide?.say, "Hold up the Ball, Cup and ask \"What's this?\"");
+    assert.equal(ex.guide?.plan, "Ball, Cup: 3 tries each");
+    assert.match(ex.guide!.moveOn, /2 times in a row/);
+    assert.deepEqual(ex.guide?.helps, ["Gave a spoken hint: Say the first sound of Ball, Cup.", "Gave hands-on help: Guide their hand to the Ball, Cup."]);
+    assert.match(ex.lines.join(" "), /Activity 1 of 1: Labels objects\./);
+    assert.deepEqual(ex.choices.map((c) => c.id), ["start", "skip"]);
+    s = apply(s, "start").state;
+    const rep = view(s);
+    assert.equal(rep.phase, "report");
+    assert.deepEqual(rep.report?.items.map((i) => i.label), ["Ball", "Cup"]);
+    assert.equal(rep.report?.triesPerItem, 3);
+    assert.deepEqual(rep.report?.helps.map((h) => h.id), ["VERBAL_PROMPT", "PHYSICAL_PROMPT"]);
+    assert.deepEqual(rep.progress, { done: 0, total: 6 });
   });
 
-  test("on their own / with help are logged with the right help; feedback carries to the next step", () => {
-    const a = activity();
-    const { s, records } = run(startState(plan([a]), "en", "Aarav"), ["ready", "ready", "own", "help", "help:VERBAL_PROMPT"]);
-    assert.deepEqual(records.map((r) => [r.itemLabel, r.outcome, r.supportLevel]), [
+  test("a report logs every marked try in item order, with the help given, and moves on", () => {
+    const a1 = activity();
+    const a2 = activity({ goalTitle: "Second" });
+    let s = apply(apply(startState(plan([a1, a2]), "en", "Aarav"), "ready").state, "start").state;
+    const r = applyReport(s, toReport(s, { Cup: ["notyet", "help"], Ball: ["own", "own", "none"] }, "VERBAL_PROMPT"), new Date("2026-11-19T10:00:00Z"));
+    assert.deepEqual(r.records.map((x) => [x.itemLabel, x.outcome, x.supportLevel]), [
       ["Ball", "CORRECT", "INDEPENDENT"],
-      ["Ball", "CORRECT", "VERBAL_PROMPT"]
+      ["Ball", "CORRECT", "INDEPENDENT"],
+      ["Cup", "INCORRECT", "UNKNOWN"],
+      ["Cup", "CORRECT", "VERBAL_PROMPT"]
     ]);
-    assert.equal(records[0].goalItemId, a.items[0].goalItemId);
-    assert.equal(view(s).item, "Ball");
-    assert.match(view(s).lines[0], /next time try a little less help/);
-    assert.deepEqual(view(s).progress, { done: 2, total: 6 });
+    assert.equal(r.records[0].goalItemId, a1.items[0].goalItemId);
+    assert.ok(r.records[0].at < r.records[3].at, "kept in order");
+    s = r.state;
+    assert.equal(view(s).phase, "explain");
+    assert.equal(view(s).activityTitle, "Second");
+    assert.equal(view(s).lines[0], "Good work! Keep the rewards quick and happy.");
+    assert.equal(view(s).feedback, "Good work! Keep the rewards quick and happy.");
+    assert.deepEqual(view(s).progress, { done: 6, total: 12 });
   });
 
-  test("the help step only offers the activity's own help levels, plus back", () => {
-    const { s } = run(startState(plan([activity()]), "en", "Aarav"), ["ready", "ready", "help"]);
-    assert.deepEqual(view(s).choices.map((c) => c.id), ["help:VERBAL_PROMPT", "help:PHYSICAL_PROMPT", "back"]);
-    assert.equal(view(apply(s, "back").state).phase, "trial");
+  test("help without saying which is logged as unknown help; feedback fits how it went", () => {
+    let s = apply(apply(startState(plan([activity(), activity()]), "en", "Aarav"), "ready").state, "start").state;
+    const helped = applyReport(s, toReport(s, { Ball: ["help", "help", "own"] }));
+    assert.deepEqual(helped.records.map((x) => x.supportLevel), ["UNKNOWN", "UNKNOWN", "INDEPENDENT"]);
+    assert.equal(helped.state.feedback, "Good. Next time, try a little less help.");
+    assert.equal(applyReport(s, toReport(s, { Ball: ["own"], Cup: ["own"] })).state.feedback, "Wonderful, Aarav did every try on their own!");
+    assert.match(applyReport(s, toReport(s, { Ball: ["notyet", "notyet", "own"] })).state.feedback!, /hard today/);
+    const nothing = applyReport(s, toReport(s, {}));
+    assert.equal(nothing.records.length, 0);
+    assert.match(nothing.state.feedback!, /skipped this one/);
+    s = nothing.state;
+    assert.equal(view(s).phase, "explain");
   });
 
-  test("after N misses in a row it moves on to the next item, with the correction first", () => {
-    const a = activity();
-    const { s, records } = run(startState(plan([a]), "en", "Aarav"), ["ready", "ready", "notyet", "notyet"]);
-    assert.deepEqual(records.map((r) => r.outcome), ["INCORRECT", "INCORRECT"]);
-    const v = view(s);
-    assert.equal(v.item, "Cup", "the third Ball try is skipped");
-    assert.match(v.lines[0], /^Say "Ball" and let them copy\. That one's hard right now/);
+  test("reports are checked against the activity", () => {
+    const s = apply(apply(startState(plan([activity()]), "en", "A"), "ready").state, "start").state;
+    assert.throws(() => applyReport(s, { items: [{ goalItemId: randomUUID(), tries: ["own"] }], help: null }), /isn't part of this activity/);
+    assert.throws(() => applyReport(s, toReport(s, { Ball: ["own", "own", "own", "own"] })), /At most 3 tries/);
+    assert.throws(() => applyReport(s, toReport(s, { Ball: ["help"] }, "FULL_ASSISTANCE")), /help isn't part/);
+    const exp = apply(startState(plan([activity()]), "en", "A"), "ready").state;
+    assert.throws(() => applyReport(exp, toReport(exp, { Ball: ["own"] })), /nothing to report/);
   });
 
-  test("skip moves to the next activity; finishing the last one ends the session", () => {
+  test("skip moves to the next activity; the last report ends the session", () => {
     const a1 = activity({ goalTitle: "First" });
     const a2 = activity({ goalTitle: "Second", items: [{ goalItemId: randomUUID(), label: "Dog" }], trialsPerItem: 1 });
-    let { s } = run(startState(plan([a1, a2]), "en", "Aarav"), ["ready", "ready", "skip"]);
-    assert.equal(view(s).phase, "setup");
+    let s = apply(apply(startState(plan([a1, a2]), "en", "Aarav"), "ready").state, "skip").state;
     assert.equal(view(s).activityTitle, "Second");
-    s = run(s, ["ready", "own"]).s;
+    assert.equal(view(s).lines[0], "Skipped. On to the next activity.");
+    s = apply(s, "start").state;
+    assert.equal(view(s).choices[0].id, "skip", "the report screen can skip too");
+    s = applyReport(s, toReport(s, { Dog: ["own"] })).state;
     assert.equal(view(s).phase, "done");
     assert.deepEqual(view(s).choices, []);
     assert.ok(view(s).lines.includes("Well done!"));
   });
 
   test("a choice that isn't offered is refused", () => {
-    assert.throws(() => apply(startState(plan([activity()]), "en", "A"), "own"), InvalidChoice);
+    assert.throws(() => apply(startState(plan([activity()]), "en", "A"), "start"), InvalidChoice);
+  });
+
+  test("a run saved mid-try by the old flow resumes at its activity's explain step", () => {
+    const a1 = activity({ goalTitle: "First" });
+    const a2 = activity({ goalTitle: "Second" });
+    const old = { plan: plan([a1, a2]), language: "en", kidName: "A", phase: "trial", a: 1, i: 1, t: 2, misses: 1, feedback: null } as RunState;
+    assert.equal(normalize(old).phase, "explain");
+    assert.equal(view(old).activityTitle, "Second");
+    assert.equal(view(apply(old, "start").state).phase, "report");
   });
 
   test("Hindi phrases, and a per-activity summary", () => {
-    const a = activity();
-    const { s, records } = run(startState(plan([a]), "hi", "आरव"), ["ready", "ready", "own", "notyet"]);
-    assert.match(view(s).lines.join(" "), /कोशिश/);
-    assert.equal(summarize(s.plan, records, "en"), "How it went:\nLabels objects: 2 tries, 1 on their own, 0 with help, 1 not yet.");
+    let s = apply(apply(startState(plan([activity()]), "hi", "आरव"), "ready").state, "start").state;
+    assert.match(view(s).lines.join(" "), /कैसा रहा/);
+    const r = applyReport(s, toReport(s, { Ball: ["own", "notyet"] }));
+    s = r.state;
+    assert.equal(summarize(s.plan, r.records, "en"), "How it went:\nLabels objects: 2 tries, 1 on their own, 0 with help, 1 not yet.");
     assert.equal(summarize(s.plan, [], "en"), "No tries were logged.");
   });
 });

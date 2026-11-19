@@ -26,6 +26,12 @@ type W = Awaited<ReturnType<typeof world>>;
 const url = (w: W, path: string) => `/api/parent-kids/${w.kid.id}${path}`;
 const startPractice = (w: W, body: object = {}) => api().post(url(w, "/practice/start")).set(bearer(w.fam.token)).send(body);
 const turn = (w: W, runId: string, choice: string) => api().post(url(w, `/session-runs/${runId}/turn`)).set(bearer(w.fam.token)).send({ choice });
+/** Reports a single try on the first item of the current activity. */
+const report = (w: W, runId: string, step: { report: { items: { goalItemId: string }[] } }, mark: string) =>
+  api()
+    .post(url(w, `/session-runs/${runId}/turn`))
+    .set(bearer(w.fam.token))
+    .send({ report: { items: [{ goalItemId: step.report.items[0].goalItemId, tries: [mark] }], help: null } });
 
 describe("practice sessions made by Pravnya", () => {
   beforeEach(resetDb);
@@ -55,12 +61,13 @@ describe("practice sessions made by Pravnya", () => {
     assert.ok(plan.activities[0].trialsPerItem >= 2);
     assert.match(plan.activities[0].instruction, /\{item\}/);
 
-    await turn(w, runId, "ready");
-    const setup = await turn(w, runId, "ready");
-    assert.equal(setup.body.step.phase, "trial");
-    assert.doesNotMatch(setup.body.step.lines.join(" "), /\{item\}/, "placeholders are filled in");
-    const own = await turn(w, runId, "own");
-    assert.equal(own.body.logged.supportLevel, "INDEPENDENT");
+    const explain = await turn(w, runId, "ready");
+    assert.equal(explain.body.step.phase, "explain");
+    assert.doesNotMatch(explain.body.step.lines.join(" "), /\{item\}/, "placeholders are filled in");
+    assert.doesNotMatch(JSON.stringify(explain.body.step.guide), /\{item\}/);
+    const step = (await turn(w, runId, "start")).body.step;
+    const own = await report(w, runId, step, "own");
+    assert.equal(own.body.logged[0].supportLevel, "INDEPENDENT");
     assert.equal(await prisma.goalItemEvidence.count({ where: { sessionRunId: runId } }), 1);
 
     assert.deepEqual((await api().get(url(w, "/sessions")).set(bearer(w.fam.token))).body, [], "not listed with the therapist's sessions");
@@ -69,7 +76,7 @@ describe("practice sessions made by Pravnya", () => {
     assert.equal((await api().patch(`/api/home-sessions/${session.id}`).set(bearer(w.linked.token)).send({ title: "x" })).status, 409);
 
     const ended = await api().post(url(w, `/session-runs/${runId}/end`)).set(bearer(w.fam.token));
-    assert.equal(ended.body.status, "ENDED_EARLY");
+    assert.equal(ended.body.status, "COMPLETED", "one activity: its report finished the session");
     assert.equal(testOutbox.length, 0, "no email to the therapist for each practice session");
     assert.equal((await api().post(url(w, `/sessions/${session.id}/start`)).set(bearer(w.fam.token))).status, 409, "a practice session isn't restarted");
   });
@@ -89,8 +96,8 @@ describe("practice sessions made by Pravnya", () => {
     for (let n = 0; n < 2; n++) {
       const runId = (await startPractice(w)).body.runId;
       await turn(w, runId, "ready");
-      await turn(w, runId, "ready");
-      await turn(w, runId, "notyet");
+      const step = (await turn(w, runId, "start")).body.step;
+      await report(w, runId, step, "notyet");
       await api().post(url(w, `/session-runs/${runId}/end`)).set(bearer(w.fam.token));
     }
     const status = (await api().get(url(w, "/practice")).set(bearer(w.fam.token))).body;
