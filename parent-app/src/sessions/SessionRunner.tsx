@@ -1,12 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
-import { api, ApiError, type SessionStep } from "../api/client";
-import mark from "../brand/mark.svg";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { api, ApiError, type SessionReport, type SessionStep, type TryMark } from "../api/client";
+import { GuideHeader, useSpeaker, type Mood } from "./PravnyaGuide";
 
-// A guided home session, like a call with a therapist: Pravnya says each step (and can read it
-// aloud), the parent answers by tapping, typing or speaking. The therapist's plan decides every
-// step on the server; typed or spoken replies are only interpreted there, never stored.
-
-type Bubble = { from: "pravnya" | "parent"; text: string };
+// A guided home session. For each activity Pravnya explains what to do (on screen and aloud),
+// then the parent puts the phone down and plays with their child, then reports every try in one
+// go: tap the grid, or just say or type "ball 2 of 3, cup with help" and check what Pravnya filled
+// in. The therapist's plan decides every step on the server; typed or spoken replies are only
+// interpreted there, never stored.
 
 const AUDIO_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
 
@@ -22,21 +22,30 @@ function readAsBase64(blob: Blob): Promise<string> {
   });
 }
 
-function speak(lines: string[], language: string) {
-  try {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(lines.join(" "));
-    u.lang = language;
-    u.rate = 0.95;
-    window.speechSynthesis.speak(u);
-  } catch {
-    // Reading aloud is a nice-to-have; the text is always on screen.
-  }
+const MARKS: { mark: TryMark; symbol: string; label: string; cls: string }[] = [
+  { mark: "none", symbol: "–", label: "not done", cls: "border-[var(--pv-border)] bg-[var(--pv-bg)] text-[var(--pv-ink-faint)]" },
+  { mark: "own", symbol: "✓", label: "on their own", cls: "border-[var(--pv-green-700)] bg-[var(--pv-green-700)] text-white" },
+  { mark: "help", symbol: "½", label: "with help", cls: "border-[var(--pv-orange-500)] bg-[var(--pv-orange-100)] text-[var(--pv-ink)]" },
+  { mark: "notyet", symbol: "✗", label: "not yet", cls: "border-red-300 bg-red-50 text-red-700" }
+];
+const nextMark = (m: TryMark): TryMark => MARKS[(MARKS.findIndex((x) => x.mark === m) + 1) % MARKS.length].mark;
+const markInfo = (m: TryMark) => MARKS.find((x) => x.mark === m)!;
+
+function emptyReport(step: SessionStep): SessionReport {
+  const r = step.report!;
+  return { items: r.items.map((i) => ({ goalItemId: i.goalItemId, tries: Array<TryMark>(r.triesPerItem).fill("none") })), help: null };
 }
 
-function stepText(step: SessionStep) {
-  return step.lines.filter(Boolean);
+/** Lays a drafted report onto the grid: one row per item, padded with "not done". */
+function fillReport(step: SessionStep, draft: SessionReport): SessionReport {
+  const r = step.report!;
+  return {
+    items: r.items.map((i) => {
+      const tries = draft.items.find((x) => x.goalItemId === i.goalItemId)?.tries ?? [];
+      return { goalItemId: i.goalItemId, tries: Array.from({ length: r.triesPerItem }, (_, n) => tries[n] ?? "none") };
+    }),
+    help: draft.help
+  };
 }
 
 export function SessionRunner({
@@ -59,7 +68,11 @@ export function SessionRunner({
   const [runId, setRunId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [step, setStep] = useState<SessionStep | null>(null);
-  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  /** Between "let's start" and reporting: the phone is down, they're playing. */
+  const [doing, setDoing] = useState(false);
+  const [showSteps, setShowSteps] = useState(false);
+  const [report, setReport] = useState<SessionReport | null>(null);
+  const [reply, setReply] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -72,18 +85,30 @@ export function SessionRunner({
       return true;
     }
   });
+  const speaker = useSpeaker(readAloud);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const endRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   // Hindi text read in a Hindi voice; everything else in Indian English.
   const voice = useRef("en-IN");
 
-  function show(next: SessionStep, reply?: string | null, parentText?: string) {
-    const lines = stepText(next);
-    setBubbles((b) => [...b, ...(parentText ? [{ from: "parent" as const, text: parentText }] : []), ...(reply ? [{ from: "pravnya" as const, text: reply }] : []), { from: "pravnya", text: lines.join("\n") }]);
-    setStep(next);
+  // What's being read aloud, for the subtitles.
+  const spoken = useRef<string[]>([]);
+  function say(lines: string[]) {
     if (/[ऀ-ॿ]/.test(lines.join(""))) voice.current = "hi-IN";
-    if (readAloud) speak([...(reply ? [reply] : []), ...lines], voice.current);
+    spoken.current = lines.filter(Boolean);
+    speaker.speak(spoken.current, voice.current);
+  }
+
+  function show(next: SessionStep, said?: string | null) {
+    setStep(next);
+    setReply(said ?? null);
+    setShowSteps(false);
+    setText("");
+    if (next.phase === "report") setReport(emptyReport(next));
+    mainRef.current?.scrollTo?.({ top: 0 });
+    // While they're playing, stay quiet; Pravnya speaks again on the report screen when they come back.
+    if (next.phase !== "report") say([...(said ? [said] : []), ...next.lines]);
   }
 
   useEffect(() => {
@@ -94,34 +119,44 @@ export function SessionRunner({
         show(r.step);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Couldn't start the session. Try again."));
-    return () => {
-      try {
-        window.speechSynthesis?.cancel();
-      } catch {
-        // ignore
-      }
-    };
     // Start once per session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, kidId, sessionId, practiceLanguage]);
 
-  useLayoutEffect(() => {
-    endRef.current?.scrollIntoView?.({ block: "end" });
-  }, [bubbles.length, summary]);
-
-  async function send(input: { choice: string } | { text: string } | { audio: { mimeType: string; base64: string } }, parentText: string) {
+  async function turn(input: Parameters<typeof api.sessionTurn>[3]) {
     if (!runId || busy) return;
     setBusy(true);
     setError("");
     try {
       const res = await api.sessionTurn(token, kidId, runId, input);
-      const changed = res.step.phase !== step?.phase || res.step.progress.done !== step?.progress.done || res.step.lines.join() !== step?.lines.join();
-      if (changed) show(res.step, res.reply, parentText);
-      else {
-        setBubbles((b) => [...b, { from: "parent", text: parentText }, ...(res.reply ? [{ from: "pravnya" as const, text: res.reply }] : [])]);
-        if (readAloud && res.reply) speak([res.reply], voice.current);
+      const moved = res.step.phase !== step?.phase || res.step.activityLabel !== step?.activityLabel;
+      if (moved) {
+        if ("choice" in input && input.choice === "start") setDoing(true);
+        else setDoing(false);
+        show(res.step, res.reply);
+      } else if (res.reply) {
+        setReply(res.reply);
+        say([res.reply]);
       }
       if (res.summary) setSummary(res.summary);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That didn't go through. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Typed or spoken: on the report screen it fills in the grid; elsewhere it's a reply or a question. */
+  async function tell(input: { text: string } | { audio: { mimeType: string; base64: string } }) {
+    if (step?.phase !== "report") return turn(input);
+    if (!runId || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await api.sessionReportDraft(token, kidId, runId, input);
+      if (res.report) setReport(fillReport(step, res.report));
+      setReply(res.reply);
+      say([res.reply]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "That didn't go through. Try again.");
     } finally {
@@ -134,7 +169,7 @@ export function SessionRunner({
     const t = text.trim();
     if (!t) return;
     setText("");
-    await send({ text: t }, t);
+    await tell({ text: t });
   }
 
   async function toggleRecording() {
@@ -143,6 +178,7 @@ export function SessionRunner({
       return;
     }
     setError("");
+    speaker.stop();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = AUDIO_TYPES.find((t) => MediaRecorder.isTypeSupported(t));
@@ -153,7 +189,7 @@ export function SessionRunner({
         stream.getTracks().forEach((t) => t.stop());
         setRecording(false);
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        if (blob.size) await send({ audio: { mimeType: blob.type, base64: await readAsBase64(blob) } }, "🎤 (voice reply)");
+        if (blob.size) await tell({ audio: { mimeType: blob.type, base64: await readAsBase64(blob) } });
       };
       recorderRef.current = recorder;
       recorder.start();
@@ -164,13 +200,15 @@ export function SessionRunner({
   }
 
   async function end() {
+    speaker.stop();
     if (!runId) return onClose();
-    if (step?.phase !== "done" && !window.confirm("End the session now? What you've done so far is saved.")) return;
+    if (step?.phase !== "done" && !window.confirm("End the session now? What you've reported so far is saved.")) return;
     try {
       const res = await api.endSession(token, kidId, runId);
       if (step?.phase !== "done" && res.summary) {
         setSummary(res.summary);
-        setStep((s) => (s ? { ...s, phase: "done", choices: [] } : s));
+        setDoing(false);
+        setStep((s) => (s ? { ...s, phase: "done", choices: [], lines: [] } : s));
         return;
       }
     } catch {
@@ -182,23 +220,107 @@ export function SessionRunner({
   function toggleReadAloud() {
     const next = !readAloud;
     setReadAloud(next);
+    if (!next) speaker.stop();
     try {
       localStorage.setItem("pv.session.readAloud", next ? "on" : "off");
-      if (!next) window.speechSynthesis?.cancel();
     } catch {
       // ignore
     }
   }
 
-  const done = step?.phase === "done";
+  function cycle(row: number, n: number) {
+    setReport((r) => (r ? { ...r, items: r.items.map((it, i) => (i === row ? { ...it, tries: it.tries.map((m, j) => (j === n ? nextMark(m) : m)) } : it)) } : r));
+  }
+  function fillRow(row: number, mark: TryMark) {
+    setReport((r) => (r ? { ...r, items: r.items.map((it, i) => (i === row ? { ...it, tries: it.tries.map(() => mark) } : it)) } : r));
+  }
+
+  const phase = step?.phase;
+  const done = phase === "done";
   const pct = step && step.progress.total ? Math.round((step.progress.done / step.progress.total) * 100) : 0;
+  const marked = report?.items.some((i) => i.tries.some((m) => m !== "none")) ?? false;
+  const usedHelp = report?.items.some((i) => i.tries.includes("help")) ?? false;
+  const mood: Mood = recording ? "listening" : speaker.speaking ? "talking" : done && summary ? "cheer" : "idle";
+
+  // Subtitles while Pravnya talks; otherwise what she last said for this step.
+  const subtitle = speaker.speaking && speaker.line >= 0 ? (spoken.current[speaker.line] ?? null) : null;
+  const caption =
+    subtitle ??
+    reply ??
+    (phase === "intro" || phase === "done" || (phase === "report" && !doing) ? step!.lines.join(" ") || null : phase === "explain" ? (step!.feedback ?? "Here's what to do. Tap ▶ to hear it.") : null);
+  // Which part of the explain card is being read (its lines: [feedback], title, setup, say, counts, help, miss, reward, plan).
+  const sections = ["title", "setup", "say", "counts", "help", "miss", "reward", "plan"];
+  const lineInStep = step && speaker.line >= 0 ? speaker.line - (spoken.current.length - step.lines.length) - (step.feedback ? 1 : 0) : -1;
+  const speakingSection = phase === "explain" && speaker.speaking ? (sections[lineInStep] ?? null) : null;
+
+  const section = (id: string, icon: string, label: string, children: ReactNode) => (
+    <div key={id} className={`rounded-xl px-3 py-2 transition ${speakingSection === id ? "bg-[var(--pv-green-100)] ring-2 ring-[var(--pv-green-500)]" : ""}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--pv-ink-faint)]">
+        <span aria-hidden="true">{icon}</span> {label}
+      </p>
+      <div className="mt-0.5 text-[1rem] leading-relaxed text-[var(--pv-ink)]">{children}</div>
+    </div>
+  );
+
+  const guideCard = step?.guide ? (
+    <div className="flex flex-col gap-1 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] p-2 shadow-sm">
+      {section("setup", "🧺", "Get ready", step.guide.setup)}
+      {section("say", "💬", "Each try", step.guide.say)}
+      {section("counts", "✅", "It counts when", step.guide.countsWhen)}
+      {section(
+        "help",
+        "🤝",
+        "If they need help (least help first)",
+        <ol className="list-decimal pl-5">
+          {step.guide.helps.map((h) => (
+            <li key={h}>{h}</li>
+          ))}
+        </ol>
+      )}
+      {section("miss", "🔁", "If they miss", step.guide.ifMiss)}
+      {section("reward", "⭐", "Reward", step.guide.reward)}
+      {section("plan", "🎯", "How many", `${step.guide.plan}. ${step.guide.moveOn}`)}
+    </div>
+  ) : null;
+
+  const askBar = (placeholder: string, label: string) => (
+    <form onSubmit={submitText} className="flex items-center gap-2">
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        className="min-w-0 flex-1 rounded-full border border-[var(--pv-border)] bg-[var(--pv-bg)] px-4 py-2.5 text-[0.98rem] text-[var(--pv-ink)] outline-none focus:border-[var(--pv-green-500)]"
+      />
+      {text.trim() ? (
+        <button type="submit" disabled={busy} className="rounded-full bg-[var(--pv-green-700)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+          Send
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={toggleRecording}
+          disabled={busy && !recording}
+          aria-label={recording ? "Stop and send" : "Answer by voice"}
+          className={`flex h-11 w-11 flex-none items-center justify-center rounded-full text-lg ${recording ? "animate-pulse bg-red-600 text-white" : "border border-[var(--pv-border)] bg-[var(--pv-bg)]"}`}
+        >
+          {recording ? "■" : "🎤"}
+        </button>
+      )}
+    </form>
+  );
+
+  const primary = "w-full rounded-2xl bg-[var(--pv-green-700)] px-5 py-3.5 text-[1.05rem] font-semibold text-white disabled:opacity-50";
 
   return (
     <div className="flex h-dvh flex-col bg-[var(--pv-bg)]">
       <header className="flex items-center gap-3 border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[1.02rem] font-semibold text-[var(--pv-ink)]">{title || "Session"}</p>
-          <p className="text-xs text-[var(--pv-ink-faint)]">With {kidName} · Pravnya is guiding</p>
+          <p className="text-xs text-[var(--pv-ink-faint)]">
+            With {kidName}
+            {step?.activityLabel && !done ? ` · ${step.activityLabel}` : " · Pravnya is guiding"}
+          </p>
         </div>
         <button type="button" onClick={toggleReadAloud} aria-pressed={readAloud} className="rounded-full border border-[var(--pv-border)] px-3 py-1.5 text-sm text-[var(--pv-ink-soft)]">
           {readAloud ? "🔊 On" : "🔇 Off"}
@@ -213,91 +335,163 @@ export function SessionRunner({
         </div>
       ) : null}
 
-      <main className="mx-auto flex w-full max-w-2xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
+      <main ref={mainRef} className="mx-auto flex w-full max-w-2xl min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-5">
         {!step && !error ? (
           <div className="flex flex-col items-center gap-3 py-10">
-            <img src={mark} alt="" className="h-8 w-8 animate-pulse opacity-60" />
-            <p className="text-sm text-[var(--pv-ink-faint)]">{practiceLanguage ? `Pravnya is picking what to practise with ${kidName}...` : "Starting the session..."}</p>
+            <GuideHeader mood="talking" caption={practiceLanguage ? `Picking what to practise with ${kidName}...` : "Starting the session..."} />
           </div>
         ) : null}
-        {bubbles.map((b, i) =>
-          b.from === "pravnya" ? (
-            <div key={i} className="max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-[var(--pv-surface)] px-4 py-3 shadow-sm">
-              <p className="mb-0.5 text-xs font-semibold text-[var(--pv-green-700)]">Pravnya</p>
-              <p className="whitespace-pre-line text-[1rem] leading-relaxed text-[var(--pv-ink)]">{b.text}</p>
+
+        {phase === "intro" ? <GuideHeader mood={mood} caption={caption} onReplay={() => say(step!.lines)} /> : null}
+
+        {phase === "explain" ? (
+          <>
+            <GuideHeader compact mood={mood} caption={caption} onReplay={() => say(step!.lines)} />
+            <h2 className="text-[1.25rem] font-semibold text-[var(--pv-ink)]">{step!.activityTitle}</h2>
+            {guideCard}
+          </>
+        ) : null}
+
+        {phase === "report" && doing ? (
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            <GuideHeader mood="idle" caption={`Your turn! Put the phone down and play with ${kidName}. Come back when you're done.`} />
+            <div className="w-full rounded-2xl border-2 border-[var(--pv-green-700)] bg-[var(--pv-surface)] px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--pv-ink-faint)]">Practise</p>
+              <p className="text-[1.6rem] font-semibold text-[var(--pv-ink)]">{step!.report!.items.map((i) => i.label).join(" · ")}</p>
+              <p className="text-[var(--pv-ink-soft)]">{step!.guide?.plan}</p>
+              <p className="mt-2 text-[0.98rem] text-[var(--pv-ink)]">💬 {step!.guide?.say}</p>
+              <p className="text-[0.98rem] text-[var(--pv-ink)]">⭐ {step!.guide?.reward}</p>
             </div>
-          ) : (
-            <div key={i} className="max-w-[85%] self-end rounded-2xl rounded-tr-sm bg-[var(--pv-green-700)] px-4 py-2.5 text-[0.98rem] text-white">
-              {b.text}
-            </div>
-          )
-        )}
-        {step?.item && (step.phase === "trial" || step.phase === "help") ? (
-          <div className="self-center rounded-2xl border-2 border-[var(--pv-green-700)] bg-[var(--pv-surface)] px-8 py-4 text-center">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--pv-ink-faint)]">Now practising</p>
-            <p className="text-[1.8rem] font-semibold text-[var(--pv-ink)]">{step.item}</p>
+            <button type="button" className="text-sm font-semibold text-[var(--pv-green-700)]" onClick={() => setShowSteps((v) => !v)}>
+              {showSteps ? "Hide the steps" : "See all the steps again"}
+            </button>
+            {showSteps ? guideCard : null}
           </div>
         ) : null}
-        {summary ? (
-          <div className="rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-green-100)] px-4 py-3">
-            <p className="whitespace-pre-line text-[0.98rem] leading-relaxed text-[var(--pv-ink)]">{summary}</p>
-            <p className="mt-2 text-sm text-[var(--pv-ink-soft)]">{practiceLanguage ? `Saved to ${kidName}'s progress, where your therapist can see it too.` : `Saved to ${kidName}'s progress, and sent to the therapist.`}</p>
-          </div>
+
+        {phase === "report" && !doing && report ? (
+          <>
+            <GuideHeader compact mood={mood} caption={caption} onReplay={() => say(step!.lines)} />
+            <div className="rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] p-4 shadow-sm">
+              <p className="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pv-ink-soft)]">
+                {MARKS.map((m) => (
+                  <span key={m.mark}>
+                    <span className={`mr-1 inline-flex h-5 w-5 items-center justify-center rounded-md border text-[0.7rem] ${m.cls}`}>{m.symbol}</span>
+                    {m.label}
+                  </span>
+                ))}
+              </p>
+              <div className="flex flex-col gap-3">
+                {step!.report!.items.map((item, row) => (
+                  <div key={item.goalItemId} className="flex flex-wrap items-center gap-2">
+                    <p className="w-24 flex-none truncate font-semibold text-[var(--pv-ink)]">{item.label}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {report.items[row].tries.map((m, n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => cycle(row, n)}
+                          aria-label={`${item.label}, try ${n + 1}: ${markInfo(m).label}`}
+                          className={`flex h-11 w-11 items-center justify-center rounded-xl border-2 text-lg font-semibold ${markInfo(m).cls}`}
+                        >
+                          {markInfo(m).symbol}
+                        </button>
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => fillRow(row, "own")} className="ml-auto rounded-full px-2 py-1 text-xs font-semibold text-[var(--pv-green-700)]" aria-label={`${item.label}: all on their own`}>
+                      All ✓
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-[var(--pv-ink-faint)]">Tap a box to change it.</p>
+            </div>
+            {usedHelp ? (
+              <div>
+                <p className="mb-1.5 text-sm font-semibold text-[var(--pv-ink)]">What help did you mostly give?</p>
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Help given">
+                  {step!.report!.helps.map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={report.help === h.id}
+                      onClick={() => setReport({ ...report, help: report.help === h.id ? null : h.id })}
+                      className={`rounded-full border px-3 py-1.5 text-sm ${report.help === h.id ? "border-[var(--pv-green-700)] bg-[var(--pv-green-100)] font-semibold" : "border-[var(--pv-border)] bg-[var(--pv-surface)]"}`}
+                    >
+                      {h.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <button type="button" className="self-start text-sm font-semibold text-[var(--pv-green-700)]" onClick={() => setShowSteps((v) => !v)}>
+              {showSteps ? "Hide the steps" : "See the steps again"}
+            </button>
+            {showSteps ? guideCard : null}
+          </>
+        ) : null}
+
+        {done ? (
+          <>
+            <GuideHeader mood={mood} caption={caption} />
+            {summary ? (
+              <div className="rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-green-100)] px-4 py-3">
+                <p className="whitespace-pre-line text-[0.98rem] leading-relaxed text-[var(--pv-ink)]">{summary}</p>
+                <p className="mt-2 text-sm text-[var(--pv-ink-soft)]">{practiceLanguage ? `Saved to ${kidName}'s progress, where your therapist can see it too.` : `Saved to ${kidName}'s progress, and sent to the therapist.`}</p>
+              </div>
+            ) : null}
+          </>
         ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div ref={endRef} />
       </main>
 
-      {step && !done ? (
+      {step ? (
         <footer className="border-t border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
           <div className="mx-auto flex max-w-2xl flex-col gap-2">
-            <div className="flex flex-wrap gap-2">
-              {step.choices.map((c, i) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => send({ choice: c.id }, c.label)}
-                  className={`rounded-2xl px-4 py-2.5 text-[0.98rem] font-semibold transition disabled:opacity-50 ${
-                    i === 0 ? "bg-[var(--pv-green-700)] text-white" : "border border-[var(--pv-border)] bg-[var(--pv-bg)] text-[var(--pv-ink)]"
-                  }`}
-                >
-                  {c.label}
+            {phase === "intro" ? (
+              <button type="button" disabled={busy} className={primary} onClick={() => turn({ choice: "ready" })}>
+                {step.choices[0]?.label ?? "We're ready"}
+              </button>
+            ) : null}
+            {phase === "explain" ? (
+              <>
+                <button type="button" disabled={busy} className={primary} onClick={() => turn({ choice: "start" })}>
+                  {step.choices.find((c) => c.id === "start")?.label ?? "Let's start"}
                 </button>
-              ))}
-            </div>
-            <form onSubmit={submitText} className="flex items-center gap-2">
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Or tell Pravnya what happened, or ask..."
-                aria-label="Tell Pravnya what happened"
-                className="min-w-0 flex-1 rounded-full border border-[var(--pv-border)] bg-[var(--pv-bg)] px-4 py-2.5 text-[0.98rem] text-[var(--pv-ink)] outline-none focus:border-[var(--pv-green-500)]"
-              />
-              {text.trim() ? (
-                <button type="submit" disabled={busy} className="rounded-full bg-[var(--pv-green-700)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
-                  Send
+                {askBar("Ask Pravnya about this activity...", "Ask Pravnya")}
+                <button type="button" disabled={busy} className="self-center py-1 text-sm font-semibold text-[var(--pv-ink-soft)] disabled:opacity-50" onClick={() => turn({ choice: "skip" })}>
+                  {step.choices.find((c) => c.id === "skip")?.label ?? "Skip this activity"}
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={toggleRecording}
-                  disabled={busy && !recording}
-                  aria-label={recording ? "Stop and send" : "Answer by voice"}
-                  className={`flex h-11 w-11 items-center justify-center rounded-full text-lg ${recording ? "animate-pulse bg-red-600 text-white" : "border border-[var(--pv-border)] bg-[var(--pv-bg)]"}`}
-                >
-                  {recording ? "■" : "🎤"}
+              </>
+            ) : null}
+            {phase === "report" && doing ? (
+              <button
+                type="button"
+                className={primary}
+                onClick={() => {
+                  setDoing(false);
+                  say(step.lines);
+                }}
+              >
+                We're done, tell Pravnya how it went
+              </button>
+            ) : null}
+            {phase === "report" && !doing && report ? (
+              <>
+                {askBar("Or say it: \"ball 2 of 3\"", "Tell Pravnya how it went")}
+                <button type="button" disabled={busy || recording} className={primary} onClick={() => turn({ report })}>
+                  {marked ? "Save and continue" : "We didn't do this one"}
                 </button>
-              )}
-            </form>
+              </>
+            ) : null}
             {recording ? <p className="text-center text-xs text-[var(--pv-ink-faint)]">Listening... tap ■ when you're done. Your voice isn't saved.</p> : null}
+            {done ? (
+              <button type="button" onClick={onClose} className={primary}>
+                Done
+              </button>
+            ) : null}
           </div>
-        </footer>
-      ) : done ? (
-        <footer className="border-t border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
-          <button type="button" onClick={onClose} className="mx-auto block w-full max-w-2xl rounded-2xl bg-[var(--pv-green-700)] px-5 py-3.5 text-[1.05rem] font-semibold text-white">
-            Done
-          </button>
         </footer>
       ) : null}
     </div>

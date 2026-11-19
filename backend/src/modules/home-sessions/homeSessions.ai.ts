@@ -4,7 +4,7 @@ import { createExecutionContext } from "@pravnix/ai-core";
 import type { AiContentPart } from "@pravnix/ai-core";
 import { orchestrator } from "../ai/ai.platform";
 import { ACTIVITY_TYPES, HELP_LEVELS, RESPONSE_MODALITIES, type Activity, type Plan } from "./homeSessions.schemas";
-import type { Language, StepView } from "./homeSessions.engine";
+import type { Language, Report, ReportForm, StepView } from "./homeSessions.engine";
 
 export type GoalForDraft = {
   id: string;
@@ -347,10 +347,8 @@ const TURN_PROMPT =
   "The app controls the session; you are given the current step (what the parent was just told) and the options the parent can choose. " +
   "The parent has typed or spoken a reply.\n\n" +
   "Decide:\n" +
-  "- If the reply tells you which option applies (e.g. \"he said ball by himself\" -> the 'did it on their own' option; \"after I pointed\" -> the help option " +
-  "matching a point/gesture; \"no\", \"he didn't\" -> not yet; \"ok\", \"ready\", \"done\" -> ready; \"skip this\" -> skip), return intent \"choice\" with that option's id " +
-  "and a very short acknowledgement in reply (or null).\n" +
-  "- If the reply says the child got it with help but not which help, choose the generic 'help' option if it's offered.\n" +
+  "- If the reply tells you which option applies (\"ok\", \"ready\", \"got it\", \"let's start\" -> ready or start; \"skip this\", \"not today\" -> skip), " +
+  "return intent \"choice\" with that option's id and a very short acknowledgement in reply (or null).\n" +
   "- Otherwise (a question, a worry, the child is upset, unclear), return intent \"answer\" with choice null and a short, practical reply (1-3 sentences): " +
   "answer within the session's activity; if the child is upset, tired or distressed, say it's fine to pause or stop and end on something easy; " +
   "if it's unclear, ask them to say what the child did or tap a button.\n\n" +
@@ -394,4 +392,56 @@ export async function interpretTurn(
   if (!result.success) return null;
   const v = result.value;
   return v.intent === "choice" ? { intent: "choice", choice: v.choice!, reply: v.reply } : { intent: "answer", choice: null, reply: v.reply! };
+}
+
+// ---------- Turning "ball 2 of 3, cup with help" into a report (parent side) ----------
+
+const REPORT_PROMPT =
+  "You are Pravnya. A parent has just done a short practice activity at home with their child and is telling you how it went, typed or spoken. " +
+  "You are given the activity's items (each with an id and label), how many tries were planned per item, and the kinds of help the activity uses.\n\n" +
+  "Fill in a report: for each item the parent mentions, a list of tries in the order they happened, each one of: \"own\" (did it on their own), " +
+  "\"help\" (did it with help), \"notyet\" (didn't get it). At most the planned number of tries per item.\n" +
+  "- \"2 of 3\" -> two \"own\" and one \"notyet\". \"try 1 yes, try 2 no\" -> [\"own\", \"notyet\"]. \"got all of them\" or \"yes\" -> every planned try \"own\" for every item. " +
+  "\"with help\" -> \"help\". \"didn't do\" or \"not done\" -> leave that item out.\n" +
+  "- A count without an item (\"did 2 of 3\") applies to every item only if there's a single item; with several items, leave them out and ask which items in reply.\n" +
+  "- Never invent tries the parent didn't describe; leave out what wasn't said.\n" +
+  "- help: if any try was with help and the parent said what help (pointed, showed, said the first sound, guided the hand), the matching help id; otherwise null.\n" +
+  "- reply: one short sentence saying back what you filled in (or asking what's missing), in the parent's language, warm and plain.\n\n" +
+  'Respond with ONLY JSON: {"items": [{"goalItemId": string, "tries": ["own" | "help" | "notyet"]}], "help": string | null, "reply": string}.';
+
+export async function interpretReport(
+  form: ReportForm,
+  context: { kidName: string; language: Language; activityTitle: string },
+  input: { text?: string; audio?: { mimeType: string; base64: string } },
+  tenantId: string
+): Promise<{ report: Report; reply: string } | null> {
+  const ids = new Set(form.items.map((i) => i.goalItemId));
+  const helpIds = form.helps.map((h) => h.id);
+  const schema = z.object({
+    items: z.array(z.object({ goalItemId: z.string().refine((id) => ids.has(id), "Unknown goalItemId"), tries: z.array(z.enum(["own", "help", "notyet"])) })),
+    help: z.string().nullable(),
+    reply: z.string().trim().min(1).max(400)
+  });
+  const situation = { child: context.kidName, activity: context.activityTitle, items: form.items, triesPerItem: form.triesPerItem, helps: form.helps };
+  const content: AiContentPart[] = [{ type: "text", text: `${languageLine(context.language)}\n\n${JSON.stringify(situation, null, 1)}\n\nWhat the parent said${input.audio ? " is in the attached audio." : `: "${input.text}"`}` }];
+  if (input.audio) content.push({ type: "audio", mimeType: input.audio.mimeType, data: { base64: input.audio.base64 } });
+  const result = await orchestrator.executeStructured({
+    name: "pravnyaadmin.home-session-report",
+    request: {
+      systemPrompt: REPORT_PROMPT,
+      messages: [{ role: "user", content }],
+      executionContext: createExecutionContext({ productId: "pravnyaadmin", tenantId, featureId: "home-session-report" })
+    },
+    schema,
+    maxRepairAttempts: 1
+  });
+  if (!result.success) return null;
+  const v = result.value;
+  // One row per item, in the activity's order, trimmed to the planned tries.
+  const items = form.items.map((i) => {
+    const said = v.items.find((x) => x.goalItemId === i.goalItemId);
+    return { goalItemId: i.goalItemId, tries: (said?.tries ?? []).slice(0, form.triesPerItem) as Report["items"][number]["tries"] };
+  });
+  const usedHelp = items.some((i) => i.tries.includes("help"));
+  return { report: { items, help: usedHelp && v.help && helpIds.includes(v.help) ? v.help : null }, reply: v.reply };
 }

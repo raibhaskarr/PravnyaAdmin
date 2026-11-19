@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, test } from "node:test";
 import { prisma } from "../../config/prisma";
@@ -104,7 +105,7 @@ describe("home sessions", () => {
     assert.equal((await api().get(`/api/home-sessions?kidId=${w.kid.id}`).set(bearer(w.viewer.token))).status, 200);
   });
 
-  test("the parent runs it by tapping: every try is logged, the end sends the therapist a summary", async () => {
+  test("the parent is told what to do, then reports every try in one go: each is logged, the end sends the therapist a summary", async () => {
     const w = await world();
     const s = await published(w);
     const list = await api().get(parentUrl(w, "/sessions")).set(bearer(w.fam.token));
@@ -116,24 +117,30 @@ describe("home sessions", () => {
     assert.equal(started.status, 200);
     assert.equal(started.body.step.phase, "intro");
     const runId = started.body.runId;
-    const turn = (choice: string) => api().post(parentUrl(w, `/session-runs/${runId}/turn`)).set(bearer(w.fam.token)).send({ choice });
+    const turn = (body: object) => api().post(parentUrl(w, `/session-runs/${runId}/turn`)).set(bearer(w.fam.token)).send(body);
 
-    await turn("ready");
-    await turn("ready");
-    const own = await turn("own");
-    assert.equal(own.body.logged.outcome, "CORRECT");
-    assert.equal(own.body.step.item, "Ball");
-    await turn("help");
-    await turn("help:VERBAL_PROMPT");
-    await turn("notyet");
-    assert.equal((await turn("own")).status, 200);
-    // 2 items x 2 tries -> the 4th try finishes the only activity.
+    const explain = await turn({ choice: "ready" });
+    assert.equal(explain.body.step.phase, "explain");
+    assert.ok(explain.body.step.guide.say);
+    const report = await turn({ choice: "start" });
+    assert.equal(report.body.step.phase, "report");
+    const [ball, cup] = report.body.step.report.items as { goalItemId: string; label: string }[];
+    assert.equal(ball.label, "Ball");
+    assert.equal(report.body.step.report.triesPerItem, 2);
+
+    const tooMany = await turn({ report: { items: [{ goalItemId: ball.goalItemId, tries: ["own", "own", "own"] }], help: null } });
+    assert.equal(tooMany.status, 400);
+    const done = await turn({ report: { items: [{ goalItemId: ball.goalItemId, tries: ["own", "help"] }, { goalItemId: cup.goalItemId, tries: ["notyet", "own"] }], help: "VERBAL_PROMPT" } });
+    assert.equal(done.status, 200);
+    assert.equal(done.body.logged.length, 4);
+    // 1 activity -> its report finishes the session.
+    assert.equal(done.body.status, "COMPLETED");
     const last = await api().get(parentUrl(w, `/session-runs/${runId}`)).set(bearer(w.fam.token));
     assert.equal(last.body.status, "COMPLETED");
     assert.equal(last.body.step.phase, "done");
     assert.match(last.body.summary, /Name familiar objects: 4 tries, 2 on their own, 1 with help, 1 not yet\./);
 
-    const evidence = await prisma.goalItemEvidence.findMany({ where: { sessionRunId: runId }, orderBy: { createdAt: "asc" } });
+    const evidence = await prisma.goalItemEvidence.findMany({ where: { sessionRunId: runId }, orderBy: { logDate: "asc" } });
     assert.deepEqual(evidence.map((e) => [e.outcome, e.supportLevel, e.centreId, e.centreName]), [
       ["CORRECT", "INDEPENDENT", null, null],
       ["CORRECT", "VERBAL_PROMPT", null, null],
@@ -147,7 +154,7 @@ describe("home sessions", () => {
     assert.match(mail[0].text, /On their own: 50% of tries\./);
     assert.match(mail[0].text, /\/tenant\/kids\//);
 
-    assert.equal((await turn("ready")).status, 409, "a finished run takes no more turns");
+    assert.equal((await turn({ choice: "ready" })).status, 409, "a finished run takes no more turns");
     const after = (await api().get(parentUrl(w, "/sessions")).set(bearer(w.fam.token))).body[0];
     assert.equal(after.dueToday, false, "done for today");
     assert.equal(after.lastRun.status, "COMPLETED");
@@ -156,7 +163,7 @@ describe("home sessions", () => {
     assert.equal(staff.body[0].runs[0].results.length, 4);
   });
 
-  test("typed and spoken replies are interpreted into a choice or answered; without AI, tap instead", async () => {
+  test("typed and spoken replies move the session on or are answered; without AI, tap instead", async () => {
     const w = await world();
     const s = await published(w);
     const runId = (await api().post(parentUrl(w, `/sessions/${s.id}/start`)).set(bearer(w.fam.token))).body.runId;
@@ -169,41 +176,84 @@ describe("home sessions", () => {
     setTestAiResponse("home-session-turn", { intent: "choice", choice: "ready", reply: "Lovely." });
     const ready = await send({ text: "ok we're set" });
     assert.equal(ready.body.reply, "Lovely.");
-    assert.equal(ready.body.step.phase, "setup");
-    await send({ choice: "ready" });
+    assert.equal(ready.body.step.phase, "explain");
 
-    setTestAiResponse("home-session-turn", { intent: "answer", choice: null, reply: "It's fine to take a short break." });
+    setTestAiResponse("home-session-turn", { intent: "answer", choice: null, reply: "Use a toy he loves as the reward." });
     const q = await send({ audio: { mimeType: "audio/webm", base64: Buffer.from("fake").toString("base64") } });
-    assert.equal(q.body.reply, "It's fine to take a short break.");
-    assert.equal(q.body.step.phase, "trial");
-    assert.equal(q.body.logged, null);
+    assert.equal(q.body.reply, "Use a toy he loves as the reward.");
+    assert.equal(q.body.step.phase, "explain");
+    assert.deepEqual(q.body.logged, []);
 
-    setTestAiResponse("home-session-turn", { intent: "choice", choice: "help:PHYSICAL_PROMPT", reply: null });
-    assert.equal((await send({ text: "I had to guide his hand" })).body.logged, null, "a help level isn't offered on the try step itself");
-
-    setTestAiResponse("home-session-turn", { intent: "choice", choice: "own", reply: "Brilliant!" });
-    const own = await send({ text: "he said ball all by himself" });
-    assert.equal(own.body.logged.supportLevel, "INDEPENDENT");
-    assert.equal(await prisma.goalItemEvidence.count({ where: { sessionRunId: runId } }), 1);
+    setTestAiResponse("home-session-turn", { intent: "choice", choice: "own", reply: null });
+    assert.equal((await send({ text: "he did it" })).body.step.phase, "explain", "a choice that isn't offered changes nothing");
+    await send({ choice: "start" });
+    assert.equal(await prisma.goalItemEvidence.count({ where: { sessionRunId: runId } }), 0);
   });
 
-  test("ending early keeps what was logged and still tells the therapist; a later start is a new run", async () => {
+  test("'ball 2 of 3' is turned into a filled-in report for the parent to check; nothing is saved until they send it", async () => {
     const w = await world();
     const s = await published(w);
     const runId = (await api().post(parentUrl(w, `/sessions/${s.id}/start`)).set(bearer(w.fam.token))).body.runId;
-    const turn = (choice: string) => api().post(parentUrl(w, `/session-runs/${runId}/turn`)).set(bearer(w.fam.token)).send({ choice });
-    await turn("ready");
-    await turn("ready");
-    await turn("own");
+    const send = (body: object) => api().post(parentUrl(w, `/session-runs/${runId}/turn`)).set(bearer(w.fam.token)).send(body);
+    const draft = (body: object) => api().post(parentUrl(w, `/session-runs/${runId}/report-draft`)).set(bearer(w.fam.token)).send(body);
 
-    const again = await api().post(parentUrl(w, `/sessions/${s.id}/start`)).set(bearer(w.fam.token));
+    assert.equal((await draft({ text: "ball 2 of 2" })).status, 400, "only on the report step");
+    await send({ choice: "ready" });
+    const step = (await send({ choice: "start" })).body.step;
+    const [ball, cup] = step.report.items as { goalItemId: string }[];
+
+    const none = await draft({ text: "ball 2 of 2" });
+    assert.equal(none.body.report, null);
+    assert.match(none.body.reply, /mark the tries/);
+
+    setTestAiResponse("home-session-report", {
+      items: [
+        { goalItemId: ball.goalItemId, tries: ["own", "own", "own"] },
+        { goalItemId: cup.goalItemId, tries: ["help"] }
+      ],
+      help: "PHYSICAL_PROMPT",
+      reply: "Ball twice on his own, cup once with help."
+    });
+    const filled = await draft({ text: "ball 2 of 2, cup once when I guided his hand" });
+    assert.equal(filled.status, 200);
+    assert.deepEqual(filled.body.report.items, [
+      { goalItemId: ball.goalItemId, tries: ["own", "own"] },
+      { goalItemId: cup.goalItemId, tries: ["help"] }
+    ]);
+    assert.equal(filled.body.report.help, "PHYSICAL_PROMPT");
+    assert.equal(filled.body.reply, "Ball twice on his own, cup once with help.");
+    assert.equal(await prisma.goalItemEvidence.count({ where: { sessionRunId: runId } }), 0);
+
+    const saved = await send({ report: filled.body.report });
+    assert.equal(saved.body.logged.length, 3);
+    assert.equal(saved.body.status, "COMPLETED");
+  });
+
+  test("ending early keeps what was reported and still tells the therapist; a later start is a new run", async () => {
+    const w = await world();
+    setTestAiResponse("home-session-draft", aiPlan(w));
+    const d = (await api().post("/api/home-sessions/draft").set(bearer(w.linked.token)).send({ kidId: w.kid.id, goalIds: [w.goal.id] })).body;
+    const two = { ...d.plan, activities: [d.plan.activities[0], { ...d.plan.activities[0], key: randomUUID() }] };
+    assert.equal((await api().patch(`/api/home-sessions/${d.id}`).set(bearer(w.linked.token)).send({ plan: two })).status, 200);
+    await api().post(`/api/home-sessions/${d.id}/publish`).set(bearer(w.linked.token));
+
+    const runId = (await api().post(parentUrl(w, `/sessions/${d.id}/start`)).set(bearer(w.fam.token))).body.runId;
+    const turn = (body: object) => api().post(parentUrl(w, `/session-runs/${runId}/turn`)).set(bearer(w.fam.token)).send(body);
+    await turn({ choice: "ready" });
+    const step = (await turn({ choice: "start" })).body.step;
+    const next = await turn({ report: { items: [{ goalItemId: step.report.items[0].goalItemId, tries: ["own"] }], help: null } });
+    assert.equal(next.body.step.phase, "explain", "on to the second activity");
+    assert.equal(next.body.step.activityLabel, "Activity 2 of 2");
+
+    const again = await api().post(parentUrl(w, `/sessions/${d.id}/start`)).set(bearer(w.fam.token));
     assert.equal(again.body.runId, runId, "an unfinished run is resumed");
     assert.equal(again.body.resumed, true);
+    assert.equal(again.body.step.phase, "explain");
 
     const ended = await api().post(parentUrl(w, `/session-runs/${runId}/end`)).set(bearer(w.fam.token));
     assert.equal(ended.body.status, "ENDED_EARLY");
     assert.match(testOutbox.at(-1)!.subject, /did part of/);
-    const fresh = await api().post(parentUrl(w, `/sessions/${s.id}/start`)).set(bearer(w.fam.token));
+    const fresh = await api().post(parentUrl(w, `/sessions/${d.id}/start`)).set(bearer(w.fam.token));
     assert.notEqual(fresh.body.runId, runId);
   });
 
