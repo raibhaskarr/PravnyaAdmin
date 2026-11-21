@@ -30,6 +30,10 @@ const envSchema = z.object({
   // backend/src/modules/ai/ai.platform.ts.
   ANTHROPIC_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
+  // "Call Pravnya" (hands-free home sessions) uses Gemini's Live API with this model.
+  GEMINI_LIVE_MODEL: z.string().default("gemini-3.8-live"),
+  // The API version for its short-lived tokens; the phone connects with the same one.
+  GEMINI_LIVE_API_VERSION: z.enum(["v1beta", "v1alpha"]).default("v1beta"),
   // Optional: therapist invitation emails degrade to logging the message server-side (dev-visible,
   // content-free in production) when unconfigured -- see modules/therapist-invitations/invitationEmail.service.ts.
   // "memory" is test-only: emails are kept in an in-process outbox (testOutbox) instead of sent,
