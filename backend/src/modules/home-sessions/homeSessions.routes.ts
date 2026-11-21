@@ -100,6 +100,12 @@ parentHomeSessionsRoutes.post(
   validateRequest({ params: parentRunParamsSchema, body: reportDraftSchema }),
   asyncHandler(async (req, res) => res.json(await homeSessionsService.reportDraft(req.parent!.id, req.params.kidId, req.params.runId, req.body)))
 );
+// Hands-free "Call Pravnya": a short-lived token for the phone to talk to the voice model directly.
+parentHomeSessionsRoutes.post(
+  "/:kidId/session-runs/:runId/call",
+  validateRequest({ params: parentRunParamsSchema }),
+  asyncHandler(async (req, res) => res.json(await homeSessionsService.startCall(req.parent!.id, req.params.kidId, req.params.runId)))
+);
 parentHomeSessionsRoutes.post(
   "/:kidId/session-runs/:runId/end",
   validateRequest({ params: parentRunParamsSchema }),

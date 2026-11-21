@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { api, ApiError, type SessionReport, type SessionStep, type TryMark } from "../api/client";
+import { CallPravnya } from "../call/CallPravnya";
 import { GuideHeader, useSpeaker, type Mood } from "./PravnyaGuide";
 
 // A guided home session. For each activity Pravnya explains what to do (on screen and aloud),
@@ -78,6 +79,8 @@ export function SessionRunner({
   const [error, setError] = useState("");
   const [text, setText] = useState("");
   const [recording, setRecording] = useState(false);
+  /** On a hands-free call with Pravnya instead of the screens. */
+  const [calling, setCalling] = useState(false);
   const [readAloud, setReadAloud] = useState(() => {
     try {
       return localStorage.getItem("pv.session.readAloud") !== "off";
@@ -235,6 +238,29 @@ export function SessionRunner({
     setReport((r) => (r ? { ...r, items: r.items.map((it, i) => (i === row ? { ...it, tries: it.tries.map(() => mark) } : it)) } : r));
   }
 
+  function startCall() {
+    speaker.stop();
+    setCalling(true);
+  }
+
+  /** Back from a call: carry on from wherever the session is now, with any tries counted but not saved. */
+  async function afterCall(unsaved: SessionReport | null) {
+    setCalling(false);
+    if (!runId) return;
+    try {
+      const res = await api.getSessionRun(token, kidId, runId);
+      setStep(res.step);
+      setReply(null);
+      setDoing(false);
+      setShowSteps(false);
+      if (res.summary && res.status !== "IN_PROGRESS") setSummary(res.summary);
+      if (res.status !== "IN_PROGRESS" && res.step.phase !== "done") setStep({ ...res.step, phase: "done", choices: [], lines: [] });
+      if (res.step.phase === "report") setReport(unsaved ? fillReport(res.step, unsaved) : emptyReport(res.step));
+    } catch {
+      setError("Couldn't load the session. Close it and open it again.");
+    }
+  }
+
   const phase = step?.phase;
   const done = phase === "done";
   const pct = step && step.progress.total ? Math.round((step.progress.done / step.progress.total) * 100) : 0;
@@ -312,6 +338,9 @@ export function SessionRunner({
 
   const primary = "w-full rounded-2xl bg-[var(--pv-green-700)] px-5 py-3.5 text-[1.05rem] font-semibold text-white disabled:opacity-50";
 
+  if (calling && runId)
+    return <CallPravnya token={token} kidId={kidId} kidName={kidName} runId={runId} title={title} initialTally={phase === "report" ? report : null} onExit={afterCall} />;
+
   return (
     <div className="flex h-dvh flex-col bg-[var(--pv-bg)]">
       <header className="flex items-center gap-3 border-b border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 py-3">
@@ -322,6 +351,11 @@ export function SessionRunner({
             {step?.activityLabel && !done ? ` · ${step.activityLabel}` : " · Pravnya is guiding"}
           </p>
         </div>
+        {runId && step && !done ? (
+          <button type="button" onClick={startCall} aria-label="Call Pravnya" className="rounded-full bg-[var(--pv-green-700)] px-3 py-1.5 text-sm font-semibold text-white">
+            📞 Call
+          </button>
+        ) : null}
         <button type="button" onClick={toggleReadAloud} aria-pressed={readAloud} className="rounded-full border border-[var(--pv-border)] px-3 py-1.5 text-sm text-[var(--pv-ink-soft)]">
           {readAloud ? "🔊 On" : "🔇 Off"}
         </button>
@@ -450,9 +484,14 @@ export function SessionRunner({
         <footer className="border-t border-[var(--pv-border)] bg-[var(--pv-surface)] px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
           <div className="mx-auto flex max-w-2xl flex-col gap-2">
             {phase === "intro" ? (
-              <button type="button" disabled={busy} className={primary} onClick={() => turn({ choice: "ready" })}>
-                {step.choices[0]?.label ?? "We're ready"}
-              </button>
+              <>
+                <button type="button" disabled={busy} className={primary} onClick={() => turn({ choice: "ready" })}>
+                  {step.choices[0]?.label ?? "We're ready"}
+                </button>
+                <button type="button" onClick={startCall} className="w-full rounded-2xl border border-[var(--pv-green-700)] px-5 py-2.5 text-[0.98rem] font-semibold text-[var(--pv-green-700)]">
+                  📞 Do it as a call with Pravnya (hands-free)
+                </button>
+              </>
             ) : null}
             {phase === "explain" ? (
               <>

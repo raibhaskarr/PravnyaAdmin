@@ -24,6 +24,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@google/genai": "2.32.0",
     "@pravnix/ai-abstractions": "file:vendor/pravnix/pravnix-ai-abstractions-0.1.0-preview.1.tgz",
     "@pravnix/ai-core": "file:vendor/pravnix/pravnix-ai-core-0.1.0-preview.1.tgz",
     "@pravnix/ai-node": "file:vendor/pravnix/pravnix-ai-node-0.1.0-preview.1.tgz",
