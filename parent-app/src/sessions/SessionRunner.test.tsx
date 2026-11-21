@@ -5,6 +5,14 @@ import { api, ApiError, type SessionStep, type SessionTurnResult } from "../api/
 import { SessionRunner } from "./SessionRunner";
 
 vi.mock("../api/client", async (orig) => (await import("../test/apiMock")).mockedClient(orig));
+// The call screen is tested on its own; here it's a stand-in that hangs up with one try counted.
+vi.mock("../call/CallPravnya", () => ({
+  CallPravnya: ({ onExit }: { onExit: (r: unknown) => void }) => (
+    <button type="button" onClick={() => onExit({ help: null, items: [{ goalItemId: "11111111-1111-4111-8111-111111111111", tries: ["own", "none"] }] })}>
+      Stub call: hang up
+    </button>
+  )
+}));
 const mockApi = vi.mocked(api);
 
 const step = (over: Partial<SessionStep> = {}): SessionStep => ({
@@ -188,6 +196,17 @@ describe("<SessionRunner />", () => {
     expect(window.confirm).toHaveBeenCalled();
     expect(await screen.findByText(/1 tries, 1 on their own/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
+  });
+
+  test("'Call' opens the call; hanging up carries on from where the session is, with the call's tries in the grid", async () => {
+    mockApi.getSessionRun.mockResolvedValue({ runId: "run-1", status: "IN_PROGRESS", step: reportStep, summary: null });
+    renderRunner();
+    await userEvent.click(await screen.findByRole("button", { name: /Do it as a call/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Stub call: hang up" }));
+    expect(mockApi.getSessionRun).toHaveBeenCalledWith("tok", "kid-1", "run-1");
+    expect(await screen.findByRole("button", { name: "Ball, try 1: on their own" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save and continue" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Call Pravnya" })).toBeInTheDocument();
   });
 
   test("errors are shown, and a failed start says so", async () => {

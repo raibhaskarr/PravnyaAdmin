@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { lastTokenRequest } from "./homeSessions.call";
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, test } from "node:test";
 import { prisma } from "../../config/prisma";
@@ -255,6 +256,38 @@ describe("home sessions", () => {
     assert.match(testOutbox.at(-1)!.subject, /did part of/);
     const fresh = await api().post(parentUrl(w, `/sessions/${d.id}/start`)).set(bearer(w.fam.token));
     assert.notEqual(fresh.body.runId, runId);
+  });
+
+  test("Call Pravnya: a short-lived token locked to Pravnya's instructions for where the session is, with a per-run limit", async () => {
+    const w = await world();
+    const s = await published(w);
+    const runId = (await api().post(parentUrl(w, `/sessions/${s.id}/start`)).set(bearer(w.fam.token))).body.runId;
+    const call = () => api().post(parentUrl(w, `/session-runs/${runId}/call`)).set(bearer(w.fam.token));
+
+    const first = await call();
+    assert.equal(first.status, 200);
+    assert.equal(first.body.token, "auth_tokens/test-call-token");
+    assert.equal(first.body.model, "gemini-3.8-live");
+    assert.equal(first.body.apiVersion, "v1beta");
+    assert.equal(first.body.step.phase, "intro");
+    const locked = lastTokenRequest!.config;
+    assert.match(String(locked.systemInstruction), /Aarav/);
+    assert.match(String(locked.systemInstruction), /Name familiar objects/);
+    assert.match(String(locked.systemInstruction), /the call has just started/);
+    const tools = (locked.tools as { functionDeclarations: { name: string }[] }[])[0].functionDeclarations.map((t) => t.name);
+    assert.deepEqual(tools, ["ready_for_activity", "start_playing", "record_try", "undo_last_try", "save_activity", "skip_activity", "end_session"]);
+
+    // Reconnecting mid-activity: the instructions say where they are.
+    await api().post(parentUrl(w, `/session-runs/${runId}/turn`)).set(bearer(w.fam.token)).send({ choice: "ready" });
+    await api().post(parentUrl(w, `/session-runs/${runId}/turn`)).set(bearer(w.fam.token)).send({ choice: "start" });
+    assert.equal((await call()).body.step.phase, "report");
+    assert.match(String(lastTokenRequest!.config.systemInstruction), /in the middle of activity 1/);
+
+    for (let n = 2; n < 8; n++) assert.equal((await call()).status, 200);
+    const limited = await call();
+    assert.equal(limited.status, 409);
+    assert.equal(limited.body.code ?? limited.body.error?.code, "CALL_LIMIT");
+    assert.equal((await api().post(`/api/parent-kids/${w.kid.id}/session-runs/${runId}/call`).set(bearer(w.other.token))).status, 404);
   });
 
   test("access: another parent 404; archived sessions disappear; only drafts can be deleted", async () => {

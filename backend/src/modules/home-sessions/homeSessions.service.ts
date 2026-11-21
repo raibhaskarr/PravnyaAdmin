@@ -4,7 +4,7 @@ import { env } from "../../config/env";
 import { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { assertOwnsKid } from "../../common/access/parentKidAccess";
-import { badRequest, conflict, notFound } from "../../common/errors/AppError";
+import { AppError, badRequest, conflict, notFound } from "../../common/errors/AppError";
 import { buildPeriodStats } from "../progress-updates/progressStats";
 import { authorFor } from "../progress-updates/progressUpdates.service";
 import { invitationEmailService } from "../therapist-invitations/invitationEmail.service";
@@ -12,6 +12,7 @@ import { draftPlanWithAi, interpretReport, interpretTurn, templatePlan, type Goa
 import { apply, applyReport, InvalidChoice, normalize, startState, summarize, view, type Language, type Report, type RunState, type TrialRecord } from "./homeSessions.engine";
 import type { Plan, Schedule } from "./homeSessions.schemas";
 import { loadCandidates, pickPractice, PRACTICE_PER_DAY } from "./homeSessions.practice";
+import { callConfig, MAX_CALLS_PER_RUN, mintCallToken } from "./homeSessions.call";
 
 const DAY = 86_400_000;
 const RESUME_WITHIN_MS = 12 * 60 * 60_000;
@@ -412,6 +413,21 @@ export const homeSessionsService = {
       };
     }
     return draft;
+  },
+
+  /** Starts (or reconnects) a hands-free call for a run: a short-lived token locked to Pravnya's instructions for where the session is now. */
+  async startCall(parentId: string, kidId: string, runId: string) {
+    await assertOwnsKid(parentId, kidId);
+    const run = await prisma.homeSessionRun.findFirst({ where: { id: runId, kidId } });
+    if (!run) throw notFound("Session not found");
+    if (run.status !== "IN_PROGRESS") throw conflict("This session has already ended", "ENDED");
+    const state = run.state as unknown as RunState & { calls?: number };
+    const calls = state.calls ?? 0;
+    if (calls >= MAX_CALLS_PER_RUN) throw conflict("That's the most calls for one session. Carry on with the step-by-step screens.", "CALL_LIMIT");
+    const token = await mintCallToken(callConfig(state));
+    if (!token) throw new AppError(503, "CALL_UNAVAILABLE", "Calls aren't available right now. Carry on with the step-by-step screens.");
+    await prisma.homeSessionRun.update({ where: { id: runId }, data: { state: { ...state, calls: calls + 1 } as unknown as Prisma.InputJsonValue } });
+    return { ...token, step: view(state) };
   },
 
   async end(parentId: string, kidId: string, runId: string) {

@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type Mood = "idle" | "talking" | "listening" | "cheer";
 
-export function PravnyaFace({ mood, size = 112 }: { mood: Mood; size?: number }) {
+/** mouthLevel (0..1), when given, opens the mouth with the actual voice instead of a loop (on a call). */
+export function PravnyaFace({ mood, size = 112, mouthLevel }: { mood: Mood; size?: number; mouthLevel?: number }) {
   return (
     <div className={`pv-guide pv-guide--${mood}`} style={{ width: size, height: size }} aria-hidden="true">
       <span className="pv-guide__halo" />
@@ -28,7 +29,9 @@ export function PravnyaFace({ mood, size = 112 }: { mood: Mood; size?: number })
         </g>
         <circle cx="34" cy="72" r="6" fill="#f39c4a" opacity="0.35" />
         <circle cx="86" cy="72" r="6" fill="#f39c4a" opacity="0.35" />
-        {mood === "talking" ? (
+        {mood === "talking" && mouthLevel !== undefined ? (
+          <ellipse cx="60" cy="82" rx="10" ry={1.5 + 8 * Math.min(1, mouthLevel)} fill="#0d4834" />
+        ) : mood === "talking" ? (
           <ellipse className="pv-guide__mouth" cx="60" cy="82" rx="10" ry="7" fill="#0d4834" />
         ) : mood === "listening" ? (
           <circle cx="60" cy="82" r="5" fill="#0d4834" />

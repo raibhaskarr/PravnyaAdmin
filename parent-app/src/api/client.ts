@@ -444,6 +444,14 @@ export const api = {
   sessionReportDraft(token: string, kidId: string, runId: string, input: { text: string } | { audio: { mimeType: string; base64: string } }) {
     return request<{ report: SessionReport | null; reply: string }>(`/parent-kids/${kidId}/session-runs/${runId}/report-draft`, { token, method: "POST", body: input });
   },
+  /** Where a run is now (after a call, to carry on with the screens). */
+  getSessionRun(token: string, kidId: string, runId: string) {
+    return request<{ runId: string; status: "IN_PROGRESS" | "COMPLETED" | "ENDED_EARLY"; step: SessionStep; summary: string | null }>(`/parent-kids/${kidId}/session-runs/${runId}`, { token });
+  },
+  /** A short-lived token for a hands-free call with Pravnya (Gemini Live), locked to this session. */
+  startCall(token: string, kidId: string, runId: string) {
+    return request<{ token: string; model: string; apiVersion: string; expiresAt: string; step: SessionStep }>(`/parent-kids/${kidId}/session-runs/${runId}/call`, { token, method: "POST" });
+  },
   endSession(token: string, kidId: string, runId: string) {
     return request<{ status: string; summary: string | null }>(`/parent-kids/${kidId}/session-runs/${runId}/end`, { token, method: "POST" });
   },
