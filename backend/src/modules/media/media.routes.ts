@@ -16,13 +16,18 @@ export const mediaRoutes = Router();
 // Public, but only with a valid signed link (see mediaPath).
 mediaRoutes.get(
   "/:id",
-  validateRequest({ params: z.object({ id: z.string().uuid() }), query: z.object({ exp: z.string().max(20), sig: z.string().max(100) }) }),
+  validateRequest({ params: z.object({ id: z.string().uuid() }), query: z.object({ v: z.string().max(40), exp: z.string().max(20), sig: z.string().max(100) }) }),
   asyncHandler(async (req, res) => {
-    if (!verifyMediaLink(req.params.id, req.query.exp as string, req.query.sig as string)) throw notFound();
-    const { body, mimeType } = await mediaService.read(req.params.id);
+    const link = verifyMediaLink(req.params.id, req.query.v as string, req.query.exp as string, req.query.sig as string);
+    if (!link) throw notFound();
+    // Checks, now, that the viewer the link was made for may still see this child's pictures.
+    const { body, mimeType } = await mediaService.read(req.params.id, link.viewer);
     // The apps load pictures from another origin than the API's.
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    res.setHeader("Cache-Control", "private, max-age=86400, immutable");
+    // Only this browser may keep it, and not past the link's expiry.
+    const maxAge = Math.max(0, Math.min(link.exp - Math.floor(Date.now() / 1000), 3600));
+    res.setHeader("Cache-Control", `private, no-transform, max-age=${maxAge}`);
+    res.setHeader("Referrer-Policy", "no-referrer");
     res.type(mimeType).send(body);
   })
 );

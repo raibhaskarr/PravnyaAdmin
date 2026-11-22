@@ -116,9 +116,9 @@ describe("visual schedules", () => {
     // The signed link serves the picture without a login; a tampered link doesn't.
     const img = await api().get(up.body.url);
     assert.equal(img.status, 200);
+    // Re-encoded on upload (this PNG has transparency, so it stays a PNG).
     assert.equal(img.headers["content-type"], "image/png");
     assert.equal(img.headers["cross-origin-resource-policy"], "cross-origin");
-    assert.ok(Buffer.from(img.body).equals(PNG));
     assert.equal((await api().get(up.body.url.replace(/sig=./, "sig=x"))).status, 404);
     assert.equal((await api().get(`/api/media/${up.body.id}`)).status, 400);
 
@@ -128,7 +128,7 @@ describe("visual schedules", () => {
 
     const created = await api().post("/api/visual-schedules").set(bearer(w.linked.token)).send({ ...base, days: ["Sat", "Sun"], steps: [step("Shoes", photo), step("Park", null)] });
     assert.equal(created.status, 201);
-    assert.match(created.body.steps[0].picture.url, new RegExp(`^/api/media/${up.body.id}\\?exp=\\d+&sig=`));
+    assert.match(created.body.steps[0].picture.url, new RegExp(`^/api/media/${up.body.id}\\?v=s\\.[0-9a-f-]{36}&exp=\\d+&sig=`));
     assert.equal(created.body.steps[1].picture, null);
     assert.equal(created.body.steps[0].minutes, null);
 

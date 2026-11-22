@@ -7,6 +7,7 @@ import { AppError, badRequest, forbidden, notFound } from "../../common/errors/A
 import { draftScheduleWithAi } from "./visualSchedules.ai";
 import { assertPhotosFitTemplate, copySteps, present } from "./visualSchedules.present";
 import { STEP_LIMITS, type Kind, type Step } from "./visualSchedules.schemas";
+import type { Viewer } from "../media/media.service";
 import { TEMPLATES } from "./visualSchedules.templates";
 
 // Picture schedule templates: Pravnya's (the built-in ones plus any a superadmin adds) and each
@@ -40,7 +41,7 @@ function canEdit(user: AuthUser, t: VisualScheduleTemplate) {
   return user.role === "THERAPIST" && t.createdByUserId === user.id;
 }
 
-function view(t: VisualScheduleTemplate, editable = false) {
+function view(t: VisualScheduleTemplate, viewer: Viewer, editable = false) {
   return {
     id: t.id,
     scope: t.tenantId ? ("CENTRE" as const) : ("PRAVNYA" as const),
@@ -49,7 +50,7 @@ function view(t: VisualScheduleTemplate, editable = false) {
     title: t.title,
     kind: t.kind,
     language: t.language,
-    steps: present(t.steps as unknown as Step[]),
+    steps: present(t.steps as unknown as Step[], viewer),
     days: t.days,
     time: t.time,
     createdByName: t.createdByName,
@@ -98,12 +99,12 @@ export async function findTemplateForUse(id: string, tenantId: string | null) {
 export const scheduleTemplatesService = {
   async list(user: AuthUser, language?: Language) {
     const rows = await visible(user.role === "SUPERADMIN" ? null : user.tenantId, language);
-    return rows.map((t) => view(t, canEdit(user, t)));
+    return rows.map((t) => view(t, { kind: "staff", id: user.id }, canEdit(user, t)));
   },
 
   async listForParent(parentId: string, kidId: string, language?: Language) {
     const kid = await assertOwnsKid(parentId, kidId);
-    return (await visible(kid.tenantId, language)).map((t) => view(t));
+    return (await visible(kid.tenantId, language)).map((t) => view(t, { kind: "parent", id: parentId }));
   },
 
   async create(user: AuthUser, input: TemplateFields) {
@@ -113,7 +114,7 @@ export const scheduleTemplatesService = {
     const t = await prisma.visualScheduleTemplate.create({
       data: { tenantId, ...input, steps: input.steps as unknown as Prisma.InputJsonValue, createdByUserId: user.id, createdByName: await authorName(user) }
     });
-    return view(t, true);
+    return view(t, { kind: "staff", id: user.id }, true);
   },
 
   async draft(user: AuthUser, input: { kind: Kind | null; language: Language; request: string }) {
@@ -132,7 +133,7 @@ export const scheduleTemplatesService = {
       where: { id },
       data: { title: input.title, kind: input.kind, language: input.language, days: input.days, time: input.time, steps: input.steps as unknown as Prisma.InputJsonValue | undefined }
     });
-    return view(row, true);
+    return view(row, { kind: "staff", id: user.id }, true);
   },
 
   /** Built-in ones are hidden rather than deleted, so they don't come back. */
@@ -162,6 +163,6 @@ export const scheduleTemplatesService = {
         createdByName: await authorName(user)
       }
     });
-    return { ...view(t, true), droppedPhotos };
+    return { ...view(t, { kind: "staff", id: user.id }, true), droppedPhotos };
   }
 };

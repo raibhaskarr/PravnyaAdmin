@@ -6,6 +6,7 @@ import { assertOwnsKid } from "../../common/access/parentKidAccess";
 import { AppError, badRequest, conflict, notFound } from "../../common/errors/AppError";
 import { authorFor } from "../progress-updates/progressUpdates.service";
 import { SYMBOL_CREDIT } from "../symbols/symbols";
+import type { Viewer } from "../media/media.service";
 import { assertPhotosFitKid, copySteps, present } from "./visualSchedules.present";
 import { findTemplateForUse } from "./scheduleTemplates.service";
 import { draftScheduleWithAi } from "./visualSchedules.ai";
@@ -17,11 +18,11 @@ type Fields = { title: string; kind: Kind; language: Language; steps: Step[]; da
 
 const recentUses = () => ({ where: { startedAt: { gte: new Date(Date.now() - LEARN_FROM_DAYS * 86_400_000) } }, select: { startedAt: true, completedAt: true }, orderBy: { startedAt: "desc" as const } });
 
-function presentSchedule(s: VisualSchedule & { uses?: Use[] }) {
+function presentSchedule(s: VisualSchedule & { uses?: Use[] }, viewer: Viewer) {
   const { uses = [], ...rest } = s;
   return {
     ...rest,
-    steps: present(s.steps as unknown as Step[]),
+    steps: present(s.steps as unknown as Step[], viewer),
     // When it's done (set, or learned from use) and how much it's used, for the therapist.
     timing: effectiveTiming(s, uses),
     usedDays: new Set(uses.map((u) => inIndia(u.startedAt).date)).size,
@@ -56,8 +57,10 @@ async function create(user: AuthUser, kidId: string, data: Fields & { aiDrafted?
   const row = await prisma.visualSchedule.create({
     data: { tenantId: kid.tenantId, kidId: kid.id, authorUserId: user.id, ...author, ...data, steps: data.steps as unknown as Prisma.InputJsonValue }
   });
-  return presentSchedule(row);
+  return presentSchedule(row, staff(user));
 }
+
+const staff = (user: AuthUser): Viewer => ({ kind: "staff", id: user.id });
 
 function aiUnavailable() {
   return new AppError(503, "AI_UNAVAILABLE", "Pravnya couldn't draft this right now. Try again, or start from a template or a blank schedule.");
@@ -93,7 +96,7 @@ function forParent(s: VisualSchedule & { uses: Use[] }, parentId: string, now: D
     remind: s.remind,
     timing,
     ...todayStatus(timing, s.uses, now),
-    steps: present(s.steps as unknown as Step[])
+    steps: present(s.steps as unknown as Step[], { kind: "parent", id: parentId })
   };
 }
 
@@ -101,7 +104,7 @@ export const visualSchedulesService = {
   async list(user: AuthUser, kidId: string) {
     await assertCanAccessKid(user, kidId);
     const rows = await prisma.visualSchedule.findMany({ where: { kidId }, orderBy: { createdAt: "desc" }, include: { uses: recentUses() } });
-    return rows.map(presentSchedule);
+    return rows.map((r) => presentSchedule(r, staff(user)));
   },
 
   create(user: AuthUser, input: Fields & { kidId: string }) {
@@ -133,19 +136,19 @@ export const visualSchedulesService = {
     const steps = input.steps ?? (schedule.steps as unknown as Step[]);
     assertStepCount(kind, steps);
     if (input.steps) await assertPhotosFitKid({ id: schedule.kidId, tenantId: schedule.tenantId }, input.steps);
-    return presentSchedule(await prisma.visualSchedule.update({ where: { id }, data: editData(input) }));
+    return presentSchedule(await prisma.visualSchedule.update({ where: { id }, data: editData(input) }), staff(user));
   },
 
   async publish(user: AuthUser, id: string) {
     const schedule = await findForStaff(user, id);
     if (schedule.status !== "DRAFT") throw conflict("Only a draft can be published", "NOT_DRAFT");
-    return presentSchedule(await prisma.visualSchedule.update({ where: { id }, data: { status: "ACTIVE", publishedAt: new Date() } }));
+    return presentSchedule(await prisma.visualSchedule.update({ where: { id }, data: { status: "ACTIVE", publishedAt: new Date() } }), staff(user));
   },
 
   async archive(user: AuthUser, id: string) {
     const schedule = await findForStaff(user, id);
     if (schedule.source === "PARENT") throw conflict("The parent made this schedule; only they can remove it", "MADE_BY_PARENT");
-    return presentSchedule(await prisma.visualSchedule.update({ where: { id }, data: { status: "ARCHIVED" } }));
+    return presentSchedule(await prisma.visualSchedule.update({ where: { id }, data: { status: "ARCHIVED" } }), staff(user));
   },
 
   async remove(user: AuthUser, id: string) {
@@ -176,7 +179,7 @@ export const visualSchedulesService = {
       featureId: "visual-schedule-parent-draft"
     });
     if (!drafted) throw aiUnavailable();
-    return { ...drafted, language: input.language, steps: present(drafted.steps) };
+    return { ...drafted, language: input.language, steps: present(drafted.steps, { kind: "parent", id: parentId }) };
   },
 
   async createForParent(parentId: string, kidId: string, data: Fields, now = new Date()) {

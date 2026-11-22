@@ -20,19 +20,18 @@ export async function purgeParent(parentId: string) {
   // Pictures uploaded for a child who is deleted completely: their rows go with the Kid (cascade),
   // the stored files are removed below.
   // Photos the parent uploaded for a centre's child go too (the centre's own uploads stay).
-  const ownPictures = await prisma.mediaAsset.findMany({ where: { OR: [{ kidId: { in: own } }, { uploadedByParentId: parentId }] }, select: { storageKey: true } });
+  const ownPictures = await prisma.mediaAsset.findMany({ where: { OR: [{ kidId: { in: own } }, { uploadedByParentId: parentId }] }, select: { id: true, tenantId: true, kidId: true, storageKey: true } });
 
   await prisma.$transaction([
     prisma.kid.deleteMany({ where: { id: { in: own } } }),
     prisma.companionMessage.deleteMany({ where: { kidId: { in: centre } } }),
     prisma.scheduleSlot.deleteMany({ where: { kidId: { in: centre } } }),
     prisma.visualSchedule.deleteMany({ where: { kidId: { in: centre }, source: "PARENT" } }),
-    prisma.mediaAsset.deleteMany({ where: { uploadedByParentId: parentId } }),
     prisma.kid.updateMany({ where: { id: { in: centre } }, data: { parentId: null } }),
     prisma.parentVerificationCode.deleteMany({ where: { email: parent.email } }),
     prisma.parent.delete({ where: { id: parentId } })
   ]);
-  await mediaService.removeFiles(ownPictures.map((p) => p.storageKey));
+  await mediaService.removeAssets(ownPictures, "DELETED_WITH_ACCOUNT");
   return { email: parent.email, kidsDeleted: own.length, kidsUnlinked: centre.length };
 }
 

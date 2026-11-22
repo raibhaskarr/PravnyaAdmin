@@ -85,8 +85,17 @@ export function printSchedule(s: { title: string; kind: VisualScheduleKind; step
 }
 
 export function Thumb({ picture, size = 64 }: { picture: SchedulePicture | null; size?: number }) {
+  // Photo links expire after about an hour; a page left open longer needs a reload to show them.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (picture?.url && failedUrl === picture.url) {
+    return (
+      <div title="Reload the page to show this photo again" style={{ width: size, height: size, borderRadius: 8, border: "1px dashed #bbb", display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 10, textAlign: "center" }}>
+        Reload to show
+      </div>
+    );
+  }
   return picture?.url ? (
-    <img src={assetUrl(picture.url)} alt="" style={{ width: size, height: size, objectFit: "contain", borderRadius: 8, background: "#fff", border: "1px solid var(--border, #ddd)" }} />
+    <img src={assetUrl(picture.url)} alt="" onError={() => setFailedUrl(picture.url ?? null)} style={{ width: size, height: size, objectFit: "contain", borderRadius: 8, background: "#fff", border: "1px solid var(--border, #ddd)" }} />
   ) : (
     <div style={{ width: size, height: size, borderRadius: 8, border: "1px dashed #bbb", display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 11 }}>No picture</div>
   );

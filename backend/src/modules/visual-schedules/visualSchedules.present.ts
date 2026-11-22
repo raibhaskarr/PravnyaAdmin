@@ -1,14 +1,14 @@
 import { prisma } from "../../config/prisma";
 import { badRequest } from "../../common/errors/AppError";
-import { mediaPath } from "../media/media.service";
+import { mediaPath, type Viewer } from "../media/media.service";
 import { getSymbol } from "../symbols/symbols";
 import type { Step } from "./visualSchedules.schemas";
 
-/** Steps as the apps show them: each picture with a link to it. */
-export function present(steps: Step[]) {
+/** Steps as the apps show them: each picture with a link to it, made for this viewer only. */
+export function present(steps: Step[], viewer: Viewer) {
   return steps.map((s) => {
     if (!s.picture) return { ...s, picture: null };
-    if (s.picture.kind === "photo") return { ...s, picture: { ...s.picture, url: mediaPath(s.picture.mediaId) } };
+    if (s.picture.kind === "photo") return { ...s, picture: { ...s.picture, url: mediaPath(s.picture.mediaId, viewer) } };
     const sym = getSymbol(s.picture.symbolId);
     return { ...s, picture: sym ? { ...s.picture, url: sym.url } : null };
   });

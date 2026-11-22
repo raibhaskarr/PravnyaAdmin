@@ -214,6 +214,21 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
       .catch(() => setVisualSchedules([]));
   }
 
+  // Photo links last about an hour: fetch fresh ones every 30 minutes and when the app comes back.
+  useEffect(() => {
+    if (!kid) return;
+    const kidId = kid.id;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void loadSchedules(kidId);
+    };
+    const timer = setInterval(refresh, 30 * 60_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [token, kid?.id]);
+
   // Reminders: keep this device's subscription fresh, and open a schedule when a reminder is tapped
   // while the app is already open.
   useEffect(() => {

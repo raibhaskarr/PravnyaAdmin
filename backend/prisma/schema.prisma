@@ -185,6 +185,7 @@ model Tenant {
   visualSchedules VisualSchedule[]
   mediaAssets MediaAsset[]
   scheduleTemplates VisualScheduleTemplate[]
+  mediaAuditEvents MediaAuditEvent[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -1061,6 +1062,9 @@ model MediaAsset {
   uploadedBy       User?    @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   /// Set when the parent uploaded it (for a schedule they made); removed when their account is deleted.
   uploadedByParentId String? @db.Uuid
+  /// When no schedule or template used it any more (set by the daily clean-up; cleared if it's used
+  /// again). Deleted, file and row, 7 days after.
+  unusedSince      DateTime?
   storageKey       String   @unique
   mimeType         String
   bytes            Int
@@ -1181,4 +1185,24 @@ model VisualScheduleTemplate {
   updatedAt       DateTime           @updatedAt
 
   @@index([tenantId])
+}
+
+/// Who uploaded or deleted which picture of which child, and when. Kept after the picture is gone;
+/// holds no picture or personal content.
+model MediaAuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Plain ids, not relations: the record outlives the picture.
+  mediaId    String   @db.Uuid
+  kidId      String?  @db.Uuid
+  /// "UPLOADED", "DELETED_UNUSED" (daily clean-up) or "DELETED_WITH_ACCOUNT".
+  action     String
+  /// "STAFF", "PARENT" or "SYSTEM".
+  actorKind  String
+  actorId    String?  @db.Uuid
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([kidId, createdAt])
 }
