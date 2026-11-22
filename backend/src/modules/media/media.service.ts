@@ -132,12 +132,16 @@ async function removeFiles(storageKeys: string[]) {
   }
 }
 
-/** Ids of photos some schedule or template still shows. */
+/** Ids of photos some schedule, AAC board or template still shows. */
 async function referencedPhotoIds() {
   const rows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT DISTINCT (e->'picture'->>'mediaId') AS id FROM "VisualSchedule" v, jsonb_array_elements(v.steps) e WHERE e->'picture'->>'kind' = 'photo'
     UNION
-    SELECT DISTINCT (e->'picture'->>'mediaId') AS id FROM "VisualScheduleTemplate" t, jsonb_array_elements(t.steps) e WHERE e->'picture'->>'kind' = 'photo'`;
+    SELECT DISTINCT (e->'picture'->>'mediaId') AS id FROM "VisualScheduleTemplate" t, jsonb_array_elements(t.steps) e WHERE e->'picture'->>'kind' = 'photo'
+    UNION
+    SELECT DISTINCT (c->'picture'->>'mediaId') AS id FROM "AacBoard" b, jsonb_array_elements(b.pages) p, jsonb_array_elements(p->'cells') c WHERE c->'picture'->>'kind' = 'photo'
+    UNION
+    SELECT DISTINCT (c->'picture'->>'mediaId') AS id FROM "AacBoardTemplate" b, jsonb_array_elements(b.pages) p, jsonb_array_elements(p->'cells') c WHERE c->'picture'->>'kind' = 'photo'`;
   return rows.map((r) => r.id).filter((id): id is string => !!id);
 }
 

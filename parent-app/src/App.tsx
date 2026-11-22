@@ -7,6 +7,7 @@ import { ForgotPassword } from "./auth/ForgotPassword";
 import { Home } from "./home/Home";
 import { DeleteAccountInfo } from "./account/Account";
 import { clearStoredToken, getStoredToken, setStoredToken } from "./session";
+import { clearOfflineData } from "./offline";
 
 type Phase = "welcome" | "login" | "forgotPassword" | "onboarding" | "home" | "deleteInfo";
 
@@ -36,6 +37,7 @@ export function App() {
   }
 
   function signOut() {
+    void clearOfflineData();
     clearStoredToken();
     setToken(null);
     setPhase("welcome");

@@ -41,6 +41,7 @@ import { parentAccountRoutes } from "./modules/parent-account/parentAccount.rout
 import { iepPlansRoutes, parentIepPlansRoutes } from "./modules/iep-plans/iepPlans.routes";
 import { parentCentresRoutes } from "./modules/parent-centres/parentCentres.routes";
 import { mediaRoutes, parentMediaRoutes } from "./modules/media/media.routes";
+import { aacBoardsRoutes, aacTemplatesRoutes, parentAacRoutes } from "./modules/aac/aac.routes";
 import { parentPushRoutes } from "./modules/push/push.routes";
 import { symbolsRoutes } from "./modules/symbols/symbols.routes";
 import { visualSchedulesRoutes, parentVisualSchedulesRoutes } from "./modules/visual-schedules/visualSchedules.routes";
@@ -71,6 +72,8 @@ export function createApp() {
   app.use("/api/parent-kids/:kidId/media", express.json({ limit: "5mb" }));
   // A parent describing a schedule out loud.
   app.use("/api/parent-kids/:kidId/visual-schedules/draft", express.json({ limit: "6mb" }));
+  // A big AAC board (up to 40 pages of 80 buttons) is a few hundred KB of JSON.
+  app.use(["/api/aac-boards", "/api/aac-templates", "/api/parent-kids/:kidId/aac-board"], express.json({ limit: "4mb" }));
   app.use(express.json({ limit: "2mb" }));
 
   app.get("/health", async (_req, res) => {
@@ -131,6 +134,9 @@ export function createApp() {
   app.use("/api/parent-kids", parentScheduleTemplatesRoutes);
   app.use("/api/parent-kids", parentMediaRoutes);
   app.use("/api/parent-push", parentPushRoutes);
+  app.use("/api/aac-boards", aacBoardsRoutes);
+  app.use("/api/aac-templates", aacTemplatesRoutes);
+  app.use("/api/parent-kids", parentAacRoutes);
 
   // Test-only: lets E2E tests (a separate process) read emails the memory provider captured, e.g.
   // a parent's sign-up verification code. Never registered outside NODE_ENV=test.

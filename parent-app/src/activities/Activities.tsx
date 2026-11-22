@@ -119,7 +119,9 @@ export function Activities({
   onStartPractice,
   visualSchedules = [],
   onOpenSchedule,
-  onMakeSchedule
+  onMakeSchedule,
+  hasAacBoard = false,
+  onOpenAac
 }: {
   token: string;
   kidId: string;
@@ -134,6 +136,9 @@ export function Activities({
   onOpenSchedule?: (id: string) => void;
   /** The parent makes their own (Pravnya drafts it from what they type or say). */
   onMakeSchedule?: () => void;
+  /** The child's talking (AAC) board: open it, or set one up. */
+  hasAacBoard?: boolean;
+  onOpenAac?: () => void;
 }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [practice, setPractice] = useState<PracticeStatus | null>(null);
@@ -220,6 +225,20 @@ export function Activities({
                 {sessions.map((s) => (
                   <SessionCard key={s.id} session={s} onStart={() => onStartSession(s.id)} />
                 ))}
+              </section>
+            ) : null}
+            {onOpenAac ? (
+              <section className="flex flex-col gap-2.5">
+                <h2 className="text-[0.78rem] font-bold uppercase tracking-wide text-[var(--pv-ink-faint)]">Talking board (AAC)</h2>
+                <button type="button" onClick={onOpenAac} className="flex items-center gap-3 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] p-4 text-left">
+                  <span className="text-2xl">🗣️</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[1rem] font-semibold text-[var(--pv-ink)]">{hasAacBoard ? `Open ${kidName}'s board` : "Set up a talking board"}</span>
+                    <span className="block text-xs text-[var(--pv-ink-faint)]">
+                      {hasAacBoard ? "Tap pictures to say words. Hold \"Hold to edit\" to change it." : `Pictures ${kidName} taps to say words out loud, in English or Hindi.`}
+                    </span>
+                  </span>
+                </button>
               </section>
             ) : null}
             {onOpenSchedule && (visualSchedules.length > 0 || onMakeSchedule) ? (

@@ -26,6 +26,7 @@ function navItemsForRole(role: AuthUser["role"]): NavItem[] {
       { to: "/admin/taxonomy", label: "Taxonomy", icon: "pi pi-sitemap" },
       { to: "/admin/home-guides", label: "Home activity guides", icon: "pi pi-home" },
       { to: "/admin/schedule-templates", label: "Schedule templates", icon: "pi pi-images" },
+      { to: "/admin/aac-templates", label: "AAC templates", icon: "pi pi-th-large" },
       { to: "/admin/poc-review", label: "AI Tagging POC", icon: "pi pi-chart-line" },
       { to: "/admin/superadmins", label: "Superadmins", icon: "pi pi-shield" },
       { to: "/manual", label: "Manual", icon: "pi pi-book" }
@@ -42,6 +43,7 @@ function navItemsForRole(role: AuthUser["role"]): NavItem[] {
     ...(role !== "THERAPIST" ? [{ to: "/tenant/parents", label: "Parents", icon: "pi pi-home" }] : []),
     { to: "/tenant/kids", label: "Kids", icon: "pi pi-id-card" },
     { to: "/tenant/schedule-templates", label: "Schedule templates", icon: "pi pi-images" },
+    { to: "/tenant/aac-templates", label: "AAC templates", icon: "pi pi-th-large" },
     ...(role === "TENANT_ADMIN" ? [{ to: "/tenant/profile", label: "Business Profile", icon: "pi pi-briefcase" }] : []),
     // A Therapist's "Account" page is mostly their own professional profile (DOB, bio, qualified
     // disciplines), not just password settings -- unlike other roles, that's worth a real nav

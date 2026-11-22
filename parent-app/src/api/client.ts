@@ -87,6 +87,38 @@ export type ScheduleFields = { title: string; kind: ScheduleKind; language: "en"
 
 export type SymbolResult = { id: string; label: string; url: string };
 
+// ---------- AAC (talking) boards ----------
+
+export type AacWordClass = "pronoun" | "verb" | "describe" | "noun" | "social" | "question" | "misc";
+export type AacCell = {
+  id: string;
+  row: number;
+  col: number;
+  kind: "word" | "folder";
+  label: string;
+  say: string | null;
+  picture: SchedulePicture | null;
+  wordClass: AacWordClass;
+  targetPageId: string | null;
+  hidden: boolean;
+};
+export type AacPage = { id: string; name: string; cells: AacCell[] };
+export type AacBoardFields = { name: string; language: "en" | "hi"; rows: number; cols: number; homePageId: string; pages: AacPage[] };
+export type AacBoard = AacBoardFields & { id: string; kidId: string; version: number; updatedByName: string; updatedAt: string; credit: string };
+export type AacTemplate = AacBoardFields & { id: string; scope: "PRAVNYA" | "CENTRE"; builtIn: boolean };
+
+/** The API stores pictures by symbol or photo id; links are only for showing them. */
+function toApiBoard(b: AacBoardFields): AacBoardFields {
+  return {
+    name: b.name,
+    language: b.language,
+    rows: b.rows,
+    cols: b.cols,
+    homePageId: b.homePageId,
+    pages: b.pages.map((p) => ({ id: p.id, name: p.name, cells: p.cells.map((c) => ({ ...c, picture: stripUrl(c as unknown as VisualScheduleStep).picture as SchedulePicture | null })) }))
+  };
+}
+
 /** A ready-made schedule from Pravnya or the child's centre, to start from. */
 export type ScheduleTemplate = { id: string; scope: "PRAVNYA" | "CENTRE"; title: string; kind: ScheduleKind; language: "en" | "hi"; steps: VisualScheduleStep[]; days: string[]; time: string | null };
 
@@ -490,6 +522,21 @@ export const api = {
   },
   draftVisualSchedule(token: string, kidId: string, body: { text?: string; audio?: { mimeType: string; base64: string }; kind: ScheduleKind | null; language: "en" | "hi" }) {
     return request<ScheduleDraft>(`/parent-kids/${kidId}/visual-schedules/draft`, { token, method: "POST", body });
+  },
+  getAacBoard(token: string, kidId: string) {
+    return request<{ board: AacBoard | null }>(`/parent-kids/${kidId}/aac-board`, { token });
+  },
+  createAacBoard(token: string, kidId: string, board: AacBoardFields) {
+    return request<AacBoard>(`/parent-kids/${kidId}/aac-board`, { token, method: "POST", body: toApiBoard(board) });
+  },
+  saveAacBoard(token: string, kidId: string, id: string, board: AacBoardFields, version: number) {
+    return request<AacBoard>(`/parent-kids/${kidId}/aac-board/${id}`, { token, method: "PUT", body: { ...toApiBoard(board), version } });
+  },
+  deleteAacBoard(token: string, kidId: string, id: string) {
+    return request<void>(`/parent-kids/${kidId}/aac-board/${id}`, { token, method: "DELETE" });
+  },
+  listAacTemplates(token: string, kidId: string, language: "en" | "hi") {
+    return request<AacTemplate[]>(`/parent-kids/${kidId}/aac-templates?language=${language}`, { token });
   },
   listScheduleTemplates(token: string, kidId: string, language: "en" | "hi") {
     return request<ScheduleTemplate[]>(`/parent-kids/${kidId}/schedule-templates?language=${language}`, { token });

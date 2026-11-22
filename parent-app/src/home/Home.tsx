@@ -7,7 +7,11 @@ import { TodaysSessionCard } from "../sessions/Sessions";
 import { TodaysSchedulesCard, VisualScheduleView } from "../schedules/VisualSchedules";
 import { ScheduleEditor, ScheduleMaker } from "../schedules/ScheduleMaker";
 import { refreshPush } from "../schedules/push";
-import { api, ApiError, type CompanionMessage, type Goal, type HomeSessionSummary, type IepPlan, type VisualSchedule, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
+import { AacTalk } from "../aac/AacTalk";
+import { AacEdit } from "../aac/AacEdit";
+import { AacSetup } from "../aac/AacSetup";
+import { loadBoardOffline, saveBoardOffline } from "../aac/shared";
+import { api, ApiError, type CompanionMessage, type Goal, type HomeSessionSummary, type IepPlan, type VisualSchedule, type AacBoard, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
@@ -20,7 +24,7 @@ import { computeNudge, NudgeCard } from "./nudges";
 import { computeOpener, OpenerCard } from "./opener";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates" | "iepPlans" | "session" | "visualSchedule" | "makeSchedule" | "editSchedule";
+type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates" | "iepPlans" | "session" | "visualSchedule" | "makeSchedule" | "editSchedule" | "aac" | "aacEdit" | "aacSetup";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
@@ -151,6 +155,9 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   // Picture schedules the therapist made; the one open full screen, and the tab to return to.
   const [visualSchedules, setVisualSchedules] = useState<VisualSchedule[]>([]);
   const [openSchedule, setOpenSchedule] = useState<{ id: string; returnTo: View } | null>(null);
+  // The child's talking (AAC) board: undefined while loading, null when there isn't one yet.
+  const [aacBoard, setAacBoard] = useState<AacBoard | null | undefined>(undefined);
+  const [aacReturnTo, setAacReturnTo] = useState<View>("home");
   // A tapped reminder opens the app at /?kid=..&schedule=..: open that schedule once it's loaded.
   const [linkedSchedule, setLinkedSchedule] = useState<{ kidId: string | null; scheduleId: string } | null>(() => {
     try {
@@ -208,7 +215,19 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
     void api.listIepPlans(token, kid.id).then(setIepPlans).catch(() => setIepPlans([]));
     void api.listSessions(token, kid.id).then(setSessions).catch(() => setSessions([]));
     void loadSchedules(kid.id);
+    void loadAac(kid.id);
   }, [token, kid?.id]);
+
+  function loadAac(kidId: string) {
+    return api
+      .getAacBoard(token, kidId)
+      ?.then((r) => {
+        setAacBoard(r?.board ?? null);
+        saveBoardOffline(kidId, r?.board ?? null);
+      })
+      // No connection: the copy kept on this phone, so the child can still talk.
+      .catch(() => setAacBoard(loadBoardOffline(kidId)));
+  }
 
   function loadSchedules(kidId: string) {
     return api
@@ -359,6 +378,61 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   function openVisualSchedule(id: string) {
     setOpenSchedule({ id, returnTo: view });
     setView("visualSchedule");
+  }
+
+  function openAac() {
+    setAacReturnTo(view);
+    setView(aacBoard ? "aac" : "aacSetup");
+  }
+
+  if (view === "aacSetup" && kid) {
+    return (
+      <AacSetup
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        onCancel={() => setView(aacReturnTo)}
+        onMade={(b) => {
+          setAacBoard(b);
+          saveBoardOffline(kid.id, b);
+          setView("aac");
+        }}
+      />
+    );
+  }
+
+  if (view === "aac" && kid && aacBoard) {
+    return <AacTalk board={aacBoard} onClose={() => setView(aacReturnTo)} onEdit={() => setView("aacEdit")} />;
+  }
+
+  if (view === "aacEdit" && kid && aacBoard) {
+    const board = aacBoard;
+    return (
+      <AacEdit
+        token={token}
+        kidId={kid.id}
+        initial={board}
+        onCancel={() => setView("aac")}
+        onSave={async (fields) => {
+          try {
+            const saved = await api.saveAacBoard(token, kid.id, board.id, fields, board.version);
+            setAacBoard(saved);
+            saveBoardOffline(kid.id, saved);
+            setView("aac");
+          } catch (err) {
+            // Changed by the therapist meanwhile: load theirs so the next save works.
+            if (err instanceof ApiError && err.status === 409) void loadAac(kid.id);
+            throw err;
+          }
+        }}
+        onDelete={async () => {
+          await api.deleteAacBoard(token, kid.id, board.id);
+          setAacBoard(null);
+          saveBoardOffline(kid.id, null);
+          setView(aacReturnTo);
+        }}
+      />
+    );
   }
 
   function closeSchedule() {
@@ -520,7 +594,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
       {activeTab === "growth" && kid ? (
         <Growth key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
       ) : activeTab === "activities" && kid ? (
-        <Activities key={kid.id + sessions.map((x) => x.lastRun?.id ?? "").join()} token={token} kidId={kid.id} kidName={kidName} sessions={sessions} onStartSession={startSession} onStartPractice={startPractice} visualSchedules={visualSchedules} onOpenSchedule={openVisualSchedule} onMakeSchedule={() => setView("makeSchedule")} />
+        <Activities key={kid.id + sessions.map((x) => x.lastRun?.id ?? "").join()} token={token} kidId={kid.id} kidName={kidName} sessions={sessions} onStartSession={startSession} onStartPractice={startPractice} visualSchedules={visualSchedules} onOpenSchedule={openVisualSchedule} onMakeSchedule={() => setView("makeSchedule")} hasAacBoard={!!aacBoard} onOpenAac={openAac} />
       ) : activeTab === "goals" && kid ? (
         <Goals
           key={kid.id}
@@ -612,6 +686,16 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
           {iepPlans[0] && !iepPlans[0].readAt ? <IepPlanCard plan={iepPlans[0]} kidName={kidName} onOpen={() => setView("iepPlans")} /> : null}
           {todaysSession ? <TodaysSessionCard session={todaysSession} kidName={kidName} onStart={() => startSession(todaysSession.id)} /> : null}
           <TodaysSchedulesCard token={token} schedules={visualSchedules} kidName={kidName} onOpen={openVisualSchedule} />
+          {aacBoard ? (
+            <button type="button" onClick={openAac} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] p-4 text-left">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--pv-green-100)] text-lg">🗣️</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.98rem] font-semibold text-[var(--pv-ink)]">{kidName}'s talking board</span>
+                <span className="block text-xs text-[var(--pv-ink-faint)]">Open it for {kidName} to tap and talk</span>
+              </span>
+              <span className="text-sm font-semibold text-[var(--pv-green-700)]">Open</span>
+            </button>
+          ) : null}
 
           {opener && kid ? (
             <OpenerCard
