@@ -599,6 +599,47 @@ describe("picture schedules", () => {
   });
 });
 
+describe("talking board (AAC)", () => {
+  const aacBoard = (): import("../api/client").AacBoard => ({
+    id: "b-1",
+    kidId: "kid-1",
+    name: "Sam's board",
+    language: "en",
+    rows: 1,
+    cols: 2,
+    homePageId: "home",
+    version: 1,
+    updatedByName: "Dr Rao",
+    updatedAt: "2026-11-20T10:00:00Z",
+    credit: "",
+    pages: [{ id: "home", name: "Home", cells: [{ id: "c1", row: 0, col: 0, kind: "word", label: "more", say: null, picture: null, wordClass: "describe", targetPageId: null, hidden: false, audio: null }] }]
+  });
+
+  test("Home opens the child's board; with no connection the copy kept on the phone opens", async () => {
+    mockApi.getAacBoard.mockResolvedValue({ board: aacBoard() });
+    renderHome();
+    await userEvent.click(await screen.findByRole("button", { name: /Sam's talking board/ }));
+    expect(await screen.findByRole("button", { name: "more" })).toBeInTheDocument();
+    cleanup();
+
+    mockApi.getAacBoard.mockRejectedValue(new TypeError("Failed to fetch"));
+    renderHome();
+    await userEvent.click(await screen.findByRole("button", { name: /Sam's talking board/ }));
+    expect(await screen.findByRole("button", { name: "more" })).toBeInTheDocument();
+  });
+
+  test("with no board yet, Activities offers to set one up", async () => {
+    mockApi.getAacBoard.mockResolvedValue({ board: null });
+    mockApi.listAacTemplates.mockResolvedValue([]);
+    renderHome();
+    await screen.findByText("Sam");
+    expect(screen.queryByRole("button", { name: /talking board/ })).not.toBeInTheDocument();
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Set up a talking board/ }));
+    expect(screen.getByText("Set up a talking board", { selector: "header p" })).toBeInTheDocument();
+  });
+});
+
 describe("practice sessions with Pravnya", () => {
   const status = (over: Partial<import("../api/client").PracticeStatus> = {}): import("../api/client").PracticeStatus => ({
     perDay: 2,

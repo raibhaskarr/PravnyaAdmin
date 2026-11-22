@@ -81,6 +81,7 @@ model User {
   visualSchedules VisualSchedule[]
   mediaAssets MediaAsset[]
   scheduleTemplates VisualScheduleTemplate[]
+  aacTemplates AacBoardTemplate[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -186,6 +187,8 @@ model Tenant {
   mediaAssets MediaAsset[]
   scheduleTemplates VisualScheduleTemplate[]
   mediaAuditEvents MediaAuditEvent[]
+  aacBoards AacBoard[]
+  aacTemplates AacBoardTemplate[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -389,6 +392,7 @@ model Kid {
   homeSessionRuns HomeSessionRun[]
   visualSchedules VisualSchedule[]
   mediaAssets MediaAsset[]
+  aacBoard AacBoard?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -1205,4 +1209,51 @@ model MediaAuditEvent {
 
   @@index([tenantId, createdAt])
   @@index([kidId, createdAt])
+}
+
+/// A child's AAC (talking) board: pages of word and folder buttons the child taps to speak. One per
+/// child, changed by their therapists and their parent. Pages are kept together as JSON (see
+/// modules/aac); `version` goes up on every save so two people editing at once can't overwrite
+/// each other unseen.
+model AacBoard {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId         String   @unique @db.Uuid
+  kid           Kid      @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  name          String
+  /// "en" or "hi": the voice the buttons speak in.
+  language      String   @default("en")
+  rows          Int
+  cols          Int
+  homePageId    String
+  /// [{ id, name, cells: [{ id, row, col, kind: "word" | "folder", label, say, picture, wordClass, targetPageId, hidden }] }]
+  pages         Json
+  version       Int      @default(1)
+  updatedByName String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// A ready-made AAC board to start from: Pravnya's (tenantId null; built-in ones have a builtInKey)
+/// or a centre's own. Starting from one copies it.
+model AacBoardTemplate {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String?  @db.Uuid
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  builtInKey      String?  @unique
+  name            String
+  language        String   @default("en")
+  rows            Int
+  cols            Int
+  homePageId      String
+  pages           Json
+  createdByUserId String?  @db.Uuid
+  createdBy       User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByName   String
+  archived        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
 }

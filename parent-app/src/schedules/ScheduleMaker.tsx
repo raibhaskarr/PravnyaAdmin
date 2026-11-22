@@ -49,7 +49,7 @@ function Screen({ title, onBack, children }: { title: string; onBack: () => void
 const input = "w-full rounded-xl border border-[var(--pv-border)] bg-[var(--pv-surface)] px-3 py-2 text-[0.95rem] text-[var(--pv-ink)]";
 const label = "text-[0.78rem] font-bold uppercase tracking-wide text-[var(--pv-ink-faint)]";
 
-function PicturePicker({ token, kidId, initialQuery, onPick, onClose }: { token: string; kidId: string; initialQuery: string; onPick: (p: SchedulePicture | null) => void; onClose: () => void }) {
+export function PicturePicker({ token, kidId, initialQuery, onPick, onClose }: { token: string; kidId: string; initialQuery: string; onPick: (p: SchedulePicture | null) => void; onClose: () => void }) {
   const [q, setQ] = useState(initialQuery);
   const [results, setResults] = useState<SymbolResult[]>([]);
   const [busy, setBusy] = useState(false);

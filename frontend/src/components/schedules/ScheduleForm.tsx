@@ -121,7 +121,7 @@ export function StepStrip({ steps }: { steps: VisualScheduleStep[] }) {
  */
 export type PhotoTarget = { kind: "kid"; kidId: string } | { kind: "centre" } | { kind: "none" };
 
-function PicturePicker({ photos, initialQuery, onPick, onClose }: { photos: PhotoTarget; initialQuery: string; onPick: (p: SchedulePicture | null) => void; onClose: () => void }) {
+export function PicturePicker({ photos, initialQuery, onPick, onClose }: { photos: PhotoTarget; initialQuery: string; onPick: (p: SchedulePicture | null) => void; onClose: () => void }) {
   const { token } = useAuth();
   const [q, setQ] = useState(initialQuery);
   const [results, setResults] = useState<SymbolResult[]>([]);

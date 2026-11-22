@@ -54,6 +54,9 @@ import type {
   VisualScheduleKind,
   VisualScheduleStep,
   ScheduleTemplate,
+  AacBoard,
+  AacBoardFields,
+  AacTemplate,
   SymbolResult
 } from "./types";
 
@@ -62,6 +65,26 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ?
 /** A picture link from the API: our own (signed) links are relative to the API server. */
 export function assetUrl(url: string) {
   return url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
+}
+
+/** The API stores pictures by symbol or photo id; links are only for showing them. */
+function toApiBoard(b: AacBoardFields): AacBoardFields {
+  return {
+    name: b.name,
+    language: b.language,
+    rows: b.rows,
+    cols: b.cols,
+    homePageId: b.homePageId,
+    pages: b.pages.map((p) => ({
+      id: p.id,
+      name: p.name,
+      cells: p.cells.map((c) => ({
+        ...c,
+        picture: c.picture && (c.picture.kind === "symbol" ? { kind: "symbol", symbolId: c.picture.symbolId } : { kind: "photo", mediaId: c.picture.mediaId }),
+        audio: c.audio ? { mediaId: c.audio.mediaId } : null
+      }))
+    }))
+  };
 }
 
 class ApiError extends Error {
@@ -414,6 +437,37 @@ export const api = {
   },
   uploadPicture(token: string, body: { kidId?: string; base64: string }) {
     return request<{ id: string; url: string }>("/media", { token, method: "POST", body });
+  },
+  // AAC boards
+  getAacBoard(token: string, kidId: string) {
+    return request<{ board: AacBoard | null }>(`/aac-boards?kidId=${kidId}`, { token });
+  },
+  createAacBoard(token: string, kidId: string, board: AacBoardFields) {
+    return request<AacBoard>("/aac-boards", { token, method: "POST", body: { kidId, ...toApiBoard(board) } });
+  },
+  saveAacBoard(token: string, id: string, board: AacBoardFields, version: number) {
+    return request<AacBoard>(`/aac-boards/${id}`, { token, method: "PUT", body: { ...toApiBoard(board), version } });
+  },
+  deleteAacBoard(token: string, id: string) {
+    return request<void>(`/aac-boards/${id}`, { token, method: "DELETE" });
+  },
+  listAacTemplates(token: string, language?: "en" | "hi") {
+    return request<AacTemplate[]>(`/aac-templates${language ? `?language=${language}` : ""}`, { token });
+  },
+  createAacTemplate(token: string, board: AacBoardFields) {
+    return request<AacTemplate>("/aac-templates", { token, method: "POST", body: toApiBoard(board) });
+  },
+  saveAacTemplate(token: string, id: string, board: AacBoardFields) {
+    return request<AacTemplate>(`/aac-templates/${id}`, { token, method: "PUT", body: toApiBoard(board) });
+  },
+  deleteAacTemplate(token: string, id: string) {
+    return request<void>(`/aac-templates/${id}`, { token, method: "DELETE" });
+  },
+  uploadAudio(token: string, kidId: string, base64: string) {
+    return request<{ id: string; url: string }>("/media/audio", { token, method: "POST", body: { kidId, base64 } });
+  },
+  aacTemplateFromBoard(token: string, boardId: string, name?: string) {
+    return request<AacTemplate & { droppedPhotos: number }>(`/aac-templates/from-board/${boardId}`, { token, method: "POST", body: { name } });
   },
   listHomeGuides(token: string) {
     return request<HomeGuideRow[]>("/home-guides", { token });

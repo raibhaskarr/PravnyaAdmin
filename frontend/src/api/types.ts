@@ -673,3 +673,30 @@ export type ScheduleTemplate = {
 };
 
 export type SymbolResult = { id: string; label: string; grammar: string; category: string; url: string };
+
+// ---------- AAC boards ----------
+
+export type AacWordClass = "pronoun" | "verb" | "describe" | "noun" | "social" | "question" | "misc";
+
+export type AacCell = {
+  id: string;
+  row: number;
+  col: number;
+  kind: "word" | "folder";
+  label: string;
+  say: string | null;
+  picture: SchedulePicture | null;
+  wordClass: AacWordClass;
+  targetPageId: string | null;
+  hidden: boolean;
+  /** Someone's recording of this word, played instead of the phone's voice. */
+  audio: { mediaId: string; url?: string } | null;
+};
+
+export type AacPage = { id: string; name: string; cells: AacCell[] };
+
+export type AacBoardFields = { name: string; language: "en" | "hi"; rows: number; cols: number; homePageId: string; pages: AacPage[] };
+
+export type AacBoard = AacBoardFields & { id: string; kidId: string; version: number; updatedByName: string; updatedAt: string };
+
+export type AacTemplate = AacBoardFields & { id: string; scope: "PRAVNYA" | "CENTRE"; builtIn: boolean; createdByName: string; canEdit: boolean; updatedAt: string };
