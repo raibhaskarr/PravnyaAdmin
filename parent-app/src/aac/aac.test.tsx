@@ -21,6 +21,7 @@ const cell = (row: number, col: number, label: string, over: Partial<AacCell> = 
   wordClass: "verb",
   targetPageId: null,
   hidden: false,
+  audio: null,
   ...over
 });
 
@@ -193,5 +194,86 @@ describe("setting up a board", () => {
     await user.click(await screen.findByRole("button", { name: /Core words/ }));
     expect(mockApi.createAacBoard).toHaveBeenCalledWith("tok", "kid-1", expect.objectContaining({ name: "Sam's board", rows: 2, cols: 3, homePageId: "home" }));
     expect(onMade).toHaveBeenCalled();
+  });
+});
+
+describe("recorded voices", () => {
+  let played: string[] = [];
+  beforeEach(() => {
+    played = [];
+    class FakeAudio {
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      src: string;
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() {
+        played.push(this.src);
+        setTimeout(() => this.onended?.(), 0);
+        return Promise.resolve();
+      }
+      pause() {}
+    }
+    vi.stubGlobal("Audio", FakeAudio);
+  });
+
+  test("a recorded word plays the recording, not the phone's voice; a sentence mixes both in order", async () => {
+    const user = userEvent.setup();
+    const b = board();
+    b.pages[0].cells = b.pages[0].cells.map((c) => (c.label === "want" ? { ...c, audio: { mediaId: "m-1", url: "https://api.example/api/media/m-1?v=p.x" } } : c));
+    render(<AacTalk board={b} onClose={() => {}} />);
+    await user.click(screen.getByRole("button", { name: "want" }));
+    expect(played).toEqual(["https://api.example/api/media/m-1?v=p.x"]);
+    expect(spoken).toEqual([]);
+
+    await user.click(screen.getByRole("button", { name: "I" }));
+    expect(spoken.map((s) => s.text)).toEqual(["I"]);
+    spoken = [];
+    played = [];
+    await user.click(screen.getByRole("button", { name: "Say: want I" }));
+    await vi.waitFor(() => expect(spoken.map((s) => s.text)).toEqual(["I"]));
+    expect(played).toHaveLength(1);
+  });
+
+  test("the parent records their voice for a button; it's uploaded and saved with the board", async () => {
+    const user = userEvent.setup();
+    const stop = vi.fn();
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop }] })) } });
+    class FakeRecorder {
+      static isTypeSupported = () => true;
+      state = "inactive";
+      mimeType = "audio/webm";
+      ondataavailable: ((e: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() {
+        this.state = "recording";
+      }
+      stop() {
+        this.state = "inactive";
+        this.ondataavailable?.({ data: new Blob(["voice"], { type: "audio/webm" }) });
+        this.onstop?.();
+      }
+    }
+    vi.stubGlobal("MediaRecorder", FakeRecorder);
+    mockApi.uploadAudio.mockResolvedValue({ id: "11111111-2222-4333-8444-555555555555", url: "/api/media/11111111-2222-4333-8444-555555555555?v=p.x" });
+    const onSave = vi.fn(async (_b: import("../api/client").AacBoardFields) => {});
+    render(<AacEdit token="tok" kidId="kid-1" initial={board()} onSave={onSave} onCancel={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Change want" }));
+    await user.click(screen.getByRole("button", { name: "🎤 Record your voice" }));
+    await user.click(await screen.findByRole("button", { name: /Stop/ }));
+    expect(await screen.findByRole("button", { name: "🎤 Record again" })).toBeInTheDocument();
+    expect(mockApi.uploadAudio).toHaveBeenCalledWith("tok", "kid-1", expect.any(String));
+    expect(stop).toHaveBeenCalled(); // the microphone is released
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    await user.click(screen.getByRole("button", { name: "Save board" }));
+    const want = onSave.mock.calls[0][0].pages[0].cells.find((c) => c.label === "want")!;
+    expect(want.audio?.mediaId).toBe("11111111-2222-4333-8444-555555555555");
+
+    // Back to the phone's voice.
+    await user.click(screen.getByRole("button", { name: "Change want" }));
+    await user.click(screen.getByRole("button", { name: "Use the phone's voice" }));
+    expect(screen.getByRole("button", { name: "🎤 Record your voice" })).toBeInTheDocument();
   });
 });

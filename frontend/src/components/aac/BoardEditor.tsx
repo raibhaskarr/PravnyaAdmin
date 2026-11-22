@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { Dropdown } from "primereact/dropdown";
 import { InputNumber } from "primereact/inputnumber";
 import { InputText } from "primereact/inputtext";
-import { assetUrl } from "../../api/client";
+import { api, ApiError, assetUrl } from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 import type { AacBoardFields, AacCell, AacPage, AacWordClass } from "../../api/types";
 import { LANGUAGES, PicturePicker, SYMBOL_CREDIT, type PhotoTarget } from "../schedules/ScheduleForm";
 
@@ -59,6 +60,82 @@ function CellFace({ cell, size }: { cell: AacCell; size: number }) {
   );
 }
 
+const AUDIO_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+
+/** Record a voice for a button on a child's board (a therapist's pronunciation of a target word). */
+function VoiceControl({ kidId, cell, language, disabled, onChange }: { kidId: string; cell: AacCell; language: "en" | "hi"; disabled: boolean; onChange: (audio: AacCell["audio"]) => void }) {
+  const { token } = useAuth();
+  const [recording, setRecording] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const rec = useRef<MediaRecorder | null>(null);
+  useEffect(() => () => (rec.current?.state === "recording" ? rec.current.stop() : undefined), []);
+
+  async function start() {
+    setError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = AUDIO_TYPES.find((t) => MediaRecorder.isTypeSupported(t));
+      const r = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: Blob[] = [];
+      r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      r.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        const blob = new Blob(chunks, { type: r.mimeType || "audio/webm" });
+        if (!blob.size) return;
+        setBusy(true);
+        try {
+          const dataUrl = await new Promise<string>((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result as string);
+            fr.onerror = () => rej(fr.error);
+            fr.readAsDataURL(blob);
+          });
+          const { id, url } = await api.uploadAudio(token!, kidId, dataUrl.slice(dataUrl.indexOf(",") + 1));
+          onChange({ mediaId: id, url });
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : "Couldn't save the recording.");
+        } finally {
+          setBusy(false);
+        }
+      };
+      rec.current = r;
+      r.start();
+      setRecording(true);
+      setTimeout(() => r.state === "recording" && r.stop(), 10_000);
+    } catch {
+      setError("Couldn't use the microphone. Allow it in the browser and try again.");
+    }
+  }
+
+  function play() {
+    if (cell.audio?.url) void new Audio(assetUrl(cell.audio.url)).play().catch(() => {});
+    else {
+      const u = new SpeechSynthesisUtterance(cell.say ?? cell.label);
+      u.lang = language === "hi" ? "hi-IN" : "en-IN";
+      window.speechSynthesis?.speak(u);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+      <span className="field-label">Voice</span>
+      {!disabled ? (
+        recording ? (
+          <Button label="Stop recording" icon="pi pi-stop-circle" className="p-button-danger p-button-sm" onClick={() => rec.current?.stop()} />
+        ) : (
+          <Button label={cell.audio ? "Record again" : "Record a voice"} icon="pi pi-microphone" className="p-button-outlined p-button-sm" loading={busy} onClick={start} />
+        )
+      ) : null}
+      <Button label="Hear it" icon="pi pi-volume-up" className="p-button-text p-button-sm" onClick={play} />
+      {cell.audio && !disabled ? <Button label="Use the device voice" className="p-button-text p-button-danger p-button-sm" onClick={() => onChange(null)} /> : null}
+      <span className="hint-text">{cell.audio ? "A recording plays when this is tapped." : "No recording: the phone's voice says it."} Up to 10 seconds; it stays with this child only.</span>
+      {error ? <span className="error-text">{error}</span> : null}
+    </div>
+  );
+}
+
 export function BoardEditor({ value, onChange, disabled, photos }: { value: AacBoardFields; onChange: (b: AacBoardFields) => void; disabled: boolean; photos: PhotoTarget }) {
   const [pageId, setPageId] = useState(value.homePageId);
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(null);
@@ -97,7 +174,7 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
   function newCellAt(row: number, col: number) {
     if (disabled) return;
     setSelected({ row, col });
-    setCell({ id: uuid(), row, col, kind: "word", label: value.language === "hi" ? "नया शब्द" : "new word", say: null, picture: null, wordClass: "misc", targetPageId: null, hidden: false });
+    setCell({ id: uuid(), row, col, kind: "word", label: value.language === "hi" ? "नया शब्द" : "new word", say: null, picture: null, wordClass: "misc", targetPageId: null, hidden: false, audio: null });
   }
 
   return (
@@ -241,6 +318,11 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
             ) : null}
           </div>
           {sel.kind === "folder" && !sel.targetPageId ? <span className="error-text">Choose the page this folder opens.</span> : null}
+          {photos.kind === "kid" ? (
+            <VoiceControl kidId={photos.kidId} cell={sel} language={value.language} disabled={disabled} onChange={(audio) => setCell({ ...sel, audio })} />
+          ) : (
+            <span className="hint-text">Voice recordings belong to one child, so templates don't have them; add them on a child's board.</span>
+          )}
         </div>
       ) : null}
       {picking && sel ? (

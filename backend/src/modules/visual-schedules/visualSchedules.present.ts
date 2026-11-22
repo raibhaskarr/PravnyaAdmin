@@ -20,7 +20,7 @@ const photoIds = (steps: Step[]) => [...new Set(steps.flatMap((s) => (s.picture?
 export async function assertPhotosFitKid(kid: { id: string; tenantId: string }, steps: Step[]) {
   const ids = photoIds(steps);
   if (!ids.length) return;
-  const found = await prisma.mediaAsset.count({ where: { id: { in: ids }, OR: [{ kidId: kid.id }, { kidId: null, tenantId: kid.tenantId }] } });
+  const found = await prisma.mediaAsset.count({ where: { id: { in: ids }, mimeType: { startsWith: "image/" }, OR: [{ kidId: kid.id }, { kidId: null, tenantId: kid.tenantId }] } });
   if (found !== ids.length) throw badRequest("A photo on this schedule wasn't uploaded for this child");
 }
 
@@ -29,7 +29,7 @@ export async function assertPhotosFitTemplate(tenantId: string | null, steps: St
   const ids = photoIds(steps);
   if (!ids.length) return;
   if (!tenantId) throw badRequest("Pravnya templates use symbols only (photos belong to a centre)");
-  const found = await prisma.mediaAsset.count({ where: { id: { in: ids }, kidId: null, tenantId } });
+  const found = await prisma.mediaAsset.count({ where: { id: { in: ids }, mimeType: { startsWith: "image/" }, kidId: null, tenantId } });
   if (found !== ids.length) throw badRequest("A photo on this template isn't one of this centre's template photos");
 }
 

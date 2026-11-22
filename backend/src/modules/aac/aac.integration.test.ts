@@ -16,7 +16,7 @@ import { boardFieldsSchema } from "./aac.schemas";
 
 type Board = { id: string; name: string; language: string; rows: number; cols: number; homePageId: string; version: number; pages: Page[] };
 type Page = { id: string; name: string; cells: Cell[] };
-type Cell = { id: string; row: number; col: number; kind: string; label: string; say: string | null; picture: { kind: string; symbolId?: string; mediaId?: string; url?: string } | null; wordClass: string; targetPageId: string | null; hidden: boolean };
+type Cell = { id: string; row: number; col: number; kind: string; label: string; say: string | null; picture: { kind: string; symbolId?: string; mediaId?: string; url?: string } | null; wordClass: string; targetPageId: string | null; hidden: boolean; audio?: { mediaId: string; url?: string } | null };
 type Template = Board & { scope: string; builtIn: boolean; builtInKey: string | null; canEdit: boolean };
 
 async function png() {
@@ -31,7 +31,10 @@ function fields(b: Pick<Board, "name" | "language" | "rows" | "cols" | "homePage
     rows: b.rows,
     cols: b.cols,
     homePageId: b.homePageId,
-    pages: b.pages.map((p) => ({ ...p, cells: p.cells.map((c) => ({ ...c, picture: c.picture && (c.picture.kind === "symbol" ? { kind: "symbol", symbolId: c.picture.symbolId } : { kind: "photo", mediaId: c.picture.mediaId }) })) }))
+    pages: b.pages.map((p) => ({
+      ...p,
+      cells: p.cells.map((c) => ({ ...c, picture: c.picture && (c.picture.kind === "symbol" ? { kind: "symbol", symbolId: c.picture.symbolId } : { kind: "photo", mediaId: c.picture.mediaId }), audio: c.audio ? { mediaId: c.audio.mediaId } : null }))
+    }))
   };
 }
 
@@ -166,6 +169,63 @@ describe("AAC boards", () => {
     const left = new Set((await prisma.mediaAsset.findMany({ select: { id: true } })).map((m) => m.id));
     assert.ok(left.has(mine.id) && left.has(centre.id));
     assert.ok(!left.has(theirs.id)); // never used anywhere
+  });
+
+  test("voice recordings: only real audio, only that child's, played through per-viewer links, never put in templates", async () => {
+    const w = await world();
+    // The start of a WebM file (what Chrome and Android record), then some bytes.
+    const webm = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(2000, 7)]).toString("base64");
+    const m4a = Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from("ftypM4A "), Buffer.alloc(2000, 1)]).toString("base64");
+
+    const mine = await api().post(`/api/parent-kids/${w.kid.id}/media/audio`).set(bearer(w.fam.token)).send({ base64: webm });
+    assert.equal(mine.status, 201, JSON.stringify(mine.body));
+    const iphone = await api().post(`/api/parent-kids/${w.kid.id}/media/audio`).set(bearer(w.fam.token)).send({ base64: m4a });
+    assert.equal(iphone.status, 201);
+    assert.equal((await prisma.mediaAsset.findUniqueOrThrow({ where: { id: iphone.body.id } })).mimeType, "audio/mp4");
+    const therapists = await api().post("/api/media/audio").set(bearer(w.therapist.token)).send({ kidId: w.kid.id, base64: webm });
+    assert.equal(therapists.status, 201);
+
+    // A picture isn't a recording, and a recording isn't a picture.
+    const notAudio = await api().post(`/api/parent-kids/${w.kid.id}/media/audio`).set(bearer(w.fam.token)).send({ base64: await png() });
+    assert.equal(notAudio.body.error.code, "NOT_AUDIO");
+    assert.equal((await api().post(`/api/parent-kids/${w.kid.id}/media`).set(bearer(w.fam.token)).send({ base64: webm })).status, 400);
+    // Not for someone else's child, and not too long.
+    assert.equal((await api().post(`/api/parent-kids/${w.otherKid.id}/media/audio`).set(bearer(w.fam.token)).send({ base64: webm })).status, 404);
+    assert.equal((await api().post("/api/media/audio").set(bearer(w.unlinked.token)).send({ kidId: w.kid.id, base64: webm })).status, 403);
+    const long = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(1024 * 1024 + 10)]).toString("base64");
+    assert.equal((await api().post(`/api/parent-kids/${w.kid.id}/media/audio`).set(bearer(w.fam.token)).send({ base64: long })).status, 400);
+    const othersVoice = (await api().post("/api/media/audio").set(bearer(w.admin.token)).send({ kidId: w.otherKid.id, base64: webm })).body;
+
+    const b = smallBoard();
+    const board = (cells: Cell[]) => ({ ...b, pages: [{ ...b.pages[0], cells }] });
+    // Another child's recording, or a recording used as a photo, is refused.
+    assert.equal((await api().post(parentUrl(w)).set(bearer(w.fam.token)).send(board([cell(0, 0, "more", { audio: { mediaId: othersVoice.id } })]))).status, 400);
+    assert.equal((await api().post(parentUrl(w)).set(bearer(w.fam.token)).send(board([cell(0, 0, "more", { picture: { kind: "photo", mediaId: mine.body.id } })]))).status, 400);
+
+    const made = await api().post(parentUrl(w)).set(bearer(w.fam.token)).send(board([cell(0, 0, "paani", { audio: { mediaId: mine.body.id } }), cell(0, 1, "more", { audio: { mediaId: therapists.body.id } })]));
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    const url = made.body.pages[0].cells[0].audio.url as string;
+    assert.match(url, new RegExp(`^/api/media/${mine.body.id}\\?v=p\\.${w.fam.parent.id}`));
+    const played = await api().get(url);
+    assert.equal(played.status, 200);
+    assert.equal(played.headers["content-type"], "audio/webm");
+    // Another family can't play it even with a link made for them.
+    const { mediaPath } = await import("../media/media.service");
+    assert.equal((await api().get(mediaPath(mine.body.id, { kind: "parent", id: w.otherFam.parent.id }))).status, 404);
+
+    // Templates never carry a child's voice.
+    const tpl = await api().post("/api/aac-templates").set(bearer(w.admin.token)).send(board([cell(0, 0, "more", { audio: { mediaId: therapists.body.id } })]));
+    assert.equal(tpl.status, 400);
+    const saved = await api().post(`/api/aac-templates/from-board/${made.body.id}`).set(bearer(w.therapist.token)).send({});
+    assert.equal(saved.status, 201);
+    assert.ok(saved.body.pages[0].cells.every((c: Cell) => c.audio === null));
+
+    // The clean-up keeps recordings used on a board; an unused one goes.
+    await mediaService.cleanUpUnused(new Date());
+    await mediaService.cleanUpUnused(new Date(Date.now() + 30 * 86_400_000));
+    const left = new Set((await prisma.mediaAsset.findMany({ select: { id: true } })).map((m) => m.id));
+    assert.ok(left.has(mine.body.id) && left.has(therapists.body.id));
+    assert.ok(!left.has(iphone.body.id));
   });
 
   test("templates: centres make their own; save a board as one (child photos left out); parents see Pravnya's and their centre's", async () => {

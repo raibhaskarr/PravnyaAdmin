@@ -33,6 +33,15 @@ mediaRoutes.get(
 );
 
 mediaRoutes.post(
+  "/audio",
+  requireAuth,
+  requireTenantScope,
+  blockViewer,
+  validateRequest({ body: z.object({ kidId: z.string().uuid(), base64: z.string().min(1).max(1_500_000) }) }),
+  asyncHandler(async (req, res) => res.status(201).json(await mediaService.uploadAudio(req.user!, req.body)))
+);
+
+mediaRoutes.post(
   "/",
   requireAuth,
   requireTenantScope,
@@ -49,6 +58,11 @@ parentMediaRoutes.post(
   "/:kidId/media",
   validateRequest({ params: z.object({ kidId: z.string().uuid() }), body: z.object({ base64: z.string().min(1).max(4_200_000) }) }),
   asyncHandler(async (req, res) => res.status(201).json(await mediaService.uploadForParent(req.parent!.id, req.params.kidId, req.body.base64)))
+);
+parentMediaRoutes.post(
+  "/:kidId/media/audio",
+  validateRequest({ params: z.object({ kidId: z.string().uuid() }), body: z.object({ base64: z.string().min(1).max(1_500_000) }) }),
+  asyncHandler(async (req, res) => res.status(201).json(await mediaService.uploadAudioForParent(req.parent!.id, req.params.kidId, req.body.base64)))
 );
 parentMediaRoutes.get(
   "/:kidId/symbols",

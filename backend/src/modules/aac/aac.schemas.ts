@@ -23,7 +23,9 @@ export const cellSchema = z.object({
   wordClass: z.enum(WORD_CLASSES).default("misc"),
   /** For a folder: the page it opens. */
   targetPageId: id.nullable().default(null),
-  hidden: z.boolean().default(false)
+  hidden: z.boolean().default(false),
+  /** A recording someone made of this word (played instead of the phone's voice). */
+  audio: z.object({ mediaId: z.string().uuid() }).nullable().default(null)
 });
 export type Cell = z.infer<typeof cellSchema>;
 

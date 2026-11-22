@@ -689,6 +689,8 @@ export type AacCell = {
   wordClass: AacWordClass;
   targetPageId: string | null;
   hidden: boolean;
+  /** Someone's recording of this word, played instead of the phone's voice. */
+  audio: { mediaId: string; url?: string } | null;
 };
 
 export type AacPage = { id: string; name: string; cells: AacCell[] };

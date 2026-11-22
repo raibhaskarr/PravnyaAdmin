@@ -4,7 +4,7 @@ import type { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { assertOwnsKid } from "../../common/access/parentKidAccess";
 import { badRequest, conflict, forbidden, notFound } from "../../common/errors/AppError";
-import type { Viewer } from "../media/media.service";
+import { mediaPath, type Viewer } from "../media/media.service";
 import { SYMBOL_CREDIT } from "../symbols/symbols";
 import { assertPhotosFitKid, assertPhotosFitTemplate, present } from "../visual-schedules/visualSchedules.present";
 import type { Step } from "../visual-schedules/visualSchedules.schemas";
@@ -23,9 +23,27 @@ const allCells = (pages: Page[]) => pages.flatMap((p) => p.cells);
 // The picture checks take anything with a `picture`; cells have the same picture shape as steps.
 const asSteps = (pages: Page[]) => allCells(pages) as unknown as Step[];
 
-/** Pages as the apps show them: pictures with links made for this viewer. */
+/** Pages as the apps show them: pictures and recordings with links made for this viewer. */
 function presentPages(pages: Page[], viewer: Viewer) {
-  return pages.map((p) => ({ ...p, cells: present(p.cells as unknown as Step[], viewer) as unknown as (Cell & { picture: (Cell["picture"] & { url: string }) | null })[] }));
+  return pages.map((p) => ({
+    ...p,
+    cells: (present(p.cells as unknown as Step[], viewer) as unknown as Cell[]).map((c) => ({ ...c, audio: c.audio ? { ...c.audio, url: mediaPath(c.audio.mediaId, viewer) } : null }))
+  }));
+}
+
+const audioIds = (pages: Page[]) => [...new Set(allCells(pages).flatMap((c) => (c.audio ? [c.audio.mediaId] : [])))];
+
+/** Recordings on a child's board must be recordings made for that child. */
+async function assertAudioFitsKid(kidId: string, pages: Page[]) {
+  const ids = audioIds(pages);
+  if (!ids.length) return;
+  const found = await prisma.mediaAsset.count({ where: { id: { in: ids }, kidId, mimeType: { startsWith: "audio/" } } });
+  if (found !== ids.length) throw badRequest("A recording on this board wasn't made for this child");
+}
+
+/** Templates are shared with other families: never someone's voice. */
+function assertNoAudio(pages: Page[]) {
+  if (audioIds(pages).length) throw badRequest("Templates can't include voice recordings (they belong to one child). Remove them first.");
 }
 
 function presentBoard(b: AacBoard, viewer: Viewer) {
@@ -65,12 +83,14 @@ async function createFor(kid: { id: string; tenantId: string }, input: BoardFiel
     throw conflict("This child already has a board. Open it to change it, or delete it to start again.", "BOARD_EXISTS");
   }
   await assertPhotosFitKid(kid, asSteps(input.pages));
+  await assertAudioFitsKid(kid.id, input.pages);
   return prisma.aacBoard.create({ data: { tenantId: kid.tenantId, kidId: kid.id, ...input, pages: json(input.pages), updatedByName: by } });
 }
 
 /** Saves only if nobody else saved since `version` was loaded. */
 async function saveFor(board: AacBoard, input: BoardFields & { version: number }, by: string) {
   await assertPhotosFitKid({ id: board.kidId, tenantId: board.tenantId }, asSteps(input.pages));
+  await assertAudioFitsKid(board.kidId, input.pages);
   const { version, ...fields } = input;
   const res = await prisma.aacBoard.updateMany({ where: { id: board.id, version }, data: { ...fields, pages: json(fields.pages), version: { increment: 1 }, updatedByName: by } });
   if (res.count === 0) throw conflict("Someone else changed this board since you opened it. Reload it to see their changes, then make yours again.", "BOARD_CHANGED");
@@ -158,7 +178,8 @@ export async function ensureBuiltInBoards() {
               picture: symbolId ? { kind: "symbol" as const, symbolId } : null,
               wordClass: folder ? ("misc" as const) : cls,
               targetPageId: folder ? pageId.get(target!)! : null,
-              hidden: false
+              hidden: false,
+              audio: null
             }
           ];
         })
@@ -221,12 +242,14 @@ export const aacTemplatesService = {
   },
   async create(user: AuthUser, input: BoardFields) {
     const tenantId = user.role === "SUPERADMIN" ? null : user.tenantId!;
+    assertNoAudio(input.pages);
     await assertPhotosFitTemplate(tenantId, asSteps(input.pages));
     const t = await prisma.aacBoardTemplate.create({ data: { tenantId, ...input, pages: json(input.pages), createdByUserId: user.id, createdByName: await staffName(user) } });
     return viewTemplate(t, staffViewer(user), true);
   },
   async edit(user: AuthUser, id: string, input: BoardFields) {
     const t = await editableTemplate(user, id);
+    assertNoAudio(input.pages);
     await assertPhotosFitTemplate(t.tenantId, asSteps(input.pages));
     const row = await prisma.aacBoardTemplate.update({ where: { id }, data: { ...input, pages: json(input.pages) } });
     return viewTemplate(row, staffViewer(user), true);
@@ -247,7 +270,8 @@ export const aacTemplatesService = {
     let droppedPhotos = 0;
     const cleaned = pages.map((p) => ({
       ...p,
-      cells: p.cells.map((c) => (c.picture?.kind === "photo" && !keep.has(c.picture.mediaId) ? (droppedPhotos++, { ...c, picture: null }) : c))
+      // The child's voice recordings never go into a template.
+      cells: p.cells.map((c) => ({ ...(c.picture?.kind === "photo" && !keep.has(c.picture.mediaId) ? (droppedPhotos++, { ...c, picture: null }) : c), audio: null }))
     }));
     if (!name && !board.name) throw badRequest("Give the template a name");
     const t = await prisma.aacBoardTemplate.create({

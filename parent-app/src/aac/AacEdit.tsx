@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { ApiError, type AacBoardFields, type AacCell, type AacPage } from "../api/client";
+import { api, ApiError, type AacBoardFields, type AacCell, type AacPage } from "../api/client";
 import { PicturePicker } from "../schedules/ScheduleMaker";
 import { CellFace, WORD_CLASSES } from "./shared";
+import { MAX_RECORDING_MS, useBoardVoice, useRecorder } from "./voice";
 
 // The parent changes the board: tap a button to change it (words, picture, colour, hide it for
 // now), tap an empty square to add one, add or rename pages. Saving never overwrites a change the
@@ -10,6 +11,53 @@ import { CellFace, WORD_CLASSES } from "./shared";
 const uuid = () => crypto.randomUUID();
 const input = "w-full rounded-xl border border-[var(--pv-border)] bg-[var(--pv-surface)] px-3 py-2 text-[0.95rem] text-[var(--pv-ink)]";
 const label = "text-[0.78rem] font-bold uppercase tracking-wide text-[var(--pv-ink-faint)]";
+
+/** Record your own voice saying this word; it's played instead of the phone's voice. */
+function VoiceControl({ token, kidId, cell, lang, onChange }: { token: string; kidId: string; cell: AacCell; lang: string; onChange: (audio: AacCell["audio"]) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const voice = useBoardVoice(lang);
+  const recorder = useRecorder(async (base64) => {
+    setUploading(true);
+    setError("");
+    try {
+      const { id, url } = await api.uploadAudio(token, kidId, base64);
+      onChange({ mediaId: id, url });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save the recording. Try again.");
+    } finally {
+      setUploading(false);
+    }
+  });
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className={label}>Voice</span>
+      <div className="flex flex-wrap items-center gap-2">
+        {recorder.recording ? (
+          <button type="button" onClick={recorder.stop} className="rounded-xl border border-red-600 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+            ■ Stop (up to {MAX_RECORDING_MS / 1000} s)
+          </button>
+        ) : (
+          <button type="button" disabled={uploading} onClick={() => void recorder.start()} className="rounded-xl border border-[var(--pv-green-700)] px-3 py-2 text-sm font-semibold text-[var(--pv-green-700)] disabled:opacity-50">
+            {uploading ? "Saving…" : cell.audio ? "🎤 Record again" : "🎤 Record your voice"}
+          </button>
+        )}
+        <button type="button" onClick={() => void voice.say([cell])} className="rounded-xl border border-[var(--pv-border)] px-3 py-2 text-sm text-[var(--pv-ink-soft)]">
+          ▶ Hear it
+        </button>
+        {cell.audio ? (
+          <button type="button" onClick={() => onChange(null)} className="text-sm font-semibold text-red-600">
+            Use the phone's voice
+          </button>
+        ) : null}
+      </div>
+      <span className="text-xs text-[var(--pv-ink-faint)]">
+        {cell.audio ? "Your recording plays when this is tapped." : `Say "${cell.say ?? cell.label}" clearly. Otherwise the phone's voice says it.`}
+      </span>
+      {recorder.error || error ? <span className="text-xs text-red-600">{recorder.error || error}</span> : null}
+    </div>
+  );
+}
 
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
@@ -59,7 +107,7 @@ export function AacEdit({
   const setCell = (c: AacCell) => setPage({ ...page, cells: page.cells.map((x) => (x.id === c.id ? c : x)) });
 
   function addAt(row: number, col: number) {
-    const c: AacCell = { id: uuid(), row, col, kind: "word", label: hi ? "नया शब्द" : "new word", say: null, picture: null, wordClass: "misc", targetPageId: null, hidden: false };
+    const c: AacCell = { id: uuid(), row, col, kind: "word", label: hi ? "नया शब्द" : "new word", say: null, picture: null, wordClass: "misc", targetPageId: null, hidden: false, audio: null };
     setPage({ ...page, cells: [...page.cells, c] });
     setEditing(c.id);
   }
@@ -142,6 +190,7 @@ export function AacEdit({
               </button>
             </div>
           </div>
+          <VoiceControl token={token} kidId={kidId} cell={cell} lang={hi ? "hi-IN" : "en-IN"} onChange={(audio) => setCell({ ...cell, audio })} />
           <label className="flex flex-col gap-1">
             <span className={label}>Says (if different)</span>
             <input className={input} value={cell.say ?? ""} placeholder={cell.label} onChange={(e) => setCell({ ...cell, say: e.target.value || null })} maxLength={200} aria-label="Says" />

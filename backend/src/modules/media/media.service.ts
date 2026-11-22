@@ -26,6 +26,21 @@ const MAX_SIDE = 1600;
 /** Refuse decompression bombs: at most this many pixels in. */
 const MAX_INPUT_PIXELS = 40_000_000;
 export const UNUSED_DAYS = 7;
+/** A recorded word or short phrase (the apps stop recording at 10 seconds). */
+export const MAX_AUDIO_BYTES = 1024 * 1024;
+
+export type AudioType = "audio/webm" | "audio/mp4" | "audio/ogg";
+
+/**
+ * Detects a voice recording from its first bytes: WebM (Chrome, Android), MP4/M4A (Safari, iPhone)
+ * or Ogg. Anything else, pictures included, is refused.
+ */
+export function sniffAudio(buf: Buffer): AudioType | null {
+  if (buf.length > 4 && buf.readUInt32BE(0) === 0x1a45dfa3) return "audio/webm";
+  if (buf.length > 12 && buf.toString("ascii", 4, 8) === "ftyp" && /^(M4A |mp4|iso|MSNV|3gp)/.test(buf.toString("ascii", 8, 12))) return "audio/mp4";
+  if (buf.length > 4 && buf.toString("ascii", 0, 4) === "OggS") return "audio/ogg";
+  return null;
+}
 
 /** Who a link is for. */
 export type Viewer = { kind: "parent"; id: string } | { kind: "staff"; id: string };
@@ -122,6 +137,20 @@ async function store(kid: { id: string | null; tenantId: string }, base64: strin
   return { id, url: mediaPath(id, viewer) };
 }
 
+/** A voice recording for one child's board. Always the child's (never centre-wide). */
+async function storeAudio(kid: { id: string; tenantId: string }, base64: string, by: { uploadedByUserId?: string; uploadedByParentId?: string }, viewer: Viewer) {
+  const body = Buffer.from(base64, "base64");
+  if (body.length > MAX_AUDIO_BYTES) throw badRequest("That recording is too long. Keep it to a word or a short phrase.", "TOO_LARGE");
+  const mimeType = sniffAudio(body);
+  if (!mimeType) throw badRequest("That file isn't a voice recording.", "NOT_AUDIO");
+  const id = randomUUID();
+  const storageKey = `media/${kid.tenantId}/${kid.id}/${id}`;
+  await objectStorage.put(storageKey, body, mimeType);
+  await prisma.mediaAsset.create({ data: { id, tenantId: kid.tenantId, kidId: kid.id, ...by, storageKey, mimeType, bytes: body.length } });
+  await recordEvent({ id, tenantId: kid.tenantId, kidId: kid.id }, "UPLOADED", by.uploadedByParentId ? { kind: "PARENT", id: by.uploadedByParentId } : { kind: "STAFF", id: by.uploadedByUserId ?? null });
+  return { id, url: mediaPath(id, viewer) };
+}
+
 async function removeFiles(storageKeys: string[]) {
   for (const key of storageKeys) {
     try {
@@ -132,7 +161,7 @@ async function removeFiles(storageKeys: string[]) {
   }
 }
 
-/** Ids of photos some schedule, AAC board or template still shows. */
+/** Ids of photos and recordings some schedule, AAC board or template still uses. */
 async function referencedPhotoIds() {
   const rows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT DISTINCT (e->'picture'->>'mediaId') AS id FROM "VisualSchedule" v, jsonb_array_elements(v.steps) e WHERE e->'picture'->>'kind' = 'photo'
@@ -141,7 +170,9 @@ async function referencedPhotoIds() {
     UNION
     SELECT DISTINCT (c->'picture'->>'mediaId') AS id FROM "AacBoard" b, jsonb_array_elements(b.pages) p, jsonb_array_elements(p->'cells') c WHERE c->'picture'->>'kind' = 'photo'
     UNION
-    SELECT DISTINCT (c->'picture'->>'mediaId') AS id FROM "AacBoardTemplate" b, jsonb_array_elements(b.pages) p, jsonb_array_elements(p->'cells') c WHERE c->'picture'->>'kind' = 'photo'`;
+    SELECT DISTINCT (c->'picture'->>'mediaId') AS id FROM "AacBoardTemplate" b, jsonb_array_elements(b.pages) p, jsonb_array_elements(p->'cells') c WHERE c->'picture'->>'kind' = 'photo'
+    UNION
+    SELECT DISTINCT (c->'audio'->>'mediaId') AS id FROM "AacBoard" b, jsonb_array_elements(b.pages) p, jsonb_array_elements(p->'cells') c WHERE c->'audio'->>'mediaId' IS NOT NULL`;
   return rows.map((r) => r.id).filter((id): id is string => !!id);
 }
 
@@ -151,6 +182,16 @@ export const mediaService = {
     if (input.kidId) return store(await assertCanAccessKid(user, input.kidId), input.base64, { uploadedByUserId: user.id }, viewer);
     // Centre-wide (template photos).
     return store({ id: null, tenantId: user.tenantId! }, input.base64, { uploadedByUserId: user.id }, viewer);
+  },
+
+  /** A recording (a therapist saying a word) for a child's board. */
+  async uploadAudio(user: AuthUser, input: { kidId: string; base64: string }) {
+    return storeAudio(await assertCanAccessKid(user, input.kidId), input.base64, { uploadedByUserId: user.id }, { kind: "staff", id: user.id });
+  },
+
+  /** A parent's recording for their own child's board. */
+  async uploadAudioForParent(parentId: string, kidId: string, base64: string) {
+    return storeAudio(await assertOwnsKid(parentId, kidId), base64, { uploadedByParentId: parentId }, { kind: "parent", id: parentId });
   },
 
   /** A parent's photo for their own child's schedule. */

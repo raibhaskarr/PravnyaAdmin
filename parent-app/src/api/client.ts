@@ -101,6 +101,8 @@ export type AacCell = {
   wordClass: AacWordClass;
   targetPageId: string | null;
   hidden: boolean;
+  /** Someone's recording of this word, played instead of the phone's voice. */
+  audio: { mediaId: string; url: string } | null;
 };
 export type AacPage = { id: string; name: string; cells: AacCell[] };
 export type AacBoardFields = { name: string; language: "en" | "hi"; rows: number; cols: number; homePageId: string; pages: AacPage[] };
@@ -115,7 +117,11 @@ function toApiBoard(b: AacBoardFields): AacBoardFields {
     rows: b.rows,
     cols: b.cols,
     homePageId: b.homePageId,
-    pages: b.pages.map((p) => ({ id: p.id, name: p.name, cells: p.cells.map((c) => ({ ...c, picture: stripUrl(c as unknown as VisualScheduleStep).picture as SchedulePicture | null })) }))
+    pages: b.pages.map((p) => ({
+      id: p.id,
+      name: p.name,
+      cells: p.cells.map((c) => ({ ...c, picture: stripUrl(c as unknown as VisualScheduleStep).picture as SchedulePicture | null, audio: c.audio ? ({ mediaId: c.audio.mediaId } as AacCell["audio"]) : null }))
+    }))
   };
 }
 
@@ -534,6 +540,9 @@ export const api = {
   },
   deleteAacBoard(token: string, kidId: string, id: string) {
     return request<void>(`/parent-kids/${kidId}/aac-board/${id}`, { token, method: "DELETE" });
+  },
+  uploadAudio(token: string, kidId: string, base64: string) {
+    return request<{ id: string; url: string }>(`/parent-kids/${kidId}/media/audio`, { token, method: "POST", body: { base64 } });
   },
   listAacTemplates(token: string, kidId: string, language: "en" | "hi") {
     return request<AacTemplate[]>(`/parent-kids/${kidId}/aac-templates?language=${language}`, { token });

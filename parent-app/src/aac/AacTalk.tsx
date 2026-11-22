@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import { assetUrl, type AacBoard, type AacCell } from "../api/client";
-import { useSpeaker } from "../sessions/PravnyaGuide";
+import { useBoardVoice } from "./voice";
 import { CellFace } from "./shared";
 
-// The child's talking board, full screen. Tap a word: it's said aloud and added to the sentence at
+// The child's talking board, full screen. Tap a word: it's said aloud (in the recorded voice, if
+// someone recorded it, otherwise the phone's voice) and added to the sentence at
 // the top; tap the sentence (or Speak) to say it all. A folder opens its page; Back and Home move
 // between pages. Hidden buttons keep their square empty, so nothing moves as words are added.
 // Leaving needs a press-and-hold, so a tap by the child doesn't close it.
@@ -14,8 +15,7 @@ export function AacTalk({ board, onClose, onEdit }: { board: AacBoard; onClose: 
   const [pageId, setPageId] = useState(board.homePageId);
   const [history, setHistory] = useState<string[]>([]);
   const [sentence, setSentence] = useState<AacCell[]>([]);
-  const speaker = useSpeaker(true);
-  const lang = board.language === "hi" ? "hi-IN" : "en-IN";
+  const voice = useBoardVoice(board.language === "hi" ? "hi-IN" : "en-IN");
   const page = board.pages.find((p) => p.id === pageId) ?? board.pages[0];
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [holding, setHolding] = useState<"exit" | "edit" | null>(null);
@@ -29,7 +29,7 @@ export function AacTalk({ board, onClose, onEdit }: { board: AacBoard; onClose: 
       return;
     }
     setSentence((s) => [...s, cell].slice(-20));
-    speaker.speak(words([cell]), lang);
+    void voice.say([cell]);
   }
 
   function hold(what: "exit" | "edit", then: () => void) {
@@ -57,7 +57,7 @@ export function AacTalk({ board, onClose, onEdit }: { board: AacBoard; onClose: 
       <div className="flex items-stretch gap-2 border-b border-[var(--pv-border)] bg-white p-2">
         <button
           type="button"
-          onClick={() => sentence.length && speaker.speak([words(sentence).join(" ")], lang)}
+          onClick={() => sentence.length && void voice.say(sentence)}
           className="flex min-h-[64px] min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-xl border-2 border-[var(--pv-border)] px-2 text-left"
           aria-label={sentence.length ? `Say: ${words(sentence).join(" ")}` : "Your words show here"}
         >

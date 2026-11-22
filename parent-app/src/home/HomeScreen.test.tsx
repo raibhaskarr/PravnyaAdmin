@@ -612,7 +612,7 @@ describe("talking board (AAC)", () => {
     updatedByName: "Dr Rao",
     updatedAt: "2026-11-20T10:00:00Z",
     credit: "",
-    pages: [{ id: "home", name: "Home", cells: [{ id: "c1", row: 0, col: 0, kind: "word", label: "more", say: null, picture: null, wordClass: "describe", targetPageId: null, hidden: false }] }]
+    pages: [{ id: "home", name: "Home", cells: [{ id: "c1", row: 0, col: 0, kind: "word", label: "more", say: null, picture: null, wordClass: "describe", targetPageId: null, hidden: false, audio: null }] }]
   });
 
   test("Home opens the child's board; with no connection the copy kept on the phone opens", async () => {

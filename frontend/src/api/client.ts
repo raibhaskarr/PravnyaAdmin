@@ -78,7 +78,11 @@ function toApiBoard(b: AacBoardFields): AacBoardFields {
     pages: b.pages.map((p) => ({
       id: p.id,
       name: p.name,
-      cells: p.cells.map((c) => ({ ...c, picture: c.picture && (c.picture.kind === "symbol" ? { kind: "symbol", symbolId: c.picture.symbolId } : { kind: "photo", mediaId: c.picture.mediaId }) }))
+      cells: p.cells.map((c) => ({
+        ...c,
+        picture: c.picture && (c.picture.kind === "symbol" ? { kind: "symbol", symbolId: c.picture.symbolId } : { kind: "photo", mediaId: c.picture.mediaId }),
+        audio: c.audio ? { mediaId: c.audio.mediaId } : null
+      }))
     }))
   };
 }
@@ -458,6 +462,9 @@ export const api = {
   },
   deleteAacTemplate(token: string, id: string) {
     return request<void>(`/aac-templates/${id}`, { token, method: "DELETE" });
+  },
+  uploadAudio(token: string, kidId: string, base64: string) {
+    return request<{ id: string; url: string }>("/media/audio", { token, method: "POST", body: { kidId, base64 } });
   },
   aacTemplateFromBoard(token: string, boardId: string, name?: string) {
     return request<AacTemplate & { droppedPhotos: number }>(`/aac-templates/from-board/${boardId}`, { token, method: "POST", body: { name } });
