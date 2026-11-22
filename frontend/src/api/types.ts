@@ -617,3 +617,59 @@ export type HomeSession = {
   runs: HomeSessionRun[];
   skippedGoals?: string[];
 };
+
+// ---------- Visual schedules ----------
+
+export type SchedulePicture = { kind: "symbol"; symbolId: string; url?: string } | { kind: "photo"; mediaId: string; url?: string };
+
+export type VisualScheduleStep = {
+  key: string;
+  label: string;
+  say: string | null;
+  picture: SchedulePicture | null;
+  minutes: number | null;
+};
+
+export type VisualScheduleKind = "FIRST_THEN" | "ROUTINE" | "DAY";
+
+export type VisualSchedule = {
+  id: string;
+  kidId: string;
+  authorName: string;
+  title: string;
+  kind: VisualScheduleKind;
+  language: "en" | "hi";
+  steps: VisualScheduleStep[];
+  days: string[];
+  aiDrafted: boolean;
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  publishedAt: string | null;
+  createdAt: string;
+  /** PARENT: the parent made it in the app (read-only here). */
+  source: "THERAPIST" | "PARENT";
+  /** "HH:MM" set by the therapist or family; null = learned from use. */
+  time: string | null;
+  remind: boolean;
+  timing: { time: string | null; days: string[]; source: "set" | "learned" | null };
+  /** Days it was opened in the last 4 weeks. */
+  usedDays: number;
+  lastUsedAt: string | null;
+};
+
+/** A ready-made schedule: Pravnya's (built in, or added by a superadmin) or a centre's own. */
+export type ScheduleTemplate = {
+  id: string;
+  scope: "PRAVNYA" | "CENTRE";
+  builtIn: boolean;
+  title: string;
+  kind: VisualScheduleKind;
+  language: "en" | "hi";
+  steps: VisualScheduleStep[];
+  days: string[];
+  time: string | null;
+  createdByName: string;
+  canEdit: boolean;
+  updatedAt: string;
+};
+
+export type SymbolResult = { id: string; label: string; grammar: string; category: string; url: string };

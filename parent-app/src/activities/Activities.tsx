@@ -3,7 +3,8 @@ import { api, ApiError, type Goal, type GoalItemEvidence } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Walkthrough } from "./Walkthrough";
 import { PracticeCard, SessionCard } from "../sessions/Sessions";
-import type { HomeSessionSummary, PracticeStatus } from "../api/client";
+import type { HomeSessionSummary, PracticeStatus, VisualSchedule } from "../api/client";
+import { ScheduleCard, SYMBOL_CREDIT } from "../schedules/VisualSchedules";
 
 // Faithful port of the admin panel's realActivities.tsx -- "Activities" = confirmation prompts,
 // not practice suggestions. A centre logging evidence for a goal is one data point; it's stronger
@@ -115,7 +116,10 @@ export function Activities({
   kidName = "your child",
   sessions = [],
   onStartSession,
-  onStartPractice
+  onStartPractice,
+  visualSchedules = [],
+  onOpenSchedule,
+  onMakeSchedule
 }: {
   token: string;
   kidId: string;
@@ -125,6 +129,11 @@ export function Activities({
   onStartSession?: (sessionId: string) => void;
   /** A practice session Pravnya puts together from the child's goals. */
   onStartPractice?: (language: "en" | "hi") => void;
+  /** Picture schedules the therapist made, to show the child. */
+  visualSchedules?: VisualSchedule[];
+  onOpenSchedule?: (id: string) => void;
+  /** The parent makes their own (Pravnya drafts it from what they type or say). */
+  onMakeSchedule?: () => void;
 }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [practice, setPractice] = useState<PracticeStatus | null>(null);
@@ -211,6 +220,25 @@ export function Activities({
                 {sessions.map((s) => (
                   <SessionCard key={s.id} session={s} onStart={() => onStartSession(s.id)} />
                 ))}
+              </section>
+            ) : null}
+            {onOpenSchedule && (visualSchedules.length > 0 || onMakeSchedule) ? (
+              <section className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[0.78rem] font-bold uppercase tracking-wide text-[var(--pv-ink-faint)]">Picture schedules</h2>
+                  {onMakeSchedule ? (
+                    <button type="button" onClick={onMakeSchedule} className="text-sm font-semibold text-[var(--pv-green-700)]">
+                      + Make one
+                    </button>
+                  ) : null}
+                </div>
+                {visualSchedules.length === 0 ? (
+                  <p className="text-[0.85rem] text-[var(--pv-ink-faint)]">Picture schedules help {kidName} know what comes next: brushing teeth, getting ready, bedtime. Make one by typing or saying what you need.</p>
+                ) : null}
+                {visualSchedules.map((s) => (
+                  <ScheduleCard key={s.id} schedule={s} onOpen={() => onOpenSchedule(s.id)} />
+                ))}
+                {visualSchedules.length ? <p className="text-[0.65rem] text-[var(--pv-ink-faint)]">{SYMBOL_CREDIT}</p> : null}
               </section>
             ) : null}
             <section>

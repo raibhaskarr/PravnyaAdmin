@@ -7,3 +7,6 @@ dist/
 .env.test
 test-results/
 playwright-report/
+
+# Uploaded pictures when STORAGE_DRIVER=local (development and tests)
+backend/storage/

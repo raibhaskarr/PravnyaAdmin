@@ -32,6 +32,7 @@ beforeEach(() => {
   mockApi.listUpdates.mockResolvedValue([]);
   mockApi.listIepPlans.mockResolvedValue([]);
   mockApi.listSessions.mockResolvedValue([]);
+  mockApi.listVisualSchedules.mockResolvedValue({ credit: "", schedules: [] });
   mockApi.getPracticeStatus.mockResolvedValue({ perDay: 2, usedToday: 0, remainingToday: 2, inProgressRunId: null, available: false, minutes: null });
   mockApi.listTherapists.mockResolvedValue([]);
   mockApi.listTherapistInvitations.mockResolvedValue([]);
@@ -527,6 +528,58 @@ describe("guided sessions from the therapist", () => {
     expect(screen.getByText(/Every Mon, Wed/)).toBeInTheDocument();
     expect(screen.getByText(/Last done/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+  });
+});
+
+describe("picture schedules", () => {
+  const schedule = (over: Partial<import("../api/client").VisualSchedule> = {}): import("../api/client").VisualSchedule => ({
+    id: "vs-1",
+    title: "Brushing teeth",
+    kind: "ROUTINE",
+    language: "en",
+    authorName: "Dr Rao",
+    centreName: "Sunrise Centre",
+    source: "THERAPIST",
+    mine: false,
+    days: [],
+    time: null,
+    remind: true,
+    timing: { time: null, days: [], source: null },
+    forToday: true,
+    doneToday: false,
+    startedToday: false,
+    dueNow: false,
+    minutesUntil: null,
+    steps: [
+      { key: "a", label: "Toothpaste", say: null, picture: { kind: "symbol", symbolId: "a", url: "https://cdn.example/a.svg" }, minutes: null },
+      { key: "b", label: "Brush teeth", say: null, picture: null, minutes: 2 }
+    ],
+    ...over
+  });
+
+  test("today's schedules show on Home and open full screen; Activities lists every schedule", async () => {
+    mockApi.listVisualSchedules.mockResolvedValue({ credit: "", schedules: [schedule(), schedule({ id: "vs-2", title: "Weekend park", days: ["Sat"], forToday: false })] });
+    renderHome();
+    expect(await screen.findByText("Sam's picture schedules")).toBeInTheDocument();
+    expect(screen.queryByText("Weekend park")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Brushing teeth/ }));
+    expect(await screen.findByText("Now · 1/2")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    expect(await screen.findByText("Picture schedules")).toBeInTheDocument();
+    expect(screen.getByText("Weekend park")).toBeInTheDocument();
+  });
+
+  test("a tapped reminder (/?kid=..&schedule=..) opens that schedule; 'Make one' opens the maker", async () => {
+    mockApi.listVisualSchedules.mockResolvedValue({ credit: "", schedules: [schedule()] });
+    window.history.replaceState(null, "", "/?kid=kid-1&schedule=vs-1");
+    renderHome();
+    expect(await screen.findByText("Now · 1/2")).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: /Activities/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "+ Make one" }));
+    expect(screen.getByText("Make a picture schedule")).toBeInTheDocument();
   });
 });
 

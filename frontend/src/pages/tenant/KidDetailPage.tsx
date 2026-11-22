@@ -19,6 +19,7 @@ import { KidCompanionTab } from "./KidCompanionTab";
 import { KidUpdatesTab } from "./KidUpdatesTab";
 import { KidIepTab } from "./KidIepTab";
 import { KidHomeSessionsTab } from "./KidHomeSessionsTab";
+import { KidVisualSchedulesTab } from "./KidVisualSchedulesTab";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -203,6 +204,9 @@ export function KidDetailPage() {
         </TabPanel>
         <TabPanel header="Home sessions">
           <KidHomeSessionsTab kid={kid} canEdit={canEdit} />
+        </TabPanel>
+        <TabPanel header="Visual schedules">
+          <KidVisualSchedulesTab kid={kid} canEdit={canEdit} />
         </TabPanel>
         <TabPanel header="Schedule">
           <KidScheduleTab kidId={kid.id} />

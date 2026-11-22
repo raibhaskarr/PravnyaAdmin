@@ -56,7 +56,30 @@ const envSchema = z.object({
   // parent-kids endpoint itself throws a clear error if a kid-creation call arrives and this is
   // unset, rather than failing silently or guessing a tenant. See
   // docs/manual/06-parent-kid-onboarding-spec.md.
-  RETAIL_TENANT_ID: z.string().optional()
+  RETAIL_TENANT_ID: z.string().optional(),
+  // Where uploaded pictures (photos on visual schedules) are kept. "s3" works with any
+  // S3-compatible store (AWS S3, Cloudflare R2, ...); "local" keeps them on disk, for development.
+  STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  LOCAL_STORAGE_DIR: z.string().default("./storage"),
+  S3_ENDPOINT: z.string().optional(),
+  S3_REGION: z.string().default("auto"),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_FORCE_PATH_STYLE: boolFromEnv.default(false),
+  // Web Push (schedule reminders in the parent app). Make a pair with `npx web-push generate-vapid-keys`.
+  // Without them reminders are off and the app doesn't offer them.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  // How often the reminder job runs. Never runs in tests.
+  SCHEDULE_REMINDERS_ENABLED: boolFromEnv.default(true),
+  // Mulberry symbol pictures (see modules/symbols). Pinned to the commit the index was built from.
+  SYMBOLS_BASE_URL: z.string().default("https://cdn.jsdelivr.net/gh/mulberrysymbols/mulberry-symbols@fa94a93ca1b5357c0b6e0d9f8a81c426a1dfefdf/EN")
+}).superRefine((v, ctx) => {
+  if (v.STORAGE_DRIVER !== "s3") return;
+  for (const key of ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {
+    if (!v[key]) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: "Required when STORAGE_DRIVER=s3" });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

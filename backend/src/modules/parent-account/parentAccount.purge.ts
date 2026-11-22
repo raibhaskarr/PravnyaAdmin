@@ -1,13 +1,14 @@
 import { prisma } from "../../config/prisma";
 import { env } from "../../config/env";
 import { invitationEmailService } from "../therapist-invitations/invitationEmail.service";
+import { mediaService } from "../media/media.service";
 
 // What deleting a parent account removes, after the 30-day grace period:
 // - A child the parent registered themselves (on the retail tenant, no centre owns the record):
 //   deleted completely -- goals, entries, messages, schedule, everything (Kid cascades).
 // - A child a centre registered: the centre keeps its therapy record. The child is unlinked from
-//   the parent, and what only the parent used -- their conversation with Pravnya and the weekly
-//   schedule they kept -- is deleted.
+//   the parent, and what only the parent used -- their conversation with Pravnya, the weekly
+//   schedule they kept, picture schedules they made and photos they uploaded -- is deleted.
 // - The parent's own record (email, names, phone, address, password) and any verification code.
 // Invitations the parent sent keep existing for the centre, with the sender cleared (SetNull).
 
@@ -16,15 +17,22 @@ export async function purgeParent(parentId: string) {
   if (!parent) return null;
   const own = parent.kids.filter((k) => env.RETAIL_TENANT_ID && k.tenantId === env.RETAIL_TENANT_ID).map((k) => k.id);
   const centre = parent.kids.filter((k) => !own.includes(k.id)).map((k) => k.id);
+  // Pictures uploaded for a child who is deleted completely: their rows go with the Kid (cascade),
+  // the stored files are removed below.
+  // Photos the parent uploaded for a centre's child go too (the centre's own uploads stay).
+  const ownPictures = await prisma.mediaAsset.findMany({ where: { OR: [{ kidId: { in: own } }, { uploadedByParentId: parentId }] }, select: { storageKey: true } });
 
   await prisma.$transaction([
     prisma.kid.deleteMany({ where: { id: { in: own } } }),
     prisma.companionMessage.deleteMany({ where: { kidId: { in: centre } } }),
     prisma.scheduleSlot.deleteMany({ where: { kidId: { in: centre } } }),
+    prisma.visualSchedule.deleteMany({ where: { kidId: { in: centre }, source: "PARENT" } }),
+    prisma.mediaAsset.deleteMany({ where: { uploadedByParentId: parentId } }),
     prisma.kid.updateMany({ where: { id: { in: centre } }, data: { parentId: null } }),
     prisma.parentVerificationCode.deleteMany({ where: { email: parent.email } }),
     prisma.parent.delete({ where: { id: parentId } })
   ]);
+  await mediaService.removeFiles(ownPictures.map((p) => p.storageKey));
   return { email: parent.email, kidsDeleted: own.length, kidsUnlinked: centre.length };
 }
 

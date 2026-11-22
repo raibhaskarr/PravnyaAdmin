@@ -40,6 +40,11 @@ import { homeGuidesRoutes, parentWalkthroughRoutes } from "./modules/home-guides
 import { parentAccountRoutes } from "./modules/parent-account/parentAccount.routes";
 import { iepPlansRoutes, parentIepPlansRoutes } from "./modules/iep-plans/iepPlans.routes";
 import { parentCentresRoutes } from "./modules/parent-centres/parentCentres.routes";
+import { mediaRoutes, parentMediaRoutes } from "./modules/media/media.routes";
+import { parentPushRoutes } from "./modules/push/push.routes";
+import { symbolsRoutes } from "./modules/symbols/symbols.routes";
+import { visualSchedulesRoutes, parentVisualSchedulesRoutes } from "./modules/visual-schedules/visualSchedules.routes";
+import { scheduleTemplatesRoutes, parentScheduleTemplatesRoutes } from "./modules/visual-schedules/scheduleTemplates.routes";
 
 export function createApp() {
   const app = express();
@@ -61,6 +66,11 @@ export function createApp() {
   // child); every other route's payloads are small CRUD bodies well under this.
   // A short spoken reply during a home session.
   app.use("/api/parent-kids/:kidId/session-runs/:runId/turn", express.json({ limit: "6mb" }));
+  // A photo for a visual schedule (base64, at most 3 MB of picture).
+  app.use("/api/media", express.json({ limit: "5mb" }));
+  app.use("/api/parent-kids/:kidId/media", express.json({ limit: "5mb" }));
+  // A parent describing a schedule out loud.
+  app.use("/api/parent-kids/:kidId/visual-schedules/draft", express.json({ limit: "6mb" }));
   app.use(express.json({ limit: "2mb" }));
 
   app.get("/health", async (_req, res) => {
@@ -113,6 +123,14 @@ export function createApp() {
   app.use("/api/home-guides", homeGuidesRoutes);
   app.use("/api/home-sessions", homeSessionsRoutes);
   app.use("/api/parent-kids", parentHomeSessionsRoutes);
+  app.use("/api/media", mediaRoutes);
+  app.use("/api/symbols", symbolsRoutes);
+  app.use("/api/visual-schedules", visualSchedulesRoutes);
+  app.use("/api/parent-kids", parentVisualSchedulesRoutes);
+  app.use("/api/schedule-templates", scheduleTemplatesRoutes);
+  app.use("/api/parent-kids", parentScheduleTemplatesRoutes);
+  app.use("/api/parent-kids", parentMediaRoutes);
+  app.use("/api/parent-push", parentPushRoutes);
 
   // Test-only: lets E2E tests (a separate process) read emails the memory provider captured, e.g.
   // a parent's sign-up verification code. Never registered outside NODE_ENV=test.
