@@ -36,6 +36,66 @@ export type IepPlan = {
   readAt: string | null;
 };
 
+/** A picture link from the API: our own (signed) links are relative to the API server. */
+export function assetUrl(url: string) {
+  return url.startsWith("/") ? apiUrl(url) : url;
+}
+
+/** One step of a picture schedule a therapist made. */
+export type SchedulePicture = { kind: "symbol"; symbolId: string; url: string } | { kind: "photo"; mediaId: string; url: string };
+
+export type VisualScheduleStep = {
+  key: string;
+  label: string;
+  say: string | null;
+  picture: SchedulePicture | null;
+  minutes: number | null;
+};
+
+export type ScheduleKind = "FIRST_THEN" | "ROUTINE" | "DAY";
+
+export type VisualSchedule = {
+  id: string;
+  title: string;
+  kind: ScheduleKind;
+  language: "en" | "hi";
+  /** PARENT: made in this app. */
+  source: "THERAPIST" | "PARENT";
+  /** This parent made it, so they can change everything (otherwise only its time and reminder). */
+  mine: boolean;
+  authorName: string;
+  centreName: string;
+  days: string[];
+  /** The time set for it ("HH:MM"), or null to learn it from use. */
+  time: string | null;
+  remind: boolean;
+  /** When it's done: the set time, or one learned from when it's usually opened. */
+  timing: { time: string | null; days: string[]; source: "set" | "learned" | null };
+  forToday: boolean;
+  doneToday: boolean;
+  startedToday: boolean;
+  /** Around its time today, and not done yet: shown first on Home. */
+  dueNow: boolean;
+  minutesUntil: number | null;
+  steps: VisualScheduleStep[];
+};
+
+/** What Pravnya drafted from the parent's description, before it's saved. */
+export type ScheduleDraft = { title: string; kind: ScheduleKind; language: "en" | "hi"; time: string | null; days: string[]; steps: VisualScheduleStep[] };
+
+export type ScheduleFields = { title: string; kind: ScheduleKind; language: "en" | "hi"; steps: VisualScheduleStep[]; days: string[]; time: string | null; remind: boolean };
+
+export type SymbolResult = { id: string; label: string; url: string };
+
+/** A ready-made schedule from Pravnya or the child's centre, to start from. */
+export type ScheduleTemplate = { id: string; scope: "PRAVNYA" | "CENTRE"; title: string; kind: ScheduleKind; language: "en" | "hi"; steps: VisualScheduleStep[]; days: string[]; time: string | null };
+
+/** The API stores a picture by symbol id or photo id; the link is only for showing it. */
+function stripUrl(s: VisualScheduleStep) {
+  const p = s.picture;
+  return { ...s, picture: p ? (p.kind === "symbol" ? { kind: "symbol", symbolId: p.symbolId } : { kind: "photo", mediaId: p.mediaId }) : null };
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -424,6 +484,39 @@ export const api = {
   },
   markUpdateRead(token: string, kidId: string, updateId: string) {
     return request<ProgressUpdate>(`/parent-kids/${kidId}/updates/${updateId}/read`, { token, method: "POST" });
+  },
+  listVisualSchedules(token: string, kidId: string) {
+    return request<{ credit: string; schedules: VisualSchedule[] }>(`/parent-kids/${kidId}/visual-schedules`, { token });
+  },
+  draftVisualSchedule(token: string, kidId: string, body: { text?: string; audio?: { mimeType: string; base64: string }; kind: ScheduleKind | null; language: "en" | "hi" }) {
+    return request<ScheduleDraft>(`/parent-kids/${kidId}/visual-schedules/draft`, { token, method: "POST", body });
+  },
+  listScheduleTemplates(token: string, kidId: string, language: "en" | "hi") {
+    return request<ScheduleTemplate[]>(`/parent-kids/${kidId}/schedule-templates?language=${language}`, { token });
+  },
+  createVisualSchedule(token: string, kidId: string, body: ScheduleFields) {
+    return request<VisualSchedule>(`/parent-kids/${kidId}/visual-schedules`, { token, method: "POST", body: { ...body, steps: body.steps.map(stripUrl) } });
+  },
+  editVisualSchedule(token: string, kidId: string, id: string, body: Partial<ScheduleFields>) {
+    return request<VisualSchedule>(`/parent-kids/${kidId}/visual-schedules/${id}`, { token, method: "PATCH", body: { ...body, steps: body.steps?.map(stripUrl) } });
+  },
+  deleteVisualSchedule(token: string, kidId: string, id: string) {
+    return request<void>(`/parent-kids/${kidId}/visual-schedules/${id}`, { token, method: "DELETE" });
+  },
+  recordScheduleUse(token: string, kidId: string, id: string, event: "start" | "complete") {
+    return request<{ ok: true }>(`/parent-kids/${kidId}/visual-schedules/${id}/uses`, { token, method: "POST", body: { event } });
+  },
+  searchSymbols(token: string, kidId: string, q: string) {
+    return request<{ credit: string; symbols: SymbolResult[] }>(`/parent-kids/${kidId}/symbols?q=${encodeURIComponent(q)}`, { token });
+  },
+  uploadPicture(token: string, kidId: string, base64: string) {
+    return request<{ id: string; url: string }>(`/parent-kids/${kidId}/media`, { token, method: "POST", body: { base64 } });
+  },
+  pushKey(token: string) {
+    return request<{ publicKey: string | null }>("/parent-push", { token });
+  },
+  pushSubscribe(token: string, sub: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+    return request<void>("/parent-push/subscriptions", { token, method: "POST", body: sub });
   },
   listSessions(token: string, kidId: string) {
     return request<HomeSessionSummary[]>(`/parent-kids/${kidId}/sessions`, { token });

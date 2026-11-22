@@ -4,7 +4,10 @@ import { IepPlanCard, IepPlansView } from "../iep/IepPlans";
 import { AccountSection, DeletionBanner } from "../account/Account";
 import { SessionRunner } from "../sessions/SessionRunner";
 import { TodaysSessionCard } from "../sessions/Sessions";
-import { api, ApiError, type CompanionMessage, type Goal, type HomeSessionSummary, type IepPlan, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
+import { TodaysSchedulesCard, VisualScheduleView } from "../schedules/VisualSchedules";
+import { ScheduleEditor, ScheduleMaker } from "../schedules/ScheduleMaker";
+import { refreshPush } from "../schedules/push";
+import { api, ApiError, type CompanionMessage, type Goal, type HomeSessionSummary, type IepPlan, type VisualSchedule, type ParentProfile, type ProgressUpdate, type ScheduleSlot } from "../api/client";
 import mark from "../brand/mark.svg";
 import { Activities } from "../activities/Activities";
 import { Goals } from "../goals/Goals";
@@ -17,7 +20,7 @@ import { computeNudge, NudgeCard } from "./nudges";
 import { computeOpener, OpenerCard } from "./opener";
 
 type Kid = NonNullable<ParentProfile["kids"]>[number];
-type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates" | "iepPlans" | "session";
+type View = "home" | "goals" | "growth" | "activities" | "logSession" | "profile" | "iepUpload" | "updates" | "iepPlans" | "session" | "visualSchedule" | "makeSchedule" | "editSchedule";
 
 const TABS = [
   { id: "home" as const, label: "Home", icon: "🏠", enabled: true },
@@ -145,6 +148,19 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   // Guided sessions the therapist set; the one being run, and the tab to return to afterwards.
   const [sessions, setSessions] = useState<HomeSessionSummary[]>([]);
   const [activeSession, setActiveSession] = useState<{ id?: string; practice?: "en" | "hi"; returnTo: View } | null>(null);
+  // Picture schedules the therapist made; the one open full screen, and the tab to return to.
+  const [visualSchedules, setVisualSchedules] = useState<VisualSchedule[]>([]);
+  const [openSchedule, setOpenSchedule] = useState<{ id: string; returnTo: View } | null>(null);
+  // A tapped reminder opens the app at /?kid=..&schedule=..: open that schedule once it's loaded.
+  const [linkedSchedule, setLinkedSchedule] = useState<{ kidId: string | null; scheduleId: string } | null>(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const scheduleId = q.get("schedule");
+      return scheduleId ? { kidId: q.get("kid"), scheduleId } : null;
+    } catch {
+      return null;
+    }
+  });
   // The real conversation thread, separate from the digest feed above -- persisted server-side
   // (companion.service.ts), fetched fresh whenever the kid changes.
   const [thread, setThread] = useState<CompanionMessage[]>([]);
@@ -188,7 +204,61 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
     void api.listUpdates(token, kid.id).then(setUpdates).catch(() => setUpdates([]));
     void api.listIepPlans(token, kid.id).then(setIepPlans).catch(() => setIepPlans([]));
     void api.listSessions(token, kid.id).then(setSessions).catch(() => setSessions([]));
+    void loadSchedules(kid.id);
   }, [token, kid?.id]);
+
+  function loadSchedules(kidId: string) {
+    return api
+      .listVisualSchedules(token, kidId)
+      ?.then((r) => setVisualSchedules(r?.schedules ?? []))
+      .catch(() => setVisualSchedules([]));
+  }
+
+  // Photo links last about an hour: fetch fresh ones every 30 minutes and when the app comes back.
+  useEffect(() => {
+    if (!kid) return;
+    const kidId = kid.id;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void loadSchedules(kidId);
+    };
+    const timer = setInterval(refresh, 30 * 60_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [token, kid?.id]);
+
+  // Reminders: keep this device's subscription fresh, and open a schedule when a reminder is tapped
+  // while the app is already open.
+  useEffect(() => {
+    void refreshPush(token);
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type !== "open-url") return;
+      const q = new URL(e.data.url).searchParams;
+      const scheduleId = q.get("schedule");
+      if (scheduleId) setLinkedSchedule({ kidId: q.get("kid"), scheduleId });
+    };
+    navigator.serviceWorker?.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
+  }, [token]);
+
+  useEffect(() => {
+    if (!linkedSchedule || !profile) return;
+    if (linkedSchedule.kidId && kid?.id !== linkedSchedule.kidId && kids.some((k) => k.id === linkedSchedule.kidId)) {
+      setSelectedKidId(linkedSchedule.kidId);
+      return;
+    }
+    if (!visualSchedules.some((s) => s.id === linkedSchedule.scheduleId)) return;
+    setOpenSchedule({ id: linkedSchedule.scheduleId, returnTo: "home" });
+    setView("visualSchedule");
+    setLinkedSchedule(null);
+    try {
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      // fine
+    }
+  }, [linkedSchedule, profile, kid?.id, visualSchedules]);
 
   // useLayoutEffect (not useEffect) -- runs before paint, so the content never visibly flashes at
   // the top before jumping down. Keyed on whatever can change the scrollable content's height.
@@ -281,6 +351,71 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   function startPractice(language: "en" | "hi") {
     setActiveSession({ practice: language, returnTo: view });
     setView("session");
+  }
+
+  function openVisualSchedule(id: string) {
+    setOpenSchedule({ id, returnTo: view });
+    setView("visualSchedule");
+  }
+
+  function closeSchedule() {
+    const back = openSchedule?.returnTo ?? "home";
+    setOpenSchedule(null);
+    if (kid) void loadSchedules(kid.id);
+    if (back === "home") backToHome();
+    else setView(back);
+  }
+
+  const shownSchedule = openSchedule ? visualSchedules.find((s) => s.id === openSchedule.id) : undefined;
+  if (view === "visualSchedule" && kid && openSchedule && shownSchedule) {
+    return <VisualScheduleView schedule={shownSchedule} token={token} kidId={kid.id} onEdit={() => setView("editSchedule")} onClose={closeSchedule} />;
+  }
+
+  if (view === "editSchedule" && kid && openSchedule && shownSchedule) {
+    const s = shownSchedule;
+    return (
+      <ScheduleEditor
+        token={token}
+        kidId={kid.id}
+        title={s.mine ? "Edit schedule" : "Time and reminder"}
+        initial={{ title: s.title, kind: s.kind, language: s.language, steps: s.steps, days: s.days, time: s.time, remind: s.remind }}
+        timingOnly={!s.mine}
+        learnedTime={s.timing.source === "learned" ? s.timing.time : null}
+        saveLabel="Save"
+        onCancel={() => setView("visualSchedule")}
+        onSave={async (f) => {
+          const body = s.mine ? f : { time: f.time, remind: f.remind };
+          const saved = await api.editVisualSchedule(token, kid.id, s.id, body);
+          setVisualSchedules((list) => list.map((x) => (x.id === saved.id ? saved : x)));
+          setView("visualSchedule");
+        }}
+        onDelete={
+          s.mine
+            ? async () => {
+                await api.deleteVisualSchedule(token, kid.id, s.id);
+                setVisualSchedules((list) => list.filter((x) => x.id !== s.id));
+                setOpenSchedule(null);
+                setView("activities");
+              }
+            : undefined
+        }
+      />
+    );
+  }
+
+  if (view === "makeSchedule" && kid) {
+    return (
+      <ScheduleMaker
+        token={token}
+        kidId={kid.id}
+        kidName={kidName}
+        onCancel={() => setView("activities")}
+        onSaved={() => {
+          void loadSchedules(kid.id);
+          setView("activities");
+        }}
+      />
+    );
   }
 
   if (view === "session" && kid && activeSession) {
@@ -383,7 +518,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
       {activeTab === "growth" && kid ? (
         <Growth key={kid.id} token={token} kidId={kid.id} kidName={kidName} />
       ) : activeTab === "activities" && kid ? (
-        <Activities key={kid.id + sessions.map((x) => x.lastRun?.id ?? "").join()} token={token} kidId={kid.id} kidName={kidName} sessions={sessions} onStartSession={startSession} onStartPractice={startPractice} />
+        <Activities key={kid.id + sessions.map((x) => x.lastRun?.id ?? "").join()} token={token} kidId={kid.id} kidName={kidName} sessions={sessions} onStartSession={startSession} onStartPractice={startPractice} visualSchedules={visualSchedules} onOpenSchedule={openVisualSchedule} onMakeSchedule={() => setView("makeSchedule")} />
       ) : activeTab === "goals" && kid ? (
         <Goals
           key={kid.id}
@@ -474,6 +609,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
           {latestUpdate && !latestUpdate.readAt ? <UpdateCard update={latestUpdate} onOpen={() => setView("updates")} /> : null}
           {iepPlans[0] && !iepPlans[0].readAt ? <IepPlanCard plan={iepPlans[0]} kidName={kidName} onOpen={() => setView("iepPlans")} /> : null}
           {todaysSession ? <TodaysSessionCard session={todaysSession} kidName={kidName} onStart={() => startSession(todaysSession.id)} /> : null}
+          <TodaysSchedulesCard token={token} schedules={visualSchedules} kidName={kidName} onOpen={openVisualSchedule} />
 
           {opener && kid ? (
             <OpenerCard

@@ -11,6 +11,7 @@ import { AcceptSuperadminInvitePage } from "./pages/AcceptSuperadminInvitePage";
 import { TenantsPage } from "./pages/admin/TenantsPage";
 import { TenantDetailPage } from "./pages/admin/TenantDetailPage";
 import { HomeGuidesPage } from "./pages/admin/HomeGuidesPage";
+import { ScheduleTemplatesPage } from "./pages/shared/ScheduleTemplatesPage";
 import { TaxonomyPage } from "./pages/admin/TaxonomyPage";
 import { PocReviewPage } from "./pages/admin/PocReviewPage";
 import { SuperadminsPage } from "./pages/admin/SuperadminsPage";
@@ -44,6 +45,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/admin/tenants/:tenantId" element={<TenantDetailPage />} />
               <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
               <Route path="/admin/home-guides" element={<HomeGuidesPage />} />
+              <Route path="/admin/schedule-templates" element={<ScheduleTemplatesPage />} />
               <Route path="/admin/poc-review" element={<PocReviewPage />} />
               <Route path="/admin/superadmins" element={<SuperadminsPage />} />
               <Route path="/admin/account" element={<AccountPage />} />
@@ -73,6 +75,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/tenant/log" element={<LogSessionPage />} />
               <Route path="/tenant/kids" element={<KidsPage />} />
               <Route path="/tenant/kids/:kidId" element={<KidDetailPage />} />
+              <Route path="/tenant/schedule-templates" element={<ScheduleTemplatesPage />} />
               <Route path="/tenant/account" element={<TenantAccountPage />} />
             </Route>
           </Route>

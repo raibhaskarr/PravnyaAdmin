@@ -78,6 +78,9 @@ model User {
   iepPlans IepPlan[]
   homeSessions HomeSession[]
   reviewedHomeGuides SkillHomeGuide[]
+  visualSchedules VisualSchedule[]
+  mediaAssets MediaAsset[]
+  scheduleTemplates VisualScheduleTemplate[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -179,6 +182,10 @@ model Tenant {
   iepPlans IepPlan[]
   homeSessions HomeSession[]
   homeSessionRuns HomeSessionRun[]
+  visualSchedules VisualSchedule[]
+  mediaAssets MediaAsset[]
+  scheduleTemplates VisualScheduleTemplate[]
+  mediaAuditEvents MediaAuditEvent[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -380,6 +387,8 @@ model Kid {
   iepPlans      IepPlan[]
   homeSessions HomeSession[]
   homeSessionRuns HomeSessionRun[]
+  visualSchedules VisualSchedule[]
+  mediaAssets MediaAsset[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -422,6 +431,8 @@ model Parent {
   createdByTenantId String?  @db.Uuid
   createdByTenant   Tenant?  @relation(fields: [createdByTenantId], references: [id], onDelete: SetNull)
   therapistInvitations TherapistInvitation[]
+  pushSubscriptions PushSubscription[]
+  visualSchedules VisualSchedule[]
   /// Set when the parent asks to delete their account; cleared if they cancel. After
   /// scheduledPurgeAt (30 days later) the daily purge deletes the account -- see parentAccount.purge.ts.
   deletionRequestedAt DateTime?
@@ -1036,4 +1047,162 @@ model HomeSessionRun {
 
   @@index([sessionId, startedAt])
   @@index([kidId, startedAt])
+}
+
+/// A picture someone uploaded (e.g. a photo of the child's own toothbrush for a visual schedule).
+/// The bytes live in object storage (common/storage) under storageKey; never served without a
+/// signed, expiring link (modules/media).
+model MediaAsset {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @db.Uuid
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId            String?  @db.Uuid
+  kid              Kid?     @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  uploadedByUserId String?  @db.Uuid
+  uploadedBy       User?    @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  /// Set when the parent uploaded it (for a schedule they made); removed when their account is deleted.
+  uploadedByParentId String? @db.Uuid
+  /// When no schedule or template used it any more (set by the daily clean-up; cleared if it's used
+  /// again). Deleted, file and row, 7 days after.
+  unusedSince      DateTime?
+  storageKey       String   @unique
+  mimeType         String
+  bytes            Int
+  createdAt        DateTime @default(now())
+
+  @@index([kidId])
+}
+
+enum VisualScheduleKind {
+  FIRST_THEN
+  ROUTINE
+  DAY
+}
+
+/// A picture schedule a therapist made for a child (First/Then, a routine, or a day plan), shown
+/// full screen in the parent app. Drafts stay with staff until published.
+model VisualSchedule {
+  id           String             @id @default(uuid()) @db.Uuid
+  tenantId     String             @db.Uuid
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kidId        String             @db.Uuid
+  kid          Kid                @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  authorUserId String?            @db.Uuid
+  author       User?              @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorName   String
+  centreName   String
+  title        String
+  kind         VisualScheduleKind
+  /// "en" or "hi": the language read aloud.
+  language     String             @default("en")
+  /// [{ key, label, say | null, picture: { kind: "symbol", symbolId } | { kind: "photo", mediaId } | null, minutes | null }]
+  steps        Json
+  /// "Mon".."Sun"; empty means any day.
+  days         String[]           @default([])
+  aiDrafted    Boolean            @default(false)
+  status       HomeSessionStatus  @default(DRAFT)
+  publishedAt  DateTime?
+  /// THERAPIST: made in the admin panel. PARENT: made by the parent in the app (always ACTIVE).
+  source             VisualScheduleSource @default(THERAPIST)
+  createdByParentId  String?              @db.Uuid
+  createdByParent    Parent?              @relation(fields: [createdByParentId], references: [id], onDelete: SetNull)
+  /// "HH:MM" (India time) when it's usually done; null = learned from when the family uses it.
+  time               String?
+  /// Send the parent a reminder at that time (theirs to switch off).
+  remind             Boolean              @default(true)
+  uses               VisualScheduleUse[]
+  reminders          VisualScheduleReminder[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([kidId, status])
+}
+
+enum VisualScheduleSource {
+  THERAPIST
+  PARENT
+}
+
+/// One time the family opened a schedule in the app (and whether they got to the end). Used to learn
+/// when a schedule is usually done, so it can show on Home and remind at that time.
+model VisualScheduleUse {
+  id          String         @id @default(uuid()) @db.Uuid
+  scheduleId  String         @db.Uuid
+  schedule    VisualSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  startedAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  @@index([scheduleId, startedAt])
+}
+
+/// A reminder already sent for a schedule on a date (India), so it's sent once a day at most.
+model VisualScheduleReminder {
+  id         String         @id @default(uuid()) @db.Uuid
+  scheduleId String         @db.Uuid
+  schedule   VisualSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  forDate    String
+  sentAt     DateTime       @default(now())
+
+  @@unique([scheduleId, forDate])
+}
+
+/// A browser/phone that agreed to get notifications for this parent (Web Push).
+model PushSubscription {
+  id         String    @id @default(uuid()) @db.Uuid
+  parentId   String    @db.Uuid
+  parent     Parent    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([parentId])
+}
+
+/// A ready-made picture schedule to start from: Pravnya's (tenantId null; the built-in ones have a
+/// builtInKey) or a centre's own. Starting from one copies it, so changing a template never changes
+/// a child's schedule, and the copy's pictures can be swapped freely.
+model VisualScheduleTemplate {
+  id              String             @id @default(uuid()) @db.Uuid
+  tenantId        String?            @db.Uuid
+  tenant          Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// "brushing-teeth:en" for the ones Pravnya ships with (created once; a superadmin can change or hide them).
+  builtInKey      String?            @unique
+  title           String
+  kind            VisualScheduleKind
+  language        String             @default("en")
+  /// Same shape as VisualSchedule.steps. Photos are centre-wide (MediaAsset.kidId null), never a child's.
+  steps           Json
+  days            String[]           @default([])
+  time            String?
+  createdByUserId String?            @db.Uuid
+  createdBy       User?              @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByName   String
+  /// Hidden from lists (a built-in one that was deleted stays hidden instead of coming back).
+  archived        Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Who uploaded or deleted which picture of which child, and when. Kept after the picture is gone;
+/// holds no picture or personal content.
+model MediaAuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Plain ids, not relations: the record outlives the picture.
+  mediaId    String   @db.Uuid
+  kidId      String?  @db.Uuid
+  /// "UPLOADED", "DELETED_UNUSED" (daily clean-up) or "DELETED_WITH_ACCOUNT".
+  action     String
+  /// "STAFF", "PARENT" or "SYSTEM".
+  actorKind  String
+  actorId    String?  @db.Uuid
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([kidId, createdAt])
 }

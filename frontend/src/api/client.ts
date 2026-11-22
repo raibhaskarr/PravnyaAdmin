@@ -49,10 +49,20 @@ import type {
   HomeGuideRow,
   HomeSession,
   SessionPlan,
-  SessionSchedule
+  SessionSchedule,
+  VisualSchedule,
+  VisualScheduleKind,
+  VisualScheduleStep,
+  ScheduleTemplate,
+  SymbolResult
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:4011" : "");
+
+/** A picture link from the API: our own (signed) links are relative to the API server. */
+export function assetUrl(url: string) {
+  return url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
+}
 
 class ApiError extends Error {
   constructor(
@@ -355,6 +365,55 @@ export const api = {
   },
   deleteHomeSession(token: string, id: string) {
     return request<void>(`/home-sessions/${id}`, { token, method: "DELETE" });
+  },
+  // Visual schedules
+  listVisualSchedules(token: string, kidId: string) {
+    return request<VisualSchedule[]>(`/visual-schedules?kidId=${kidId}`, { token });
+  },
+  listScheduleTemplates(token: string, language?: "en" | "hi") {
+    return request<ScheduleTemplate[]>(`/schedule-templates${language ? `?language=${language}` : ""}`, { token });
+  },
+  createScheduleTemplate(token: string, body: { title: string; kind: VisualScheduleKind; language: "en" | "hi"; steps: VisualScheduleStep[]; days: string[]; time: string | null }) {
+    return request<ScheduleTemplate>("/schedule-templates", { token, method: "POST", body });
+  },
+  draftScheduleTemplate(token: string, body: { kind: VisualScheduleKind | null; language: "en" | "hi"; request: string }) {
+    return request<ScheduleTemplate>("/schedule-templates/draft", { token, method: "POST", body });
+  },
+  editScheduleTemplate(token: string, id: string, body: { title?: string; kind?: VisualScheduleKind; language?: "en" | "hi"; steps?: VisualScheduleStep[]; days?: string[]; time?: string | null }) {
+    return request<ScheduleTemplate>(`/schedule-templates/${id}`, { token, method: "PATCH", body });
+  },
+  deleteScheduleTemplate(token: string, id: string) {
+    return request<void>(`/schedule-templates/${id}`, { token, method: "DELETE" });
+  },
+  scheduleTemplateFromSchedule(token: string, scheduleId: string, title?: string) {
+    return request<ScheduleTemplate & { droppedPhotos: number }>(`/schedule-templates/from-schedule/${scheduleId}`, { token, method: "POST", body: { title } });
+  },
+  createVisualSchedule(token: string, body: { kidId: string; title: string; kind: VisualScheduleKind; language: "en" | "hi"; steps: VisualScheduleStep[]; days: string[]; time?: string | null }) {
+    return request<VisualSchedule>("/visual-schedules", { token, method: "POST", body });
+  },
+  visualScheduleFromTemplate(token: string, body: { kidId: string; templateId: string }) {
+    return request<VisualSchedule>("/visual-schedules/from-template", { token, method: "POST", body });
+  },
+  draftVisualSchedule(token: string, body: { kidId: string; kind: VisualScheduleKind; language: "en" | "hi"; request: string }) {
+    return request<VisualSchedule>("/visual-schedules/draft", { token, method: "POST", body });
+  },
+  editVisualSchedule(token: string, id: string, body: { title?: string; kind?: VisualScheduleKind; language?: "en" | "hi"; steps?: VisualScheduleStep[]; days?: string[]; time?: string | null; remind?: boolean }) {
+    return request<VisualSchedule>(`/visual-schedules/${id}`, { token, method: "PATCH", body });
+  },
+  publishVisualSchedule(token: string, id: string) {
+    return request<VisualSchedule>(`/visual-schedules/${id}/publish`, { token, method: "POST" });
+  },
+  archiveVisualSchedule(token: string, id: string) {
+    return request<VisualSchedule>(`/visual-schedules/${id}/archive`, { token, method: "POST" });
+  },
+  deleteVisualSchedule(token: string, id: string) {
+    return request<void>(`/visual-schedules/${id}`, { token, method: "DELETE" });
+  },
+  searchSymbols(token: string, q: string) {
+    return request<{ credit: string; symbols: SymbolResult[] }>(`/symbols?q=${encodeURIComponent(q)}`, { token });
+  },
+  uploadPicture(token: string, body: { kidId?: string; base64: string }) {
+    return request<{ id: string; url: string }>("/media", { token, method: "POST", body });
   },
   listHomeGuides(token: string) {
     return request<HomeGuideRow[]>("/home-guides", { token });

@@ -61,16 +61,26 @@ jobs:
           SMTP_PORT: ${{ vars.SMTP_PORT }}
           SMTP_SECURE: ${{ vars.SMTP_SECURE }}
           RETAIL_TENANT_ID: ${{ vars.RETAIL_TENANT_ID }}
+          STORAGE_DRIVER: ${{ vars.STORAGE_DRIVER }}
+          S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+          S3_REGION: ${{ vars.S3_REGION }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          S3_FORCE_PATH_STYLE: ${{ vars.S3_FORCE_PATH_STYLE }}
+          VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
         run: |
           umask 077
           for k in NODE_ENV PORT JWT_EXPIRES_IN BCRYPT_SALT_ROUNDS CORS_ORIGIN EMAIL_PROVIDER EMAIL_FROM_ADDRESS EMAIL_FROM_NAME APP_BASE_URL \
-                   SMTP_HOST SMTP_PORT SMTP_SECURE RETAIL_TENANT_ID DATABASE_URL JWT_SECRET SMTP_USER SMTP_PASS ANTHROPIC_API_KEY GEMINI_API_KEY; do
+                   SMTP_HOST SMTP_PORT SMTP_SECURE RETAIL_TENANT_ID DATABASE_URL JWT_SECRET SMTP_USER SMTP_PASS ANTHROPIC_API_KEY GEMINI_API_KEY \
+                   STORAGE_DRIVER S3_ENDPOINT S3_REGION S3_BUCKET S3_FORCE_PATH_STYLE S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY; do
             if [ -n "${!k}" ]; then printf '%s=%s\n' "$k" "${!k}"; fi
           done | sort > /tmp/pravnyaadmin.env
           echo "Settings: $(cut -d= -f1 /tmp/pravnyaadmin.env | tr '\n' ' ')"
