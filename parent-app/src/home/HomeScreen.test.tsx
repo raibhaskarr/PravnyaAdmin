@@ -313,6 +313,22 @@ describe("feed + opener", () => {
     await user.click(screen.getByRole("button", { name: "Log it" }));
     expect(await screen.findByRole("textbox")).toHaveValue("ABA today");
   });
+
+  test("the session opener stays while other data arrives and the parent types", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 11, 17, 0)); // a Wednesday
+    const user = userEvent.setup();
+    mockApi.listSchedule.mockResolvedValue([makeSlot({ label: "ABA", dayOfWeek: "Wed", startTime: "15:00" })]);
+    // Picture schedules arrive after the opener has shown (and marked itself shown).
+    let arrive!: (v: { credit: string; schedules: [] }) => void;
+    mockApi.listVisualSchedules.mockReturnValue(new Promise((r) => (arrive = r)));
+    renderHome();
+    const text = "Looks like Sam had ABA today — want to jot down how it went?";
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    arrive({ credit: "", schedules: [] });
+    await user.type(screen.getByPlaceholderText(/Ask a question/), "hello");
+    expect(screen.getByText(text)).toBeInTheDocument();
+  });
 });
 
 describe("Goals -> IEP upload sub-screen", () => {

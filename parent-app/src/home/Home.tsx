@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { UpdateCard, UpdatesView } from "../updates/Updates";
 import { IepPlanCard, IepPlansView } from "../iep/IepPlans";
 import { AccountSection, DeletionBanner } from "../account/Account";
@@ -193,6 +193,9 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   const kids = profile?.kids ?? [];
   const kid: Kid | undefined = kids.find((k) => k.id === selectedKidId) ?? kids[0];
   const kidName = kid?.firstName || "your child";
+  // Before any early return (hooks). // Worked out once per child and data load, not on every render: the card marks itself as shown
+  // when it appears, so working it out again (on typing, or when other data arrives) would hide it.
+  const opener = useMemo(() => (kid && goals && schedule ? computeOpener(kid.id, goals, schedule) : null), [kid?.id, goals, schedule]);
 
   useEffect(() => {
     if (!kid) return;
@@ -486,7 +489,6 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   const feed = goals ? buildFeed(goals) : [];
   // The newest update stays on Home while it's unread, or for two weeks after it was sent.
   const latestUpdate = updates.find((u) => !u.readAt || Date.now() - new Date(u.sentAt).getTime() < 14 * 86_400_000) ?? null;
-  const opener = kid && goals && schedule ? computeOpener(kid.id, goals, schedule) : null;
   // A session left halfway comes first, then one due today.
   const todaysSession = sessions.find((s) => s.inProgressRunId) ?? sessions.find((s) => s.dueToday) ?? null;
 
