@@ -104,7 +104,29 @@ export function AacTalk({ board, onClose, onEdit }: { board: AacBoard; onClose: 
         >
           🏠
         </button>
-        <span className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-[var(--pv-ink-soft)]">{page.name}</span>
+        <nav className="min-w-0 flex-1 overflow-x-auto text-center text-sm font-semibold" aria-label="Pages visited">
+          {history.map((id, i) => {
+            const p = board.pages.find((x) => x.id === id);
+            if (!p) return null;
+            return (
+              <span key={`${id}-${i}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Jump straight back to that page, dropping the trail after it.
+                    setPageId(id);
+                    setHistory((h) => h.slice(0, i));
+                  }}
+                  className="truncate text-[var(--pv-green-700)] hover:underline"
+                >
+                  {p.name}
+                </button>
+                <span className="mx-1 text-[var(--pv-ink-faint)]">▸</span>
+              </span>
+            );
+          })}
+          <span className="truncate text-[var(--pv-ink-soft)]">{page.name}</span>
+        </nav>
         {onEdit ? (
           <button type="button" {...holdProps("edit", onEdit)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${holding === "edit" ? "bg-[var(--pv-green-100)]" : "bg-white"}`}>
             {holding === "edit" ? "Keep holding…" : "Hold to edit"}
