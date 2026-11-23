@@ -193,5 +193,244 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         ]
       }
     ]
+  },
+  // "First Words Together" Pranav-style core: a 4-column home with four sub-pages (actions, feelings, body, food).
+  // Modelled on Pranav Roy's own Proloquo2Go layout; "more" and "all done" pinned top-right on every page.
+  {
+    key: "words-together",
+    name: { en: "Words Together (4x3 with sub-pages)", hi: "शब्द मिलकर (4x3, सब-पेज के साथ)" },
+    rows: 3,
+    cols: 4,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["I", "मैं", "I", "pronoun"], ["you", "तुम", null, "pronoun"], ["want", "चाहिए", "want_,_to", "verb"], MORE,
+          ["not", "नहीं", "cross", "describe"], ["help", "मदद", "help_,_to", "verb"], ["go", "चलो", "go_,_to", "verb"], DONE,
+          ["Actions", "कर्म", "run_,_to", "folder", "actions"], ["Feelings", "भावनाएँ", "happy_man", "folder", "feelings"], ["Body", "शरीर", "body_outline", "folder", "body"], ["Food", "खाना-पीना", "eat_,_to", "folder", "food"]
+        ]
+      },
+      {
+        key: "actions",
+        name: { en: "Actions", hi: "कर्म" },
+        cells: [
+          ["eat", "खाना", "eat_,_to", "verb"], ["drink", "पीना", "drink_,_to", "verb"], ["play", "खेलना", "play_,_to", "verb"], MORE,
+          ["run", "दौड़ो", "run_,_to", "verb"], ["jump", "कूदो", "jump_,_to", "verb"], ["sleep", "सोना", "sleep_male_,_to", "verb"], DONE,
+          ["dance", "नाचो", "dance_,_to", "verb"], ["read", "पढ़ो", "read_book_,_to", "verb"], ["write", "लिखो", "write_,_to", "verb"], ["sing", "गाओ", "sing_,_to", "verb"]
+        ]
+      },
+      {
+        key: "feelings",
+        name: { en: "Feelings", hi: "भावनाएँ" },
+        cells: [
+          ["happy", "खुश", "happy_man", "describe"], ["sad", "उदास", "sad_man", "describe"], ["angry", "गुस्सा", "angry_man", "describe"], MORE,
+          ["scared", "डर", "afraid_man", "describe"], ["love", "प्यार", "heart", "describe"], ["like", "अच्छा लगा", "thumbs", "describe"], DONE,
+          ["bored", "बोर", null, "describe"], ["excited", "उत्साहित", "excited_man", "describe"], ["funny", "मज़ेदार", "funny_laugh", "describe"], ["tired", "थका", null, "describe"]
+        ]
+      },
+      {
+        key: "body",
+        name: { en: "Body", hi: "शरीर" },
+        cells: [
+          ["head", "सिर", "head", "noun"], ["ear", "कान", "ear", "noun"], ["eye", "आँख", "eye", "noun"], MORE,
+          ["mouth", "मुँह", "mouth", "noun"], ["hand", "हाथ", "clean_hands", "noun"], ["stomach", "पेट", "stomach", "noun"], DONE,
+          ["shoulder", "कंधा", "shoulder", "noun"], ["foot", "पैर", "foot", "noun"], ["leg", "टांग", "leg", "noun"], ["arm", "बाँह", "arm", "noun"]
+        ]
+      },
+      {
+        key: "food",
+        name: { en: "Food", hi: "खाना-पीना" },
+        cells: [
+          ["milk", "दूध", "milk", "noun"], ["water", "पानी", "water", "noun"], ["rice", "चावल", "rice", "noun"], MORE,
+          ["bread", "ब्रेड", "bread", "noun"], ["chapati", "रोटी", "bread", "noun"], ["apple", "सेब", "apple", "noun"], DONE,
+          ["banana", "केला", "banana", "noun"], ["biscuit", "बिस्कुट", "biscuits", "noun"], ["egg", "अंडा", "egg", "noun"], ["juice", "जूस", "apple_juice", "noun"]
+        ]
+      }
+    ]
+  },
+  // Topic sub-boards. Small, single-page, reusable. Match the "pin more/done top-right" habit.
+  {
+    key: "order-words",
+    name: { en: "Order words (3x3)", hi: "क्रम के शब्द (3x3)" },
+    rows: 3,
+    cols: 3,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["before", "पहले", "before", "describe"], ["next", "अगला", "next", "describe"], ["after", "बाद में", "after", "describe"],
+          ["beginning", "शुरू", "begin_start", "describe"], ["middle", "बीच", "middle", "describe"], ["end", "अंत", "finish", "describe"],
+          ["first", "पहला", "first", "describe"], ["last", "आखिरी", "last", "describe"], ["close", "बंद", "close_,_to", "describe"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "prepositions",
+    name: { en: "Prepositions (3x3)", hi: "सम्बन्धबोधक (3x3)" },
+    rows: 3,
+    cols: 3,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["in", "अंदर", "in", "describe"], ["on", "ऊपर", "on", "describe"], ["under", "नीचे", "under_1", "describe"],
+          ["over", "ऊपर से", "over", "describe"], ["between", "बीच में", "between", "describe"], ["near", "पास", "near", "describe"],
+          ["behind", "पीछे", "behind", "describe"], ["in front", "सामने", null, "describe"], ["beside", "बग़ल में", null, "describe"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "wh-questions",
+    name: { en: "Wh- questions (3x3)", hi: "प्रश्न शब्द (3x3)" },
+    rows: 3,
+    cols: 3,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["who", "कौन", "who", "question"], ["what", "क्या", "what", "question"], MORE,
+          ["where", "कहाँ", "where", "question"], ["when", "कब", "when", "question"], DONE,
+          ["why", "क्यों", "why", "question"], ["how", "कैसे", "how", "question"], ["how many", "कितने", "how_many", "question"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "action-verbs",
+    name: { en: "Action verbs (3x3)", hi: "क्रिया शब्द (3x3)" },
+    rows: 3,
+    cols: 3,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["eat", "खाना", "eat_,_to", "verb"], ["drink", "पीना", "drink_,_to", "verb"], MORE,
+          ["run", "दौड़ो", "run_,_to", "verb"], ["jump", "कूदो", "jump_,_to", "verb"], DONE,
+          ["sleep", "सोना", "sleep_male_,_to", "verb"], ["dance", "नाचो", "dance_,_to", "verb"], ["play", "खेलना", "play_,_to", "verb"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "body-full",
+    name: { en: "Body parts (3x3)", hi: "शरीर के अंग (3x3)" },
+    rows: 3,
+    cols: 3,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["head", "सिर", "head", "noun"], ["ear", "कान", "ear", "noun"], ["mouth", "मुँह", "mouth", "noun"],
+          ["eye", "आँख", "eye", "noun"], ["nose", "नाक", null, "noun"], ["hand", "हाथ", "clean_hands", "noun"],
+          ["stomach", "पेट", "stomach", "noun"], ["foot", "पैर", "foot", "noun"], ["back", "पीठ", "back", "noun"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "feelings-full",
+    name: { en: "Feelings (3x3)", hi: "भावनाएँ (3x3)" },
+    rows: 3,
+    cols: 3,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["happy", "खुश", "happy_man", "describe"], ["sad", "उदास", "sad_man", "describe"], ["angry", "गुस्सा", "angry_man", "describe"],
+          ["scared", "डर", "afraid_man", "describe"], ["love", "प्यार", "heart", "describe"], ["like", "अच्छा लगा", "thumbs", "describe"],
+          ["bored", "बोर", null, "describe"], ["excited", "उत्साहित", "excited_man", "describe"], ["funny", "मज़ेदार", "funny_laugh", "describe"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "clothes",
+    name: { en: "Clothes (3x3)", hi: "कपड़े (3x3)" },
+    rows: 3,
+    cols: 3,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["t-shirt", "टी-शर्ट", "t-shirt", "noun"], ["pants", "पैंट", "pants", "noun"], MORE,
+          ["jumper", "स्वेटर", "jumper", "noun"], ["jacket", "जैकेट", "jacket", "noun"], DONE,
+          ["shoes", "जूते", "trainers", "noun"], ["socks", "मोज़े", "socks", "noun"], ["cap", "टोपी", "cap", "noun"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "currency-india",
+    name: { en: "Indian currency (2x3)", hi: "भारतीय मुद्रा (2x3)" },
+    rows: 2,
+    cols: 3,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["10 rupees", "10 रुपये", "money", "noun"], ["20 rupees", "20 रुपये", "money", "noun"], ["50 rupees", "50 रुपये", "money", "noun"],
+          ["100 rupees", "100 रुपये", "money", "noun"], ["200 rupees", "200 रुपये", "money", "noun"], ["500 rupees", "500 रुपये", "money", "noun"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "safe-dangerous",
+    name: { en: "Safe / dangerous (2x2)", hi: "सुरक्षित / ख़तरनाक (2x2)" },
+    rows: 2,
+    cols: 2,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["safe", "सुरक्षित", "thumbs", "describe"], ["dangerous", "ख़तरनाक", "sharp", "describe"],
+          ["don't touch", "मत छुओ", "cross", "verb"], ["I'm not sure", "मुझे पता नहीं", null, "social"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "public-private",
+    name: { en: "Public / private (2x2)", hi: "सार्वजनिक / निजी (2x2)" },
+    rows: 2,
+    cols: 2,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["public place", "सार्वजनिक जगह", null, "noun"], ["private place", "निजी जगह", null, "noun"],
+          ["at home", "घर पर", "house", "noun"], ["at school", "स्कूल में", "school", "noun"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "social-questions",
+    name: { en: "Social questions (2x2)", hi: "सामाजिक प्रश्न (2x2)" },
+    rows: 2,
+    cols: 2,
+    pages: [
+      {
+        key: "home",
+        name: { en: "Home", hi: "होम" },
+        cells: [
+          ["Who are you?", "आप कौन हैं?", null, "question"], ["What's your name?", "तुम्हारा नाम क्या है?", null, "question"],
+          ["Where do you live?", "कहाँ रहते हो?", null, "question"], ["How are you?", "कैसे हो?", null, "question"]
+        ]
+      }
+    ]
   }
 ];
