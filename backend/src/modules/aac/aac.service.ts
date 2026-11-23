@@ -3,7 +3,8 @@ import { prisma } from "../../config/prisma";
 import type { AuthUser } from "../../common/middleware/auth";
 import { assertCanAccessKid } from "../../common/access/kidAccess";
 import { assertOwnsKid } from "../../common/access/parentKidAccess";
-import { badRequest, conflict, forbidden, notFound } from "../../common/errors/AppError";
+import { AppError, badRequest, conflict, forbidden, notFound } from "../../common/errors/AppError";
+import { draftBoardWithAi } from "./aac.ai";
 import { mediaPath, type Viewer } from "../media/media.service";
 import { SYMBOL_CREDIT } from "../symbols/symbols";
 import { assertPhotosFitKid, assertPhotosFitTemplate, present } from "../visual-schedules/visualSchedules.present";
@@ -147,6 +148,24 @@ export const aacBoardsService = {
   async removeForParent(parentId: string, kidId: string, id: string) {
     await parentBoard(parentId, kidId, id);
     await prisma.aacBoard.delete({ where: { id } });
+  },
+
+  /** AI draft (staff). The therapist reviews and saves through the normal create/save route; nothing is saved here. */
+  async draftForStaff(user: AuthUser, input: { kidId: string; brief: string; language: "en" | "hi"; mediaIds: string[] }) {
+    const kid = await assertCanAccessKid(user, input.kidId);
+    const name = (await prisma.kid.findUniqueOrThrow({ where: { id: kid.id }, select: { firstName: true } })).firstName;
+    const draft = await draftBoardWithAi({ kidId: kid.id, kidName: name, tenantId: kid.tenantId, brief: input.brief, language: input.language, photos: input.mediaIds.map((mediaId) => ({ mediaId })) });
+    if (!draft) throw new AppError(503, "AI_UNAVAILABLE", "Pravnya couldn't draft the board just now. Try again in a moment, or build it yourself.");
+    return draft;
+  },
+
+  /** AI draft (parent). Same, bound to a kid they own. */
+  async draftForParent(parentId: string, kidId: string, input: { brief: string; language: "en" | "hi"; mediaIds: string[] }) {
+    const kid = await assertOwnsKid(parentId, kidId);
+    const name = (await prisma.kid.findUniqueOrThrow({ where: { id: kid.id }, select: { firstName: true } })).firstName;
+    const draft = await draftBoardWithAi({ kidId: kid.id, kidName: name, tenantId: kid.tenantId, brief: input.brief, language: input.language, photos: input.mediaIds.map((mediaId) => ({ mediaId })) });
+    if (!draft) throw new AppError(503, "AI_UNAVAILABLE", "Pravnya couldn't draft the board just now. Try again in a moment, or build it yourself.");
+    return draft;
   }
 };
 

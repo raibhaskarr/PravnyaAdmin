@@ -10,6 +10,7 @@ import { symbolExists } from "../symbols/symbols";
 import { mediaService } from "../media/media.service";
 import { BUILT_IN_BOARDS } from "./aac.templates";
 import { boardFieldsSchema } from "./aac.schemas";
+import { setTestAiResponse } from "../ai/ai.platform";
 
 // AAC boards: one per child, made from a template (Pravnya's or the centre's) or from scratch, and
 // changed by the child's therapists and parent without overwriting each other.
@@ -251,5 +252,52 @@ describe("AAC boards", () => {
     const parentList = (await api().get(`/api/parent-kids/${w.kid.id}/aac-templates?language=en`).set(bearer(w.fam.token))).body as Template[];
     assert.deepEqual(parentList.filter((t) => t.scope === "CENTRE").map((t) => t.name).sort(), ["Circle time", "Starter for new kids"]);
     assert.equal(parentList.filter((t) => t.scope === "PRAVNYA").length, BUILT_IN_BOARDS.length);
+  });
+
+  test("AI draft: brief + the kid's photos -> a draft board. Symbols are checked, foreign photos dropped; nothing is saved", async () => {
+    const w = await world();
+    const ourPhoto = (await api().post("/api/media").set(bearer(w.therapist.token)).send({ kidId: w.kid.id, base64: await png() })).body;
+    // A photo for Zoya, not for Aarav -- the AI must not be allowed to place it on Aarav's board.
+    const otherKidPhoto = (await api().post("/api/media").set(bearer(w.admin.token)).send({ kidId: w.otherKid.id, base64: await png() })).body;
+
+    setTestAiResponse("aac-board-draft", {
+      name: "Aarav's lunch board",
+      rows: 2, cols: 3,
+      pages: [
+        {
+          key: "home", name: "Home",
+          cells: [
+            { row: 0, col: 0, label: "eat", say: "eat", wordClass: "verb", kind: "word", targetPage: null, picture: { symbolId: "eat_,_to" } },
+            { row: 0, col: 1, label: "my cup", say: "my cup", wordClass: "noun", kind: "word", targetPage: null, picture: { photoIndex: 0 } },
+            { row: 0, col: 2, label: "more", say: "more", wordClass: "describe", kind: "word", targetPage: null, picture: { symbolId: "more" } },
+            { row: 1, col: 1, label: "oops", say: "oops", wordClass: "noun", kind: "word", targetPage: null, picture: { photoIndex: 1 } }, // index 1 doesn't exist after we drop Zoya's photo
+            { row: 1, col: 2, label: "all done", say: "all done", wordClass: "social", kind: "word", targetPage: null, picture: { symbolId: "finish" } }
+          ]
+        }
+      ]
+    });
+    const draft = await api().post("/api/aac-boards/draft").set(bearer(w.therapist.token)).send({
+      kidId: w.kid.id, brief: "A small lunch board for Aarav with his own cup and water", language: "en", mediaIds: [ourPhoto.id, otherKidPhoto.id]
+    });
+    assert.equal(draft.status, 200, JSON.stringify(draft.body));
+    assert.equal(draft.body.name, "Aarav's lunch board");
+    assert.deepEqual([draft.body.rows, draft.body.cols], [2, 3]);
+    // Only Aarav's photo is in the AI's attached images, so photoIndex 0 maps to that; index 1 is rejected by the schema.
+    assert.deepEqual(draft.body.photosUsed, [ourPhoto.id]);
+    const cells = draft.body.pages[0].cells;
+    // "oops" referred to photoIndex 1, which doesn't exist (Zoya's photo was dropped before the AI saw anything). The cell survives with no picture; it shows as a coloured word.
+    assert.deepEqual(cells.map((c: any) => [c.label, c.picture?.kind ?? null]).sort(), [["all done", "symbol"], ["eat", "symbol"], ["more", "symbol"], ["my cup", "photo"], ["oops", null]].sort());
+    // Nothing persisted: no board for this kid.
+    assert.equal(await prisma.aacBoard.count({ where: { kidId: w.kid.id } }), 0);
+
+    // An invented symbol id doesn't kill the draft -- the cell just comes back with no picture.
+    setTestAiResponse("aac-board-draft", { name: "x", rows: 2, cols: 2, pages: [{ key: "home", name: "Home", cells: [{ row: 0, col: 0, label: "hello", say: "hello", wordClass: "noun", kind: "word", targetPage: null, picture: { symbolId: "not-a-real-symbol" } }] }] });
+    const okDraft = await api().post("/api/aac-boards/draft").set(bearer(w.therapist.token)).send({ kidId: w.kid.id, brief: "a tiny test board", language: "en", mediaIds: [] });
+    assert.equal(okDraft.status, 200);
+    assert.equal(okDraft.body.pages[0].cells[0].picture, null);
+
+    // A viewer can't draft; another centre's admin gets forbidden.
+    assert.equal((await api().post("/api/aac-boards/draft").set(bearer(w.viewer.token)).send({ kidId: w.kid.id, brief: "a tiny test board", language: "en", mediaIds: [] })).status, 403);
+    assert.equal((await api().post("/api/aac-boards/draft").set(bearer(w.outsider.token)).send({ kidId: w.kid.id, brief: "a tiny test board", language: "en", mediaIds: [] })).status, 403);
   });
 });
