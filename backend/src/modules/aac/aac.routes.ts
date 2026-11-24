@@ -8,6 +8,14 @@ import { forbidden } from "../../common/errors/AppError";
 import { aacBoardsService, aacTemplatesService } from "./aac.service";
 import { boardFieldsSchema, createBoardSchema, LANGUAGES, parentCreateBoardSchema, saveBoardSchema } from "./aac.schemas";
 
+const draftSchema = z.object({
+  kidId: z.string().uuid(),
+  brief: z.string().trim().min(3).max(2000),
+  language: z.enum(LANGUAGES).default("en"),
+  mediaIds: z.array(z.string().uuid()).max(8).default([])
+});
+const parentDraftSchema = draftSchema.omit({ kidId: true });
+
 const idParams = z.object({ id: z.string().uuid() });
 const languageQuery = z.object({ language: z.enum(LANGUAGES).optional() });
 
@@ -39,6 +47,13 @@ aacBoardsRoutes.delete(
     await aacBoardsService.removeForStaff(req.user!, req.params.id);
     res.status(204).end();
   })
+);
+// Draft a new board from a brief + photos. Returns a draft only; the therapist saves it via POST /.
+aacBoardsRoutes.post(
+  "/draft",
+  blockViewer,
+  validateRequest({ body: draftSchema }),
+  asyncHandler(async (req, res) => res.json(await aacBoardsService.draftForStaff(req.user!, req.body)))
 );
 
 // /api/aac-templates: a superadmin manages Pravnya's; centre staff see Pravnya's and their centre's.
@@ -107,6 +122,11 @@ parentAacRoutes.delete(
     await aacBoardsService.removeForParent(req.parent!.id, req.params.kidId, req.params.id);
     res.status(204).end();
   })
+);
+parentAacRoutes.post(
+  "/:kidId/aac-board/draft",
+  validateRequest({ params: kidParams, body: parentDraftSchema }),
+  asyncHandler(async (req, res) => res.json(await aacBoardsService.draftForParent(req.parent!.id, req.params.kidId, req.body)))
 );
 parentAacRoutes.get(
   "/:kidId/aac-templates",

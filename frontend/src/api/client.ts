@@ -451,6 +451,14 @@ export const api = {
   deleteAacBoard(token: string, id: string) {
     return request<void>(`/aac-boards/${id}`, { token, method: "DELETE" });
   },
+  /** Draft a board with the AI from a brief and a few uploaded photos. Returns a draft only; create it with createAacBoard. */
+  draftAacBoard(token: string, body: { kidId: string; brief: string; language: "en" | "hi"; mediaIds: string[] }) {
+    return request<AacBoardFields & { photosUsed: string[] }>("/aac-boards/draft", { token, method: "POST", body });
+  },
+  /** Upload a photo for a child (returns the media id); used by the AI draft and by cell photo pickers. */
+  uploadKidPhoto(token: string, kidId: string, base64: string) {
+    return request<{ id: string; url: string }>("/media", { token, method: "POST", body: { kidId, base64 } });
+  },
   listAacTemplates(token: string, language?: "en" | "hi") {
     return request<AacTemplate[]>(`/aac-templates${language ? `?language=${language}` : ""}`, { token });
   },
