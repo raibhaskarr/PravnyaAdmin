@@ -70,7 +70,7 @@ describe("visual schedules", () => {
     assert.equal(res.body.title, "दाँत साफ़ करना");
     assert.equal(res.body.steps[1].label, "ब्रश करो");
     assert.equal(res.body.steps[1].minutes, 2);
-    assert.match(res.body.steps[1].picture.url, /^https:\/\/.+\.svg$/);
+    assert.match(res.body.steps[1].picture.url, /^https:\/\/.+\.(svg|png)$/);
 
     const before = await api().get(`/api/parent-kids/${w.kid.id}/visual-schedules`).set(bearer(w.fam.token));
     assert.deepEqual(before.body.schedules, []);

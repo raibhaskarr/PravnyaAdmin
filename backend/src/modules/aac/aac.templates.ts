@@ -9,9 +9,9 @@ type Spec = [string, string, string | null, W] | [string, string, string | null,
 
 export type BuiltInBoard = { key: string; name: { en: string; hi: string }; rows: number; cols: number; pages: { key: string; name: { en: string; hi: string }; cells: (Spec | null)[] }[] };
 
-// "more" and "all done" sit in the same squares on every page, so the child finds them by habit.
-const MORE: Spec = ["more", "और", "more", "describe"];
-const DONE: Spec = ["all done", "हो गया", "finish", "social"];
+// "arasaac:5508" and "all done" sit in the same squares on every page, so the child finds them by habit.
+const MORE: Spec = ["arasaac:5508", "और", "arasaac:5508", "describe"];
+const DONE: Spec = ["all done", "हो गया", "arasaac:5358", "social"];
 
 export const BUILT_IN_BOARDS: BuiltInBoard[] = [
   {
@@ -23,7 +23,7 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
       {
         key: "home",
         name: { en: "Home", hi: "होम" },
-        cells: [MORE, DONE, ["help", "मदद", "help_,_to", "verb"], ["eat", "खाना", "eat_,_to", "verb"], ["drink", "पीना", "drink_,_to", "verb"], ["play", "खेलना", "play_,_to", "verb"]]
+        cells: [MORE, DONE, ["help", "मदद", "arasaac:32648", "verb"], ["eat", "खाना", "arasaac:6456", "verb"], ["drink", "पीना", "arasaac:4575", "verb"], ["play", "खेलना", "arasaac:6537", "verb"]]
       }
     ]
   },
@@ -37,42 +37,42 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["I", "मैं", "I", "pronoun"], ["you", "तुम", null, "pronoun"], ["want", "चाहिए", "want_,_to", "verb"], MORE, ["help", "मदद", "help_,_to", "verb"], DONE,
-          ["go", "चलो", "go_,_to", "verb"], ["stop", "रुको", null, "verb"], ["eat", "खाना", "eat_,_to", "verb"], ["drink", "पीना", "drink_,_to", "verb"], ["play", "खेलना", "play_,_to", "verb"], ["look", "देखो", "look_,_to", "verb"],
-          ["yes", "हाँ", null, "social"], ["no", "नहीं", null, "social"], ["open", "खोलो", "open_,_to", "verb"], ["up", "ऊपर", "up", "describe"], ["down", "नीचे", "down", "describe"], ["good", "अच्छा", "good", "describe"],
-          ["what", "क्या", "what", "question"], ["where", "कहाँ", "where", "question"], ["Food", "खाना-पीना", "food", "folder", "food"], ["Toys", "खिलौने", "toys", "folder", "toys"], ["Feelings", "भावनाएँ", "happy_man", "folder", "feelings"], ["People", "लोग", "family", "folder", "people"]
+          ["arasaac:6632", "मैं", "arasaac:6632", "pronoun"], ["you", "तुम", null, "pronoun"], ["want", "चाहिए", "arasaac:5441", "verb"], MORE, ["help", "मदद", "arasaac:32648", "verb"], DONE,
+          ["go", "चलो", "arasaac:8142", "verb"], ["stop", "रुको", null, "verb"], ["eat", "खाना", "arasaac:6456", "verb"], ["drink", "पीना", "arasaac:4575", "verb"], ["play", "खेलना", "arasaac:6537", "verb"], ["look", "देखो", "arasaac:6564", "verb"],
+          ["yes", "हाँ", null, "social"], ["no", "नहीं", null, "social"], ["open", "खोलो", "arasaac:24825", "verb"], ["arasaac:5388", "ऊपर", "arasaac:5388", "describe"], ["arasaac:5355", "नीचे", "arasaac:5355", "describe"], ["arasaac:4581", "अच्छा", "arasaac:4581", "describe"],
+          ["arasaac:22620", "क्या", "arasaac:22620", "question"], ["arasaac:7764", "कहाँ", "arasaac:7764", "question"], ["Food", "खाना-पीना", "arasaac:4610", "folder", "arasaac:4610"], ["Toys", "खिलौने", "arasaac:9813", "folder", "arasaac:9813"], ["Feelings", "भावनाएँ", "arasaac:35533", "folder", "feelings"], ["People", "लोग", "arasaac:2392", "folder", "people"]
         ]
       },
       {
-        key: "food",
+        key: "arasaac:4610",
         name: { en: "Food", hi: "खाना-पीना" },
         cells: [
-          ["apple", "सेब", "apple", "noun"], ["banana", "केला", "banana", "noun"], ["biscuit", "बिस्कुट", "biscuits", "noun"], MORE, ["rice", "चावल", "rice", "noun"], DONE,
-          ["bread", "रोटी", "bread", "noun"], ["milk", "दूध", "milk", "noun"], ["water", "पानी", "water", "noun"], ["juice", "जूस", "apple_juice", "noun"], ["hot", "गरम", "hot", "describe"], ["eat", "खाना", "eat_,_to", "verb"]
+          ["arasaac:2462", "सेब", "arasaac:2462", "noun"], ["arasaac:2530", "केला", "arasaac:2530", "noun"], ["biscuit", "बिस्कुट", "arasaac:2402", "noun"], MORE, ["arasaac:6911", "चावल", "arasaac:6911", "noun"], DONE,
+          ["arasaac:2494", "रोटी", "arasaac:2494", "noun"], ["arasaac:2445", "दूध", "arasaac:2445", "noun"], ["arasaac:2816", "पानी", "arasaac:2816", "noun"], ["juice", "जूस", "arasaac:11403", "noun"], ["arasaac:2300", "गरम", "arasaac:2300", "describe"], ["eat", "खाना", "arasaac:6456", "verb"]
         ]
       },
       {
-        key: "toys",
+        key: "arasaac:9813",
         name: { en: "Toys", hi: "खिलौने" },
         cells: [
-          ["ball", "गेंद", "ball", "noun"], ["car", "गाड़ी", "toy_car", "noun"], ["bubbles", "बुलबुले", "bubbles", "noun"], MORE, ["doll", "गुड़िया", "doll", "noun"], DONE,
-          ["swing", "झूला", "swing", "noun"], ["music", "गाना", "music", "noun"], ["book", "किताब", "read_book_,_to", "noun"], ["outside", "बाहर", "outside", "describe"], ["my turn", "मेरी बारी", null, "social"], ["play", "खेलना", "play_,_to", "verb"]
+          ["arasaac:3241", "गेंद", "arasaac:3241", "noun"], ["arasaac:2339", "गाड़ी", "arasaac:2340", "noun"], ["arasaac:6945", "बुलबुले", "arasaac:6945", "noun"], MORE, ["arasaac:26238", "गुड़िया", "arasaac:26238", "noun"], DONE,
+          ["arasaac:4608", "झूला", "arasaac:4608", "noun"], ["arasaac:24791", "गाना", "arasaac:24791", "noun"], ["book", "किताब", "arasaac:7141", "noun"], ["arasaac:5475", "बाहर", "arasaac:5475", "describe"], ["my turn", "मेरी बारी", null, "social"], ["play", "खेलना", "arasaac:6537", "verb"]
         ]
       },
       {
         key: "feelings",
         name: { en: "Feelings", hi: "भावनाएँ" },
         cells: [
-          ["happy", "खुश", "happy_man", "describe"], ["sad", "उदास", "sad_man", "describe"], ["angry", "गुस्सा", "angry_man", "describe"], MORE, ["scared", "डर", "afraid_man", "describe"], DONE,
-          ["tired", "थका", null, "describe"], ["hurts", "दर्द", null, "describe"], ["funny", "मज़ेदार", "funny_laugh", "describe"], ["help", "मदद", "help_,_to", "verb"]
+          ["happy", "खुश", "arasaac:35533", "describe"], ["sad", "उदास", "arasaac:35545", "describe"], ["angry", "गुस्सा", "arasaac:35539", "describe"], MORE, ["scared", "डर", "arasaac:35535", "describe"], DONE,
+          ["tired", "थका", null, "describe"], ["hurts", "दर्द", null, "describe"], ["funny", "मज़ेदार", "arasaac:8593", "describe"], ["help", "मदद", "arasaac:32648", "verb"]
         ]
       },
       {
         key: "people",
         name: { en: "People", hi: "लोग" },
         cells: [
-          ["Mummy", "मम्मी", "mum_parent", "pronoun"], ["Papa", "पापा", "dad_parent", "pronoun"], ["brother", "भाई", "brother", "pronoun"], MORE, ["sister", "बहन", "sister", "pronoun"], DONE,
-          ["Grandma", "दादी", "grandmother", "pronoun"], ["teacher", "टीचर", "teacher_1a", "pronoun"], ["I", "मैं", "I", "pronoun"], ["you", "तुम", null, "pronoun"]
+          ["Mummy", "मम्मी", "arasaac:2458", "pronoun"], ["Papa", "पापा", "arasaac:2497", "pronoun"], ["arasaac:2423", "भाई", "arasaac:2423", "pronoun"], MORE, ["arasaac:2422", "बहन", "arasaac:2422", "pronoun"], DONE,
+          ["Grandma", "दादी", "arasaac:23710", "pronoun"], ["teacher", "टीचर", "arasaac:2457", "pronoun"], ["arasaac:6632", "मैं", "arasaac:6632", "pronoun"], ["you", "तुम", null, "pronoun"]
         ]
       }
     ]
@@ -87,7 +87,7 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
       {
         key: "home",
         name: { en: "Home", hi: "होम" },
-        cells: [MORE, ["help", "मदद", "help_,_to", "verb"], ["stop", "रुको", "traffic_lights", "verb"], DONE]
+        cells: [MORE, ["help", "मदद", "arasaac:32648", "verb"], ["stop", "रुको", "arasaac:2567", "verb"], DONE]
       }
     ]
   },
@@ -101,9 +101,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["eat", "खाना", "eat_,_to", "verb"], ["drink", "पीना", "drink_,_to", "verb"], MORE, DONE,
-          ["hungry", "भूख", "hungry", "describe"], ["thirsty", "प्यास", "thirsty", "describe"], ["hot", "गरम", "hot", "describe"], ["help", "मदद", "help_,_to", "verb"],
-          ["water", "पानी", "water", "noun"], ["milk", "दूध", "milk", "noun"], ["rice", "चावल", "rice", "noun"], ["spoon", "चम्मच", "spoon", "noun"]
+          ["eat", "खाना", "arasaac:6456", "verb"], ["drink", "पीना", "arasaac:4575", "verb"], MORE, DONE,
+          ["arasaac:4962", "भूख", "arasaac:4962", "describe"], ["arasaac:4963", "प्यास", "arasaac:4963", "describe"], ["arasaac:2300", "गरम", "arasaac:2300", "describe"], ["help", "मदद", "arasaac:32648", "verb"],
+          ["arasaac:2816", "पानी", "arasaac:2816", "noun"], ["arasaac:2445", "दूध", "arasaac:2445", "noun"], ["arasaac:6911", "चावल", "arasaac:6911", "noun"], ["arasaac:2362", "चम्मच", "arasaac:2362", "noun"]
         ]
       }
     ]
@@ -118,9 +118,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["play", "खेलना", "play_,_to", "verb"], ["more", "और", "more", "describe"], ["my turn", "मेरी बारी", "star", "social"], DONE,
-          ["your turn", "तुम्हारी बारी", null, "social"], ["help", "मदद", "help_,_to", "verb"], ["stop", "रुको", "traffic_lights", "verb"], ["share", "साथ में", "share_,_to", "verb"],
-          ["ball", "गेंद", "ball", "noun"], ["car", "गाड़ी", "toy_car", "noun"], ["doll", "गुड़िया", "doll", "noun"], ["book", "किताब", "read_book_,_to", "noun"]
+          ["play", "खेलना", "arasaac:6537", "verb"], ["arasaac:5508", "और", "arasaac:5508", "describe"], ["my turn", "मेरी बारी", "arasaac:2752", "social"], DONE,
+          ["your turn", "तुम्हारी बारी", null, "social"], ["help", "मदद", "arasaac:32648", "verb"], ["stop", "रुको", "arasaac:2567", "verb"], ["share", "साथ में", "arasaac:38900", "verb"],
+          ["arasaac:3241", "गेंद", "arasaac:3241", "noun"], ["arasaac:2339", "गाड़ी", "arasaac:2340", "noun"], ["arasaac:26238", "गुड़िया", "arasaac:26238", "noun"], ["book", "किताब", "arasaac:7141", "noun"]
         ]
       }
     ]
@@ -135,9 +135,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["happy", "खुश", "happy_man", "describe"], ["sad", "उदास", "sad_man", "describe"], ["angry", "गुस्सा", "angry_man", "describe"], ["scared", "डर", "afraid_man", "describe"],
-          ["tired", "थका", null, "describe"], ["hurts", "दर्द", null, "describe"], ["funny", "मज़ेदार", "funny_laugh", "describe"], ["excited", "उत्साहित", "excited_man", "describe"],
-          ["I", "मैं", "I", "pronoun"], ["help", "मदद", "help_,_to", "verb"], ["hug", "झप्पी", "hug_,_to", "verb"], DONE
+          ["happy", "खुश", "arasaac:35533", "describe"], ["sad", "उदास", "arasaac:35545", "describe"], ["angry", "गुस्सा", "arasaac:35539", "describe"], ["scared", "डर", "arasaac:35535", "describe"],
+          ["tired", "थका", null, "describe"], ["hurts", "दर्द", null, "describe"], ["funny", "मज़ेदार", "arasaac:8593", "describe"], ["excited", "उत्साहित", "arasaac:39090", "describe"],
+          ["arasaac:6632", "मैं", "arasaac:6632", "pronoun"], ["help", "मदद", "arasaac:32648", "verb"], ["hug", "झप्पी", "arasaac:4550", "verb"], DONE
         ]
       }
     ]
@@ -152,9 +152,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["go", "चलो", "go_,_to", "verb"], ["stop", "रुको", "traffic_lights", "verb"], MORE, DONE,
-          ["car", "गाड़ी", "car", "noun"], ["bus", "बस", "bus", "noun"], ["auto", "ऑटो", null, "noun"], ["park", "पार्क", "park_,_to", "noun"],
-          ["shop", "दुकान", "shop", "noun"], ["home", "घर", "house", "noun"], ["toilet", "टॉयलेट", "toilet_,_go_to_the", "noun"], ["help", "मदद", "help_,_to", "verb"]
+          ["go", "चलो", "arasaac:8142", "verb"], ["stop", "रुको", "arasaac:2567", "verb"], MORE, DONE,
+          ["arasaac:2339", "गाड़ी", "arasaac:2339", "noun"], ["arasaac:2262", "बस", "arasaac:2262", "noun"], ["auto", "ऑटो", null, "noun"], ["park", "पार्क", "arasaac:5379", "noun"],
+          ["arasaac:8986", "दुकान", "arasaac:8986", "noun"], ["home", "घर", "arasaac:6964", "noun"], ["arasaac:5921", "टॉयलेट", "arasaac:5921", "noun"], ["help", "मदद", "arasaac:32648", "verb"]
         ]
       }
     ]
@@ -169,9 +169,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["brush teeth", "ब्रश", "brush_teeth_,_to", "verb"], ["pyjamas", "नाइट सूट", "pyjamas", "noun"], ["book", "किताब", "read_book_,_to", "noun"],
-          ["water", "पानी", "water", "noun"], ["song", "गाना", "music", "noun"], ["hug", "झप्पी", "hug_,_to", "verb"],
-          ["light off", "लाइट बंद", "turn_off_light_switch_,_to", "verb"], ["bed", "बिस्तर", "bed_time", "noun"], DONE
+          ["brush teeth", "ब्रश", "arasaac:2326", "verb"], ["arasaac:2522", "नाइट सूट", "arasaac:2522", "noun"], ["book", "किताब", "arasaac:7141", "noun"],
+          ["arasaac:2816", "पानी", "arasaac:2816", "noun"], ["song", "गाना", "arasaac:24791", "noun"], ["hug", "झप्पी", "arasaac:4550", "verb"],
+          ["light off", "लाइट बंद", "arasaac:8619", "verb"], ["bed", "बिस्तर", "arasaac:25900", "noun"], DONE
         ]
       }
     ]
@@ -186,16 +186,16 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["I", "मैं", "I", "pronoun"], ["help", "मदद", "help_,_to", "verb"], ["toilet", "टॉयलेट", "toilet_,_go_to_the", "noun"], ["water", "पानी", "water", "noun"],
-          ["break", "ब्रेक", "break_time_1", "noun"], ["snack", "नाश्ता", "biscuits", "noun"], ["more", "और", "more", "describe"], DONE,
-          ["teacher", "टीचर", "teacher_1a", "pronoun"], ["friend", "दोस्त", null, "pronoun"], ["pencil", "पेंसिल", "pencil", "noun"], ["book", "किताब", "read_book_,_to", "noun"],
-          ["I don't understand", "समझ नहीं आया", "confused_man", "social"], ["my turn", "मेरी बारी", "star", "social"], ["listen", "सुनो", null, "verb"], ["music", "गाना", "music", "noun"]
+          ["arasaac:6632", "मैं", "arasaac:6632", "pronoun"], ["help", "मदद", "arasaac:32648", "verb"], ["arasaac:5921", "टॉयलेट", "arasaac:5921", "noun"], ["arasaac:2816", "पानी", "arasaac:2816", "noun"],
+          ["break", "ब्रेक", "arasaac:6604", "noun"], ["snack", "नाश्ता", "arasaac:2402", "noun"], ["arasaac:5508", "और", "arasaac:5508", "describe"], DONE,
+          ["teacher", "टीचर", "arasaac:2457", "pronoun"], ["friend", "दोस्त", null, "pronoun"], ["arasaac:2440", "पेंसिल", "arasaac:2440", "noun"], ["book", "किताब", "arasaac:7141", "noun"],
+          ["I don't understand", "समझ नहीं आया", "arasaac:2352", "social"], ["my turn", "मेरी बारी", "arasaac:2752", "social"], ["listen", "सुनो", null, "verb"], ["arasaac:24791", "गाना", "arasaac:24791", "noun"]
         ]
       }
     ]
   },
   // "First Words Together" Pranav-style core: a 4-column home with four sub-pages (actions, feelings, body, food).
-  // Modelled on Pranav Roy's own Proloquo2Go layout; "more" and "all done" pinned top-right on every page.
+  // Modelled on Pranav Roy's own Proloquo2Go layout; "arasaac:5508" and "all done" pinned top-right on every page.
   {
     key: "words-together",
     name: { en: "Words Together (4x3 with sub-pages)", hi: "शब्द मिलकर (4x3, सब-पेज के साथ)" },
@@ -206,45 +206,45 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["I", "मैं", "I", "pronoun"], ["you", "तुम", null, "pronoun"], ["want", "चाहिए", "want_,_to", "verb"], MORE,
-          ["not", "नहीं", "cross", "describe"], ["help", "मदद", "help_,_to", "verb"], ["go", "चलो", "go_,_to", "verb"], DONE,
-          ["Actions", "कर्म", "run_,_to", "folder", "actions"], ["Feelings", "भावनाएँ", "happy_man", "folder", "feelings"], ["Body", "शरीर", "body_outline", "folder", "body"], ["Food", "खाना-पीना", "eat_,_to", "folder", "food"]
+          ["arasaac:6632", "मैं", "arasaac:6632", "pronoun"], ["you", "तुम", null, "pronoun"], ["want", "चाहिए", "arasaac:5441", "verb"], MORE,
+          ["not", "नहीं", "arasaac:5976", "describe"], ["help", "मदद", "arasaac:32648", "verb"], ["go", "चलो", "arasaac:8142", "verb"], DONE,
+          ["Actions", "कर्म", "arasaac:6465", "folder", "actions"], ["Feelings", "भावनाएँ", "arasaac:35533", "folder", "feelings"], ["Body", "शरीर", "arasaac:6473", "folder", "body"], ["Food", "खाना-पीना", "arasaac:6456", "folder", "arasaac:4610"]
         ]
       },
       {
         key: "actions",
         name: { en: "Actions", hi: "कर्म" },
         cells: [
-          ["eat", "खाना", "eat_,_to", "verb"], ["drink", "पीना", "drink_,_to", "verb"], ["play", "खेलना", "play_,_to", "verb"], MORE,
-          ["run", "दौड़ो", "run_,_to", "verb"], ["jump", "कूदो", "jump_,_to", "verb"], ["sleep", "सोना", "sleep_male_,_to", "verb"], DONE,
-          ["dance", "नाचो", "dance_,_to", "verb"], ["read", "पढ़ो", "read_book_,_to", "verb"], ["write", "लिखो", "write_,_to", "verb"], ["sing", "गाओ", "sing_,_to", "verb"]
+          ["eat", "खाना", "arasaac:6456", "verb"], ["drink", "पीना", "arasaac:4575", "verb"], ["play", "खेलना", "arasaac:6537", "verb"], MORE,
+          ["run", "दौड़ो", "arasaac:6465", "verb"], ["jump", "कूदो", "arasaac:6607", "verb"], ["sleep", "सोना", "arasaac:6479", "verb"], DONE,
+          ["dance", "नाचो", "arasaac:6052", "verb"], ["read", "पढ़ो", "arasaac:7141", "verb"], ["write", "लिखो", "arasaac:2380", "verb"], ["sing", "गाओ", "arasaac:6960", "verb"]
         ]
       },
       {
         key: "feelings",
         name: { en: "Feelings", hi: "भावनाएँ" },
         cells: [
-          ["happy", "खुश", "happy_man", "describe"], ["sad", "उदास", "sad_man", "describe"], ["angry", "गुस्सा", "angry_man", "describe"], MORE,
-          ["scared", "डर", "afraid_man", "describe"], ["love", "प्यार", "heart", "describe"], ["like", "अच्छा लगा", "thumbs", "describe"], DONE,
-          ["bored", "बोर", null, "describe"], ["excited", "उत्साहित", "excited_man", "describe"], ["funny", "मज़ेदार", "funny_laugh", "describe"], ["tired", "थका", null, "describe"]
+          ["happy", "खुश", "arasaac:35533", "describe"], ["sad", "उदास", "arasaac:35545", "describe"], ["angry", "गुस्सा", "arasaac:35539", "describe"], MORE,
+          ["scared", "डर", "arasaac:35535", "describe"], ["love", "प्यार", "arasaac:4613", "describe"], ["like", "अच्छा लगा", "arasaac:7799", "describe"], DONE,
+          ["bored", "बोर", null, "describe"], ["excited", "उत्साहित", "arasaac:39090", "describe"], ["funny", "मज़ेदार", "arasaac:8593", "describe"], ["tired", "थका", null, "describe"]
         ]
       },
       {
         key: "body",
         name: { en: "Body", hi: "शरीर" },
         cells: [
-          ["head", "सिर", "head", "noun"], ["ear", "कान", "ear", "noun"], ["eye", "आँख", "eye", "noun"], MORE,
-          ["mouth", "मुँह", "mouth", "noun"], ["hand", "हाथ", "clean_hands", "noun"], ["stomach", "पेट", "stomach", "noun"], DONE,
-          ["shoulder", "कंधा", "shoulder", "noun"], ["foot", "पैर", "foot", "noun"], ["leg", "टांग", "leg", "noun"], ["arm", "बाँह", "arm", "noun"]
+          ["arasaac:2673", "सिर", "arasaac:2673", "noun"], ["arasaac:2871", "कान", "arasaac:2871", "noun"], ["arasaac:6573", "आँख", "arasaac:6573", "noun"], MORE,
+          ["arasaac:2663", "मुँह", "arasaac:2663", "noun"], ["hand", "हाथ", "arasaac:3351", "noun"], ["arasaac:2786", "पेट", "arasaac:2786", "noun"], DONE,
+          ["arasaac:2977", "कंधा", "arasaac:2977", "noun"], ["arasaac:25327", "पैर", "arasaac:25327", "noun"], ["arasaac:8666", "टांग", "arasaac:8666", "noun"], ["arasaac:2669", "बाँह", "arasaac:2669", "noun"]
         ]
       },
       {
-        key: "food",
+        key: "arasaac:4610",
         name: { en: "Food", hi: "खाना-पीना" },
         cells: [
-          ["milk", "दूध", "milk", "noun"], ["water", "पानी", "water", "noun"], ["rice", "चावल", "rice", "noun"], MORE,
-          ["bread", "ब्रेड", "bread", "noun"], ["chapati", "रोटी", "bread", "noun"], ["apple", "सेब", "apple", "noun"], DONE,
-          ["banana", "केला", "banana", "noun"], ["biscuit", "बिस्कुट", "biscuits", "noun"], ["egg", "अंडा", "egg", "noun"], ["juice", "जूस", "apple_juice", "noun"]
+          ["arasaac:2445", "दूध", "arasaac:2445", "noun"], ["arasaac:2816", "पानी", "arasaac:2816", "noun"], ["arasaac:6911", "चावल", "arasaac:6911", "noun"], MORE,
+          ["arasaac:2494", "ब्रेड", "arasaac:2494", "noun"], ["chapati", "रोटी", "arasaac:2494", "noun"], ["arasaac:2462", "सेब", "arasaac:2462", "noun"], DONE,
+          ["arasaac:2530", "केला", "arasaac:2530", "noun"], ["biscuit", "बिस्कुट", "arasaac:2402", "noun"], ["arasaac:2427", "अंडा", "arasaac:2427", "noun"], ["juice", "जूस", "arasaac:11403", "noun"]
         ]
       }
     ]
@@ -260,9 +260,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["before", "पहले", "before", "describe"], ["next", "अगला", "next", "describe"], ["after", "बाद में", "after", "describe"],
-          ["beginning", "शुरू", "begin_start", "describe"], ["middle", "बीच", "middle", "describe"], ["end", "अंत", "finish", "describe"],
-          ["first", "पहला", "first", "describe"], ["last", "आखिरी", "last", "describe"], ["close", "बंद", "close_,_to", "describe"]
+          ["arasaac:7044", "पहले", "arasaac:7044", "describe"], ["arasaac:27331", "अगला", "arasaac:27331", "describe"], ["arasaac:32749", "बाद में", "arasaac:32749", "describe"],
+          ["beginning", "शुरू", "arasaac:5431", "describe"], ["arasaac:5449", "बीच", "arasaac:5449", "describe"], ["end", "अंत", "arasaac:5358", "describe"],
+          ["arasaac:32129", "पहला", "arasaac:32129", "describe"], ["arasaac:4765", "आखिरी", "arasaac:4765", "describe"], ["close", "बंद", "arasaac:24976", "describe"]
         ]
       }
     ]
@@ -277,9 +277,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["in", "अंदर", "in", "describe"], ["on", "ऊपर", "on", "describe"], ["under", "नीचे", "under_1", "describe"],
-          ["over", "ऊपर से", "over", "describe"], ["between", "बीच में", "between", "describe"], ["near", "पास", "near", "describe"],
-          ["behind", "पीछे", "behind", "describe"], ["in front", "सामने", null, "describe"], ["beside", "बग़ल में", null, "describe"]
+          ["arasaac:7034", "अंदर", "arasaac:7034", "describe"], ["arasaac:7814", "ऊपर", "arasaac:7814", "describe"], ["under", "नीचे", "under_1", "describe"],
+          ["arasaac:7814", "ऊपर से", "arasaac:7814", "describe"], ["arasaac:7765", "बीच में", "arasaac:7765", "describe"], ["arasaac:30383", "पास", "arasaac:30383", "describe"],
+          ["arasaac:7818", "पीछे", "arasaac:7818", "describe"], ["in front", "सामने", null, "describe"], ["beside", "बग़ल में", null, "describe"]
         ]
       }
     ]
@@ -294,9 +294,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["who", "कौन", "who", "question"], ["what", "क्या", "what", "question"], MORE,
-          ["where", "कहाँ", "where", "question"], ["when", "कब", "when", "question"], DONE,
-          ["why", "क्यों", "why", "question"], ["how", "कैसे", "how", "question"], ["how many", "कितने", "how_many", "question"]
+          ["arasaac:9853", "कौन", "arasaac:9853", "question"], ["arasaac:22620", "क्या", "arasaac:22620", "question"], MORE,
+          ["arasaac:7764", "कहाँ", "arasaac:7764", "question"], ["arasaac:32874", "कब", "arasaac:32874", "question"], DONE,
+          ["arasaac:36719", "क्यों", "arasaac:36719", "question"], ["arasaac:22619", "कैसे", "arasaac:22619", "question"], ["how many", "कितने", "arasaac:24731", "question"]
         ]
       }
     ]
@@ -311,9 +311,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["eat", "खाना", "eat_,_to", "verb"], ["drink", "पीना", "drink_,_to", "verb"], MORE,
-          ["run", "दौड़ो", "run_,_to", "verb"], ["jump", "कूदो", "jump_,_to", "verb"], DONE,
-          ["sleep", "सोना", "sleep_male_,_to", "verb"], ["dance", "नाचो", "dance_,_to", "verb"], ["play", "खेलना", "play_,_to", "verb"]
+          ["eat", "खाना", "arasaac:6456", "verb"], ["drink", "पीना", "arasaac:4575", "verb"], MORE,
+          ["run", "दौड़ो", "arasaac:6465", "verb"], ["jump", "कूदो", "arasaac:6607", "verb"], DONE,
+          ["sleep", "सोना", "arasaac:6479", "verb"], ["dance", "नाचो", "arasaac:6052", "verb"], ["play", "खेलना", "arasaac:6537", "verb"]
         ]
       }
     ]
@@ -328,9 +328,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["head", "सिर", "head", "noun"], ["ear", "कान", "ear", "noun"], ["mouth", "मुँह", "mouth", "noun"],
-          ["eye", "आँख", "eye", "noun"], ["nose", "नाक", null, "noun"], ["hand", "हाथ", "clean_hands", "noun"],
-          ["stomach", "पेट", "stomach", "noun"], ["foot", "पैर", "foot", "noun"], ["back", "पीठ", "back", "noun"]
+          ["arasaac:2673", "सिर", "arasaac:2673", "noun"], ["arasaac:2871", "कान", "arasaac:2871", "noun"], ["arasaac:2663", "मुँह", "arasaac:2663", "noun"],
+          ["arasaac:6573", "आँख", "arasaac:6573", "noun"], ["nose", "नाक", null, "noun"], ["hand", "हाथ", "arasaac:3351", "noun"],
+          ["arasaac:2786", "पेट", "arasaac:2786", "noun"], ["arasaac:25327", "पैर", "arasaac:25327", "noun"], ["arasaac:2748", "पीठ", "arasaac:2748", "noun"]
         ]
       }
     ]
@@ -345,9 +345,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["happy", "खुश", "happy_man", "describe"], ["sad", "उदास", "sad_man", "describe"], ["angry", "गुस्सा", "angry_man", "describe"],
-          ["scared", "डर", "afraid_man", "describe"], ["love", "प्यार", "heart", "describe"], ["like", "अच्छा लगा", "thumbs", "describe"],
-          ["bored", "बोर", null, "describe"], ["excited", "उत्साहित", "excited_man", "describe"], ["funny", "मज़ेदार", "funny_laugh", "describe"]
+          ["happy", "खुश", "arasaac:35533", "describe"], ["sad", "उदास", "arasaac:35545", "describe"], ["angry", "गुस्सा", "arasaac:35539", "describe"],
+          ["scared", "डर", "arasaac:35535", "describe"], ["love", "प्यार", "arasaac:4613", "describe"], ["like", "अच्छा लगा", "arasaac:7799", "describe"],
+          ["bored", "बोर", null, "describe"], ["excited", "उत्साहित", "arasaac:39090", "describe"], ["funny", "मज़ेदार", "arasaac:8593", "describe"]
         ]
       }
     ]
@@ -362,9 +362,9 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["t-shirt", "टी-शर्ट", "t-shirt", "noun"], ["pants", "पैंट", "pants", "noun"], MORE,
-          ["jumper", "स्वेटर", "jumper", "noun"], ["jacket", "जैकेट", "jacket", "noun"], DONE,
-          ["shoes", "जूते", "trainers", "noun"], ["socks", "मोज़े", "socks", "noun"], ["cap", "टोपी", "cap", "noun"]
+          ["arasaac:2309", "टी-शर्ट", "arasaac:2309", "noun"], ["arasaac:2565", "पैंट", "arasaac:2565", "noun"], MORE,
+          ["arasaac:2436", "स्वेटर", "arasaac:2436", "noun"], ["arasaac:4872", "जैकेट", "arasaac:4872", "noun"], DONE,
+          ["shoes", "जूते", "arasaac:5991", "noun"], ["arasaac:2298", "मोज़े", "arasaac:2298", "noun"], ["arasaac:2412", "टोपी", "arasaac:2412", "noun"]
         ]
       }
     ]
@@ -379,8 +379,8 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["10 rupees", "10 रुपये", "money", "noun"], ["20 rupees", "20 रुपये", "money", "noun"], ["50 rupees", "50 रुपये", "money", "noun"],
-          ["100 rupees", "100 रुपये", "money", "noun"], ["200 rupees", "200 रुपये", "money", "noun"], ["500 rupees", "500 रुपये", "money", "noun"]
+          ["10 rupees", "10 रुपये", "arasaac:4630", "noun"], ["20 rupees", "20 रुपये", "arasaac:4630", "noun"], ["50 rupees", "50 रुपये", "arasaac:4630", "noun"],
+          ["100 rupees", "100 रुपये", "arasaac:4630", "noun"], ["200 rupees", "200 रुपये", "arasaac:4630", "noun"], ["500 rupees", "500 रुपये", "arasaac:4630", "noun"]
         ]
       }
     ]
@@ -395,8 +395,8 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         key: "home",
         name: { en: "Home", hi: "होम" },
         cells: [
-          ["safe", "सुरक्षित", "thumbs", "describe"], ["dangerous", "ख़तरनाक", "sharp", "describe"],
-          ["don't touch", "मत छुओ", "cross", "verb"], ["I'm not sure", "मुझे पता नहीं", null, "social"]
+          ["safe", "सुरक्षित", "arasaac:7799", "describe"], ["dangerous", "ख़तरनाक", "arasaac:5362", "describe"],
+          ["don't touch", "मत छुओ", "arasaac:5976", "verb"], ["I'm not sure", "मुझे पता नहीं", null, "social"]
         ]
       }
     ]
@@ -412,7 +412,7 @@ export const BUILT_IN_BOARDS: BuiltInBoard[] = [
         name: { en: "Home", hi: "होम" },
         cells: [
           ["public place", "सार्वजनिक जगह", null, "noun"], ["private place", "निजी जगह", null, "noun"],
-          ["at home", "घर पर", "house", "noun"], ["at school", "स्कूल में", "school", "noun"]
+          ["at home", "घर पर", "arasaac:6964", "noun"], ["at school", "स्कूल में", "arasaac:32446", "noun"]
         ]
       }
     ]
