@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { UpdateCard, UpdatesView } from "../updates/Updates";
 import { IepPlanCard, IepPlansView } from "../iep/IepPlans";
 import { AccountSection, DeletionBanner } from "../account/Account";
+import { ChildrenSection } from "../account/Children";
 import { SessionRunner } from "../sessions/SessionRunner";
 import { TodaysSessionCard } from "../sessions/Sessions";
 import { TodaysSchedulesCard, VisualScheduleView } from "../schedules/VisualSchedules";
@@ -611,7 +612,12 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
           kidId={kid.id}
           kidName={kidName}
           focusAccount={initialView === "profile"}
-          account={<AccountSection token={token} email={profile.email} scheduledPurgeAt={profile.scheduledPurgeAt ?? null} onChanged={refetch} />}
+          account={
+            <div className="flex flex-col gap-6">
+              <ChildrenSection token={token} kids={kids} onChanged={refetch} />
+              <AccountSection token={token} email={profile.email} scheduledPurgeAt={profile.scheduledPurgeAt ?? null} onChanged={refetch} />
+            </div>
+          }
         />
       ) : (
       <div className="flex min-h-0 flex-1 flex-col">
