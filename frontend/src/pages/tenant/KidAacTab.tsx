@@ -156,6 +156,7 @@ export function KidAacTab({ kid, canEdit }: { kid: Kid; canEdit: boolean }) {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [stale, setStale] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   function load() {
     setStale(false);
@@ -221,6 +222,19 @@ export function KidAacTab({ kid, canEdit }: { kid: Kid; canEdit: boolean }) {
         Last changed by {board.updatedByName} on {new Date(board.updatedAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}.
       </span>
       <BoardEditor value={draft} onChange={setDraft} disabled={!canEdit} photos={{ kind: "kid", kidId: kid.id }} />
+      {aiOpen && canEdit ? (
+        <AiDraftDialog
+          kid={kid}
+          language={draft.language}
+          onDraft={(b) => {
+            setAiOpen(false);
+            // Load the AI draft into the editor so the therapist reviews and saves it (or reloads to discard).
+            setDraft({ ...b, name: draft.name });
+            setNote("Pravnya's draft is loaded. Tweak anything, then Save board. Reload the board to discard it.");
+          }}
+          onClose={() => setAiOpen(false)}
+        />
+      ) : null}
       {error ? (
         <p className="error-text">
           {error} {stale ? <Button label="Reload the board" className="p-button-text p-button-sm" onClick={load} /> : null}
@@ -230,6 +244,7 @@ export function KidAacTab({ kid, canEdit }: { kid: Kid; canEdit: boolean }) {
       {canEdit ? (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <Button label="Save board" loading={busy === "save"} disabled={busy !== ""} onClick={() => run("save")} />
+          <Button label="Redraft with Pravnya" icon="pi pi-sparkles" className="p-button-outlined" disabled={busy !== ""} onClick={() => setAiOpen(true)} />
           <Button label="Save as centre template" icon="pi pi-clone" className="p-button-outlined" loading={busy === "template"} disabled={busy !== ""} onClick={() => run("template")} />
           <Button label="Delete board" className="p-button-text p-button-danger" loading={busy === "delete"} disabled={busy !== ""} onClick={() => run("delete")} />
         </div>
