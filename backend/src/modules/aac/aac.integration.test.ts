@@ -87,7 +87,8 @@ describe("AAC boards", () => {
     assert.equal(core.pages.find((p) => p.id === food.targetPageId)!.name, "खाना-पीना");
     // "more" is in the same square on every page.
     for (const p of core.pages) assert.equal(p.cells.find((c) => c.row === 0 && c.col === 3)?.label, "और", p.name);
-    assert.match(home.cells[2].picture!.url!, /want_%2C_to\.svg$/);
+    // The "want" cell now carries an ARASAAC id (it was a Mulberry id before the migration).
+    assert.match(home.cells[2].picture!.url!, /(static\.arasaac\.org\/pictograms|mulberrysymbols)/);
   });
 
   test("a therapist makes a child's board from a template; the parent sees and changes it; a stale save is refused, not overwritten", async () => {
@@ -100,7 +101,8 @@ describe("AAC boards", () => {
 
     const forParent = (await api().get(parentUrl(w)).set(bearer(w.fam.token))).body.board as Board;
     assert.equal(forParent.name, "Aarav's board");
-    assert.match(forParent.pages[0].cells[2].picture!.url!, /\.svg$/);
+    // Picture may be Mulberry (.svg) or ARASAAC (.png) after the migration.
+    assert.match(forParent.pages[0].cells[2].picture!.url!, /\.(svg|png)$/);
 
     // The parent hides "stop" for now: the square stays, the child doesn't see it.
     const b1 = fields(forParent);
