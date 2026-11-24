@@ -66,7 +66,7 @@ describe("visual schedules: parents", () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.kind, "ROUTINE");
     assert.equal(res.body.time, "19:30");
-    assert.match(res.body.steps[1].picture.url, /bath\.svg$/);
+    assert.match(res.body.steps[1].picture.url, /(static\.arasaac\.org\/pictograms|mulberrysymbols)/);
     assert.equal(await prisma.visualSchedule.count(), 0);
 
     // Voice works the same way (the audio goes to the AI, never stored).
@@ -83,7 +83,8 @@ describe("visual schedules: parents", () => {
     const photo = (await api().post(`/api/parent-kids/${w.kid.id}/media`).set(bearer(w.fam.token)).send({ base64: PNG.toString("base64") })).body;
     assert.ok(photo.id);
     const sym = await api().get(`/api/parent-kids/${w.kid.id}/symbols?q=bath`).set(bearer(w.fam.token));
-    assert.equal(sym.body.symbols[0].id, "bath");
+    // ARASAAC is the first set searched (so the first result is an arasaac: id).
+    assert.match(sym.body.symbols[0].id as string, /^arasaac:\d+$/);
 
     const made = await parentSchedule(w, { time: "19:30", steps: [step("Bath", { kind: "photo", mediaId: photo.id }), step("Towel")] });
     assert.equal(made.mine, true);

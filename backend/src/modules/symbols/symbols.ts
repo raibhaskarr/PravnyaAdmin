@@ -1,68 +1,58 @@
-import { env } from "../../config/env";
-import index from "./mulberry.json";
+import { mulberry, type Info as MulberryInfo } from "./mulberry";
+import { arasaac, ARASAAC_PREFIX } from "./arasaac";
 
-// The Mulberry symbol set (CC BY-SA 4.0, Steve Lee): ~3,000 simple pictures for schedules and AAC.
-// The list (built by scripts/build-mulberry-index.ts) ships with the code; the pictures are served
-// from SYMBOLS_BASE_URL.
+// Pravnya ships two symbol sets side-by-side: Mulberry (CC BY-SA 4.0, bare ids) and ARASAAC
+// (CC BY-NC-SA 4.0, ids prefixed "arasaac:"). The picker shows ARASAAC first and falls back to
+// Mulberry for anything ARASAAC doesn't have. Bare ids are always Mulberry, so every schedule and
+// AAC board made before ARASAAC was added still works unchanged.
 
-export const SYMBOL_CREDIT = "Symbols: Mulberry Symbols by Steve Lee, CC BY-SA 4.0";
+export type SymbolInfo = MulberryInfo;
 
-export type SymbolInfo = { id: string; label: string; grammar: string; category: string; url: string };
+export const SYMBOL_CREDITS = {
+  arasaac: "Pictograms: ARASAAC Pictograms by Sergio Palao, CC BY-NC-SA 4.0, Government of Aragón.",
+  mulberry: "Symbols: Mulberry Symbols by Steve Lee, CC BY-SA 4.0."
+};
+/** Joined credit shown on a page that uses either set. */
+export const SYMBOL_CREDIT = `${SYMBOL_CREDITS.arasaac} ${SYMBOL_CREDITS.mulberry}`;
 
-type Entry = { id: string; label: string; grammar: string; category: string; words: string[]; tags: string };
-const entries: Entry[] = (index.symbols as string[][]).map(([id, label, grammar, category, tags]) => ({
-  id,
-  label,
-  grammar,
-  category,
-  tags: tags.toLowerCase(),
-  words: label.toLowerCase().split(/[\s-]+/).filter(Boolean)
-}));
-const byId = new Map(entries.map((e) => [e.id, e]));
-
-export function symbolUrl(id: string) {
-  return `${env.SYMBOLS_BASE_URL}/${encodeURIComponent(id)}.svg`;
+export function symbolExists(id: string): boolean {
+  if (id.startsWith(ARASAAC_PREFIX)) return arasaac.exists(id);
+  return mulberry.exists(id);
 }
 
-export function symbolExists(id: string) {
-  return byId.has(id);
+export function symbolUrl(id: string): string {
+  if (id.startsWith(ARASAAC_PREFIX)) return arasaac.get(id)?.url ?? "";
+  return mulberry.get(id)?.url ?? "";
 }
-
-const info = (e: Entry): SymbolInfo => ({ id: e.id, label: e.label, grammar: e.grammar, category: e.category, url: symbolUrl(e.id) });
 
 export function getSymbol(id: string): SymbolInfo | null {
-  const e = byId.get(id);
-  return e ? info(e) : null;
+  if (id.startsWith(ARASAAC_PREFIX)) return arasaac.get(id);
+  return mulberry.get(id);
 }
 
-function score(e: Entry, q: string, qWords: string[]) {
-  const label = e.label.toLowerCase();
-  if (label === q) return 100;
-  if (label.startsWith(q)) return 80 - Math.min(label.length - q.length, 20) / 2;
-  if (qWords.every((w) => e.words.some((x) => x.startsWith(w)))) return 60 - e.words.length;
-  if (qWords.every((w) => e.tags.includes(w) || e.category.toLowerCase().includes(w))) return 30;
-  if (label.includes(q)) return 20;
-  return 0;
-}
-
-/** The best matches for a search like "brush teeth" or "toilet". */
+/** Search both sets. ARASAAC results come first, then Mulberry fills the rest up to `limit`. */
 export function searchSymbols(query: string, limit = 40): SymbolInfo[] {
-  const q = query.trim().toLowerCase().replace(/\s+/g, " ");
-  if (!q) return [];
-  const qWords = q.split(/[\s-]+/).filter(Boolean);
-  // "shoes" should also find "shoe".
-  const singular = (w: string) => (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
-  const sWords = qWords.map(singular);
-  const sq = sWords.join(" ");
-  return entries
-    .map((e) => ({ e, s: Math.max(score(e, q, qWords), sq !== q ? score(e, sq, sWords) - 1 : 0) }))
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s || a.e.label.length - b.e.label.length)
-    .slice(0, limit)
-    .map((x) => info(x.e));
+  const half = Math.ceil(limit / 2);
+  const ar = arasaac.search(query, Math.max(half, limit));
+  const mb = mulberry.search(query, limit);
+  const seen = new Set<string>();
+  const merged: SymbolInfo[] = [];
+  for (const s of ar) {
+    if (seen.has(s.id)) continue;
+    seen.add(s.id);
+    merged.push(s);
+    if (merged.length >= limit) return merged;
+  }
+  for (const s of mb) {
+    if (seen.has(s.id)) continue;
+    seen.add(s.id);
+    merged.push(s);
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }
 
-/** The single best symbol for a word or short phrase, or null. */
+/** The single best match -- prefers ARASAAC. */
 export function bestSymbol(query: string): SymbolInfo | null {
   return searchSymbols(query, 1)[0] ?? null;
 }

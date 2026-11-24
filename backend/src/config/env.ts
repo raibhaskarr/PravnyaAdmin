@@ -74,7 +74,9 @@ const envSchema = z.object({
   // How often the reminder job runs. Never runs in tests.
   SCHEDULE_REMINDERS_ENABLED: boolFromEnv.default(true),
   // Mulberry symbol pictures (see modules/symbols). Pinned to the commit the index was built from.
-  SYMBOLS_BASE_URL: z.string().default("https://cdn.jsdelivr.net/gh/mulberrysymbols/mulberry-symbols@fa94a93ca1b5357c0b6e0d9f8a81c426a1dfefdf/EN")
+  SYMBOLS_BASE_URL: z.string().default("https://cdn.jsdelivr.net/gh/mulberrysymbols/mulberry-symbols@fa94a93ca1b5357c0b6e0d9f8a81c426a1dfefdf/EN"),
+  /** ARASAAC pictograms CDN. Can be swapped for our own bucket once we proxy them. */
+  ARASAAC_BASE_URL: z.string().default("https://static.arasaac.org/pictograms")
 }).superRefine((v, ctx) => {
   if (v.STORAGE_DRIVER !== "s3") return;
   for (const key of ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {

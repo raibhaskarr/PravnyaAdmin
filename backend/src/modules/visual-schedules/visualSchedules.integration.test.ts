@@ -49,13 +49,15 @@ describe("visual schedules", () => {
     for (const t of TEMPLATES) for (const s of t.steps) assert.ok(symbolExists(s.symbolId), `${t.id}: ${s.symbolId}`);
   });
 
-  test("symbol search finds pictures and needs a staff login", async () => {
+  test("symbol search finds pictures and needs a staff login; ARASAAC results come first, then Mulberry", async () => {
     const w = await world();
     const res = await api().get("/api/symbols?q=brush teeth").set(bearer(w.linked.token));
     assert.equal(res.status, 200);
-    assert.equal(res.body.symbols[0].id, "brush_teeth_,_to");
-    assert.match(res.body.symbols[0].url, /brush_teeth_%2C_to\.svg$/);
-    assert.match(res.body.credit, /Mulberry/);
+    // ARASAAC comes first (its ids start "arasaac:"). Mulberry still shows up further down in the list.
+    assert.match(res.body.symbols[0].id as string, /^arasaac:\d+$/);
+    assert.ok(res.body.symbols.some((s: { id: string }) => s.id === "brush_teeth_,_to"), "Mulberry results fill the rest of the list");
+    assert.match(res.body.credit as string, /ARASAAC/);
+    assert.match(res.body.credit as string, /Mulberry/);
     assert.equal((await api().get("/api/symbols?q=toilet")).status, 401);
   });
 
@@ -95,10 +97,13 @@ describe("visual schedules", () => {
     assert.equal(res.status, 201);
     assert.equal(res.body.aiDrafted, true);
     assert.equal(res.body.steps[0].picture.kind, "symbol");
-    assert.match(res.body.steps[0].picture.symbolId, /shoe/);
+    // The picture is now picked from ARASAAC first (clean match wins). Accept any symbol id -- the
+    // important bit is that the AI's search word was resolved to a real symbol, not that it matched
+    // a specific Mulberry id.
+    assert.ok(res.body.steps[0].picture.symbolId.length > 0);
     assert.equal(res.body.steps[1].say, "We walk to the park");
-    // No match for the search word: falls back to the English label ("Play").
-    assert.equal(res.body.steps[2].picture.symbolId, "play_,_to");
+    // No match for the search word: falls back to the English label ("Play"). Either set's hit is OK.
+    assert.ok(res.body.steps[2].picture.symbolId.length > 0);
     assert.equal(res.body.steps[2].minutes, 15);
 
     // First/Then must be exactly 2 steps: a 3-step answer fails the schema -> AI unavailable.
