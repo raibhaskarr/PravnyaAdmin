@@ -159,7 +159,8 @@ describe("schedules at the right time", () => {
     const nowCard = screen.getByText("Time for").closest("button")!;
     expect(within(nowCard).getByText("Morning")).toBeInTheDocument();
     expect(within(nowCard).getByText("Usually 7:30 am")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Bedtime.*8:30 pm/ })).toBeInTheDocument();
+    // "Later today" row: time first then title (20:30 · Bedtime).
+    expect(screen.getByRole("button", { name: /20:30.*Bedtime/ })).toBeInTheDocument();
     expect(screen.queryByText("Park")).not.toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Turn on reminders" })).toBeInTheDocument();
     await user.click(nowCard);

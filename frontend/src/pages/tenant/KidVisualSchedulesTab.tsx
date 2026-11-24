@@ -8,7 +8,9 @@ import { Tag } from "primereact/tag";
 import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { Kid, ScheduleTemplate, VisualSchedule, VisualScheduleKind } from "../../api/types";
-import { blankSteps, daysText, KIND_LABEL, KINDS, LANGUAGES, printSchedule, ScheduleForm, StepStrip, toApiSteps, type ScheduleFormValue } from "../../components/schedules/ScheduleForm";
+import { blankSteps, daysText, DAYS, KIND_LABEL, KINDS, LANGUAGES, printSchedule, ScheduleForm, StepStrip, toApiSteps, type ScheduleFormValue } from "../../components/schedules/ScheduleForm";
+import { WeeklyTimetable } from "../../components/schedules/WeeklyTimetable";
+import { Dialog } from "primereact/dialog";
 
 // Visual (picture) schedules: First/Then boards, routines and day plans the parent shows the child
 // in the app, one picture per step, read aloud. Start from a template (the centre's or Pravnya's),
@@ -25,7 +27,7 @@ function ScheduleCard({ schedule, kidId, canEdit, onChanged }: { schedule: Visua
   const { token, user } = useAuth();
   const [form, setForm] = useState<ScheduleFormValue>({ title: schedule.title, kind: schedule.kind, language: schedule.language, days: schedule.days, time: schedule.time, steps: schedule.steps });
   const [remind, setRemind] = useState(schedule.remind);
-  const [open, setOpen] = useState(schedule.status === "DRAFT");
+  const [open, setOpen] = useState(schedule.status === "DRAFT" || (typeof window !== "undefined" && window.location.hash === `#schedule-${schedule.id}`));
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
@@ -56,7 +58,7 @@ function ScheduleCard({ schedule, kidId, canEdit, onChanged }: { schedule: Visua
   }
 
   return (
-    <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+    <div id={`schedule-${schedule.id}`} className="card" style={{ display: "flex", flexDirection: "column", gap: "0.6rem", scrollMarginTop: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: "0.6rem", alignItems: "flex-start", flexWrap: "wrap" }}>
         <div>
           <strong>{schedule.title}</strong>{" "}
@@ -128,6 +130,44 @@ function TemplateButtons({ title, templates, busy, onPick }: { title: string; te
   );
 }
 
+function ScheduleWhenDialog({ template, onCancel, onConfirm }: { template: ScheduleTemplate; onCancel: () => void; onConfirm: (v: { days: string[]; time: string | null; remind: boolean }) => void }) {
+  const [days, setDays] = useState<string[]>(template.days ?? []);
+  const [time, setTime] = useState<string | null>(template.time ?? null);
+  const [remind, setRemind] = useState(true);
+  return (
+    <Dialog header={`Use "${template.title}" for this child`} visible onHide={onCancel} style={{ width: "min(92vw, 480px)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+        <span className="hint-text">The template copies to this child as a new schedule. Set when it's for; leave time empty and Pravnya learns it from use.</span>
+        <div className="field">
+          <span className="field-label">Days</span>
+          <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+            {DAYS.map((d) => (
+              <label key={d} className="field" style={{ flexDirection: "row", gap: "0.25rem", alignItems: "center" }}>
+                <Checkbox checked={days.includes(d)} onChange={(e) => setDays(e.checked ? DAYS.filter((x) => x === d || days.includes(x)) : days.filter((x) => x !== d))} />
+                {d}
+              </label>
+            ))}
+            <Button label={days.length === 7 ? "Clear" : "Every day"} className="p-button-text p-button-sm" onClick={() => setDays(days.length === 7 ? [] : [...DAYS])} />
+          </div>
+          <span className="hint-text">Leave empty for any day.</span>
+        </div>
+        <div className="field">
+          <span className="field-label">Time (24-hour, India)</span>
+          <InputText value={time ?? ""} onChange={(e) => setTime(e.target.value || null)} placeholder="08:00" maxLength={5} style={{ width: 120 }} />
+        </div>
+        <label className="field" style={{ flexDirection: "row", gap: "0.4rem", alignItems: "center" }}>
+          <Checkbox checked={remind} onChange={(e) => setRemind(!!e.checked)} />
+          Remind the parent at that time (if they've turned on notifications)
+        </label>
+        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+          <Button label="Cancel" className="p-button-text" onClick={onCancel} />
+          <Button label="Add this schedule" icon="pi pi-check" onClick={() => onConfirm({ days, time, remind })} />
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 export function KidVisualSchedulesTab({ kid, canEdit }: { kid: Kid; canEdit: boolean }) {
   const { token } = useAuth();
   const [schedules, setSchedules] = useState<VisualSchedule[] | null>(null);
@@ -137,6 +177,7 @@ export function KidVisualSchedulesTab({ kid, canEdit }: { kid: Kid; canEdit: boo
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [pendingTemplate, setPendingTemplate] = useState<ScheduleTemplate | null>(null);
 
   function load() {
     api.listVisualSchedules(token!, kid.id).then(setSchedules);
@@ -164,7 +205,14 @@ export function KidVisualSchedulesTab({ kid, canEdit }: { kid: Kid; canEdit: boo
   }
 
   if (!schedules) return <p className="empty-state">Loading...</p>;
-  const fromTemplate = (t: ScheduleTemplate) => make(t.id, () => api.visualScheduleFromTemplate(token!, { kidId: kid.id, templateId: t.id }));
+  // "Use this template" opens a small dialog for Days/Time/Remind, then copies the template to this child.
+  const fromTemplate = (t: ScheduleTemplate) => setPendingTemplate(t);
+  const confirmTemplate = (when: { days: string[]; time: string | null; remind: boolean }) => {
+    if (!pendingTemplate) return;
+    const t = pendingTemplate;
+    setPendingTemplate(null);
+    void make(t.id, () => api.visualScheduleFromTemplate(token!, { kidId: kid.id, templateId: t.id, ...when }));
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", maxWidth: 960 }}>
@@ -212,6 +260,15 @@ export function KidVisualSchedulesTab({ kid, canEdit }: { kid: Kid; canEdit: boo
           {error ? <p className="error-text">{error}</p> : null}
         </div>
       ) : null}
+      <WeeklyTimetable
+        schedules={schedules}
+        onOpen={(id) => {
+          window.location.hash = `#schedule-${id}`;
+          const el = document.getElementById(`schedule-${id}`);
+          el?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+      />
+      {pendingTemplate ? <ScheduleWhenDialog template={pendingTemplate} onCancel={() => setPendingTemplate(null)} onConfirm={confirmTemplate} /> : null}
       {schedules.length === 0 ? <p className="empty-state">No picture schedules yet.</p> : null}
       {schedules.map((s) => (
         <ScheduleCard key={s.id + s.status + s.steps.length} schedule={s} kidId={kid.id} canEdit={canEdit} onChanged={load} />

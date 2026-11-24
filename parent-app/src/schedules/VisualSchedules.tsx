@@ -167,12 +167,14 @@ export function TodaysSchedulesCard({ token, schedules, kidName, onOpen }: { tok
         </button>
       ))}
       {rest.length ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-medium text-[var(--pv-ink-faint)]">Later today</p>
           {rest.map((s) => (
-            <button key={s.id} type="button" onClick={() => onOpen(s.id)} className={`flex items-center gap-2 rounded-xl border border-[var(--pv-border)] px-3 py-2 text-sm font-semibold text-[var(--pv-ink)] ${s.doneToday ? "opacity-60" : ""}`}>
-              {s.steps[0] ? <Picture step={s.steps[0]} className="h-7 w-7 bg-white" /> : null}
-              {s.title}
-              {s.doneToday ? <span className="text-[var(--pv-green-700)]">✓</span> : whenText(s) ? <span className="font-normal text-[var(--pv-ink-faint)]">{whenText(s)}</span> : null}
+            <button key={s.id} type="button" onClick={() => onOpen(s.id)} className={`flex items-center gap-3 rounded-xl border border-[var(--pv-border)] px-3 py-2 text-left ${s.doneToday ? "opacity-60" : ""}`}>
+              <span className="w-14 flex-shrink-0 text-sm font-semibold tabular-nums text-[var(--pv-ink-soft)]">{s.timing.time ?? "—"}</span>
+              {s.steps[0] ? <Picture step={s.steps[0]} className="h-9 w-9 flex-shrink-0 bg-white" /> : null}
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--pv-ink)]">{s.title}</span>
+              {s.doneToday ? <span className="text-sm font-semibold text-[var(--pv-green-700)]">✓ Done</span> : s.timing.source === "learned" ? <span className="text-xs text-[var(--pv-ink-faint)]">usually</span> : null}
             </button>
           ))}
         </div>
