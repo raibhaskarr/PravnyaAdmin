@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { api, ApiError } from "../../api/client";
 import type { AacBoard, AacBoardFields, AacTemplate, Kid } from "../../api/types";
 import { BoardEditor, blankBoard } from "../../components/aac/BoardEditor";
+import { AacStats } from "../../components/aac/AacStats";
 import { LANGUAGES } from "../../components/schedules/ScheduleForm";
 
 function readBase64(file: File): Promise<string> {
@@ -215,6 +216,7 @@ export function KidAacTab({ kid, canEdit }: { kid: Kid; canEdit: boolean }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", maxWidth: 1000 }}>
       {!kid.parentId ? <p className="hint-text">This child has no parent account yet; the family sees the board once they join.</p> : null}
+      <AacStats kidId={kid.id} kidName={kid.firstName} />
       <span className="hint-text">
         Last changed by {board.updatedByName} on {new Date(board.updatedAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}.
       </span>

@@ -7,6 +7,18 @@ import { validateRequest } from "../../common/middleware/validateRequest";
 import { forbidden } from "../../common/errors/AppError";
 import { aacBoardsService, aacTemplatesService } from "./aac.service";
 import { boardFieldsSchema, createBoardSchema, LANGUAGES, parentCreateBoardSchema, saveBoardSchema } from "./aac.schemas";
+import { aacStatsService } from "./aac.stats";
+
+const tapsSchema = z.object({
+  taps: z.array(z.object({
+    cellId: z.string().uuid(),
+    pageId: z.string().uuid(),
+    label: z.string().trim().min(1).max(40),
+    wordClass: z.string().max(20),
+    kind: z.enum(["word", "folder"]).default("word"),
+    at: z.string().datetime().optional()
+  })).max(300)
+});
 
 const draftSchema = z.object({
   kidId: z.string().uuid(),
@@ -47,6 +59,12 @@ aacBoardsRoutes.delete(
     await aacBoardsService.removeForStaff(req.user!, req.params.id);
     res.status(204).end();
   })
+);
+// Usage stats for the child's AAC board (how many taps a day, top words, pages never opened).
+aacBoardsRoutes.get(
+  "/stats",
+  validateRequest({ query: z.object({ kidId: z.string().uuid(), windowDays: z.coerce.number().int().min(1).max(90).default(28) }) }),
+  asyncHandler(async (req, res) => res.json({ stats: await aacStatsService.forStaff(req.user!, req.query.kidId as string, req.query.windowDays as unknown as number) }))
 );
 // Draft a new board from a brief + photos. Returns a draft only; the therapist saves it via POST /.
 aacBoardsRoutes.post(
@@ -122,6 +140,17 @@ parentAacRoutes.delete(
     await aacBoardsService.removeForParent(req.parent!.id, req.params.kidId, req.params.id);
     res.status(204).end();
   })
+);
+// Weekly summary for the parent, and a batched log of taps from the talking screen.
+parentAacRoutes.get(
+  "/:kidId/aac-board/stats",
+  validateRequest({ params: kidParams }),
+  asyncHandler(async (req, res) => res.json({ stats: await aacStatsService.summaryForParent(req.parent!.id, req.params.kidId) }))
+);
+parentAacRoutes.post(
+  "/:kidId/aac-board/taps",
+  validateRequest({ params: kidParams, body: tapsSchema }),
+  asyncHandler(async (req, res) => res.json(await aacStatsService.recordForParent(req.parent!.id, req.params.kidId, req.body.taps)))
 );
 parentAacRoutes.post(
   "/:kidId/aac-board/draft",

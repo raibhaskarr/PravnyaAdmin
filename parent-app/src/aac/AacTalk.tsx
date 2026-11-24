@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { assetUrl, type AacBoard, type AacCell } from "../api/client";
 import { useBoardVoice } from "./voice";
 import { CellFace } from "./shared";
+import { TapLog } from "./taps";
 
 // The child's talking board, full screen. Tap a word: it's said aloud (in the recorded voice, if
 // someone recorded it, otherwise the phone's voice) and added to the sentence at
@@ -11,7 +12,7 @@ import { CellFace } from "./shared";
 
 const HOLD_MS = 1200;
 
-export function AacTalk({ board, onClose, onEdit }: { board: AacBoard; onClose: () => void; onEdit?: () => void }) {
+export function AacTalk({ board, token, kidId, onClose, onEdit }: { board: AacBoard; token?: string; kidId?: string; onClose: () => void; onEdit?: () => void }) {
   const [pageId, setPageId] = useState(board.homePageId);
   const [history, setHistory] = useState<string[]>([]);
   const [sentence, setSentence] = useState<AacCell[]>([]);
@@ -22,7 +23,20 @@ export function AacTalk({ board, onClose, onEdit }: { board: AacBoard; onClose: 
 
   const words = (cells: AacCell[]) => cells.map((c) => c.say ?? c.label);
 
+  // Buffered log of every tap: cellId + pageId + label + word class + time, sent to the server
+  // every ~20 s and on page hide. No audio, no sentence; used only for therapist stats and a
+  // weekly summary for the parent.
+  const log = useRef<TapLog | null>(null);
+  useEffect(() => {
+    if (!token || !kidId) return;
+    const l = new TapLog(token, kidId);
+    l.start();
+    log.current = l;
+    return () => l.stop();
+  }, [token, kidId]);
+
   function tap(cell: AacCell) {
+    log.current?.record({ cellId: cell.id, pageId: page.id, label: cell.label, wordClass: cell.wordClass, kind: cell.kind });
     if (cell.kind === "folder" && cell.targetPageId) {
       setHistory((h) => [...h, page.id]);
       setPageId(cell.targetPageId);

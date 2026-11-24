@@ -393,6 +393,7 @@ model Kid {
   visualSchedules VisualSchedule[]
   mediaAssets MediaAsset[]
   aacBoard AacBoard?
+  aacCellTaps AacCellTap[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -1233,6 +1234,31 @@ model AacBoard {
   updatedByName String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  taps          AacCellTap[]
+}
+
+/// One tap on a cell of the child's AAC talking screen (parent app). Lightweight log used only for
+/// usage stats shown to the therapist and a weekly summary to the parent -- no audio or sentence
+/// is kept. Rows are discarded on parent account deletion (via kidId -> Kid cascade).
+model AacCellTap {
+  id        String   @id @default(uuid()) @db.Uuid
+  boardId   String   @db.Uuid
+  board     AacBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  kidId     String   @db.Uuid
+  kid       Kid      @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  /// The cell's id at the time (the board changes over time, so a cell may no longer exist).
+  cellId    String
+  pageId    String
+  /// A copy of the label and word class, so the stat still reads cleanly after the cell is renamed or removed.
+  label     String
+  wordClass String
+  /// "word" (said aloud) or "folder" (opened a sub-page).
+  kind      String   @default("word")
+  at        DateTime @default(now())
+
+  @@index([kidId, at])
+  @@index([boardId, at])
 }
 
 /// A ready-made AAC board to start from: Pravnya's (tenantId null; built-in ones have a builtInKey)
