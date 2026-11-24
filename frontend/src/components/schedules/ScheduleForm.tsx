@@ -22,7 +22,7 @@ export const LANGUAGES = [
   { label: "English", value: "en" },
   { label: "Hindi", value: "hi" }
 ];
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+export const DAYS: readonly string[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const SYMBOL_CREDIT = "Symbols: Mulberry Symbols by Steve Lee, CC BY-SA 4.0";
 const MAX_STEPS: Record<VisualScheduleKind, number> = { FIRST_THEN: 2, ROUTINE: 12, DAY: 16 };
 

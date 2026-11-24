@@ -414,7 +414,7 @@ export const api = {
   createVisualSchedule(token: string, body: { kidId: string; title: string; kind: VisualScheduleKind; language: "en" | "hi"; steps: VisualScheduleStep[]; days: string[]; time?: string | null }) {
     return request<VisualSchedule>("/visual-schedules", { token, method: "POST", body });
   },
-  visualScheduleFromTemplate(token: string, body: { kidId: string; templateId: string }) {
+  visualScheduleFromTemplate(token: string, body: { kidId: string; templateId: string; days?: string[]; time?: string | null; remind?: boolean }) {
     return request<VisualSchedule>("/visual-schedules/from-template", { token, method: "POST", body });
   },
   draftVisualSchedule(token: string, body: { kidId: string; kind: VisualScheduleKind; language: "en" | "hi"; request: string }) {

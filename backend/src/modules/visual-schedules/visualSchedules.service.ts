@@ -112,13 +112,18 @@ export const visualSchedulesService = {
     return create(user, kidId, data);
   },
 
-  /** A copy of a template (Pravnya's, or the user's centre's) as a draft for this child, to change as needed. */
-  async fromTemplate(user: AuthUser, input: { kidId: string; templateId: string }) {
+  /** A copy of a template (Pravnya's, or the user's centre's) as a draft for this child; days/time/remind may be set now. */
+  async fromTemplate(user: AuthUser, input: { kidId: string; templateId: string; days?: string[]; time?: string | null; remind?: boolean }) {
     const kid = await assertCanAccessKid(user, input.kidId);
     const t = await findTemplateForUse(input.templateId, user.tenantId);
     // A guest therapist's own centre's photos don't travel to another centre's child.
     const { steps } = await copySteps(t.steps as unknown as Step[], (a) => a.kidId === null && a.tenantId === kid.tenantId);
-    return create(user, kid.id, { title: t.title, kind: t.kind, language: t.language as Language, steps, days: t.days, time: t.time, remind: true });
+    return create(user, kid.id, {
+      title: t.title, kind: t.kind, language: t.language as Language, steps,
+      days: input.days ?? t.days,
+      time: input.time ?? t.time,
+      remind: input.remind ?? true
+    });
   },
 
   async draft(user: AuthUser, input: { kidId: string; kind: Kind; language: Language; request: string }) {

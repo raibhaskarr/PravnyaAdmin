@@ -36,7 +36,15 @@ visualSchedulesRoutes.post(
 visualSchedulesRoutes.post(
   "/from-template",
   blockViewer,
-  validateRequest({ body: z.object({ kidId: z.string().uuid(), templateId: z.string().uuid() }) }),
+  validateRequest({
+    body: z.object({
+      kidId: z.string().uuid(),
+      templateId: z.string().uuid(),
+      days: z.array(z.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])).max(7).optional(),
+      time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM").nullable().optional(),
+      remind: z.boolean().optional()
+    })
+  }),
   asyncHandler(async (req, res) => res.status(201).json(await visualSchedulesService.fromTemplate(req.user!, req.body)))
 );
 visualSchedulesRoutes.post(
