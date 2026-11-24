@@ -23,7 +23,7 @@ export const LANGUAGES = [
   { label: "Hindi", value: "hi" }
 ];
 export const DAYS: readonly string[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-export const SYMBOL_CREDIT = "Symbols: Mulberry Symbols by Steve Lee, CC BY-SA 4.0";
+export const SYMBOL_CREDIT = "Pictograms: ARASAAC Pictograms by Sergio Palao, CC BY-NC-SA 4.0, Government of Aragón. Symbols: Mulberry Symbols by Steve Lee, CC BY-SA 4.0.";
 const MAX_STEPS: Record<VisualScheduleKind, number> = { FIRST_THEN: 2, ROUTINE: 12, DAY: 16 };
 
 export type ScheduleFormValue = {

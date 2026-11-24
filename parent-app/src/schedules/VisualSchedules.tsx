@@ -7,7 +7,7 @@ import { enablePush, pushState, type PushState } from "./push";
 // hands the phone to the child (or holds it up): one big picture at a time, tap to hear it, "Done"
 // to tick it off. Progress is kept on this device for today only.
 
-export const SYMBOL_CREDIT = "Symbols: Mulberry Symbols by Steve Lee, CC BY-SA 4.0";
+export const SYMBOL_CREDIT = "Pictograms: ARASAAC Pictograms by Sergio Palao, CC BY-NC-SA 4.0, Government of Aragón. Symbols: Mulberry Symbols by Steve Lee, CC BY-SA 4.0.";
 
 const KIND_LABEL: Record<VisualSchedule["kind"], string> = { FIRST_THEN: "First / Then", ROUTINE: "Routine", DAY: "Day plan" };
 
