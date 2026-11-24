@@ -541,6 +541,14 @@ export const api = {
   deleteAacBoard(token: string, kidId: string, id: string) {
     return request<void>(`/parent-kids/${kidId}/aac-board/${id}`, { token, method: "DELETE" });
   },
+  /** Send a batch of taps from the talking screen. The server drops ones whose cell no longer exists. */
+  sendAacTaps(token: string, kidId: string, taps: { cellId: string; pageId: string; label: string; wordClass: string; kind: "word" | "folder"; at: string }[]) {
+    return request<{ saved: number }>(`/parent-kids/${kidId}/aac-board/taps`, { token, method: "POST", body: { taps } });
+  },
+  /** Weekly stats for the parent (last 7 days, top 10 words). Null when there's no board yet. */
+  getAacStats(token: string, kidId: string) {
+    return request<{ stats: { perDay: { date: string; words: number }[]; totals: { words: number; activeDays: number; windowDays: number }; topWords: { label: string; count: number; lastAt: string }[] } | null }>(`/parent-kids/${kidId}/aac-board/stats`, { token });
+  },
   uploadAudio(token: string, kidId: string, base64: string) {
     return request<{ id: string; url: string }>(`/parent-kids/${kidId}/media/audio`, { token, method: "POST", body: { base64 } });
   },

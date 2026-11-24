@@ -8,6 +8,7 @@ import { TodaysSchedulesCard, VisualScheduleView } from "../schedules/VisualSche
 import { ScheduleEditor, ScheduleMaker } from "../schedules/ScheduleMaker";
 import { refreshPush } from "../schedules/push";
 import { AacTalk } from "../aac/AacTalk";
+import { AacWeeklyCard } from "../aac/AacWeeklyCard";
 import { AacEdit } from "../aac/AacEdit";
 import { AacSetup } from "../aac/AacSetup";
 import { loadBoardOffline, saveBoardOffline } from "../aac/shared";
@@ -402,7 +403,7 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
   }
 
   if (view === "aac" && kid && aacBoard) {
-    return <AacTalk board={aacBoard} onClose={() => setView(aacReturnTo)} onEdit={() => setView("aacEdit")} />;
+    return <AacTalk board={aacBoard} token={token} kidId={kid.id} onClose={() => setView(aacReturnTo)} onEdit={() => setView("aacEdit")} />;
   }
 
   if (view === "aacEdit" && kid && aacBoard) {
@@ -687,14 +688,17 @@ export function Home({ token, onSessionExpired, onSignOut, initialView = "home" 
           {todaysSession ? <TodaysSessionCard session={todaysSession} kidName={kidName} onStart={() => startSession(todaysSession.id)} /> : null}
           <TodaysSchedulesCard token={token} schedules={visualSchedules} kidName={kidName} onOpen={openVisualSchedule} />
           {aacBoard ? (
-            <button type="button" onClick={openAac} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] p-4 text-left">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--pv-green-100)] text-lg">🗣️</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[0.98rem] font-semibold text-[var(--pv-ink)]">{kidName}'s talking board</span>
-                <span className="block text-xs text-[var(--pv-ink-faint)]">Open it for {kidName} to tap and talk</span>
-              </span>
-              <span className="text-sm font-semibold text-[var(--pv-green-700)]">Open</span>
-            </button>
+            <>
+              <button type="button" onClick={openAac} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--pv-border)] bg-[var(--pv-surface)] p-4 text-left">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--pv-green-100)] text-lg">🗣️</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[0.98rem] font-semibold text-[var(--pv-ink)]">{kidName}'s talking board</span>
+                  <span className="block text-xs text-[var(--pv-ink-faint)]">Open it for {kidName} to tap and talk</span>
+                </span>
+                <span className="text-sm font-semibold text-[var(--pv-green-700)]">Open</span>
+              </button>
+              {kid ? <AacWeeklyCard token={token} kidId={kid.id} kidName={kidName} /> : null}
+            </>
           ) : null}
 
           {opener && kid ? (
