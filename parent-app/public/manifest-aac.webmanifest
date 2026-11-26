@@ -1,0 +1,14 @@
+{
+  "name": "Pravnya Talk",
+  "short_name": "Talk",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0d4834",
+  "theme_color": "#0d4834",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
