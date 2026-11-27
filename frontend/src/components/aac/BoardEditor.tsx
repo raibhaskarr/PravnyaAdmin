@@ -32,6 +32,22 @@ export function blankBoard(name: string, language: "en" | "hi", rows: number, co
   return { name, language, rows, cols, homePageId: home, pages: [{ id: home, name: language === "hi" ? "होम" : "Home", cells: [] }] };
 }
 
+// Fitzgerald Key legend: parents learn the colour code quicker if the names sit next to the
+// swatches in the editor, rather than only showing up in the cell-type dropdown.
+function WordClassLegend() {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center", fontSize: 12, color: "var(--text-color-secondary, #666)" }} aria-label="Word colour key">
+      <span style={{ fontWeight: 600 }}>Colour key:</span>
+      {WORD_CLASSES.map((c) => (
+        <span key={c.value} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span aria-hidden="true" style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3, background: c.bg, border: `2px solid ${c.border}` }} />
+          {c.label.replace(/ \(.*\)/, "")}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CellFace({ cell, size }: { cell: AacCell; size: number }) {
   const c = COLOUR[cell.wordClass];
   return (
@@ -250,6 +266,12 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
           );
         })}
       </div>
+      <WordClassLegend />
+      {page.cells.some((c) => c.hidden) ? (
+        <span className="hint-text" style={{ fontSize: 12 }}>
+          {page.cells.filter((c) => c.hidden).length} hidden cell{page.cells.filter((c) => c.hidden).length === 1 ? "" : "s"} on this page. They're greyed out above — tap any to bring it back.
+        </span>
+      ) : null}
       <span className="hint-text" style={{ fontSize: 11 }}>
         Click a button to change it, or an empty square to add one. Colours follow the word type (a common AAC colour code). {SYMBOL_CREDIT}
       </span>
@@ -301,16 +323,22 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
                 ) : null}
               </>
             ) : null}
-            <label style={{ display: "flex", gap: "0.3rem", alignItems: "center" }} title="Keeps its square, so other words don't move, but the child doesn't see it yet">
-              <Checkbox checked={sel.hidden} disabled={disabled} onChange={(e) => setCell({ ...sel, hidden: !!e.checked })} />
-              Hidden for now
-            </label>
+            <Button
+              label={sel.hidden ? "Show this word again" : "Hide this word"}
+              icon={sel.hidden ? "pi pi-eye" : "pi pi-eye-slash"}
+              className="p-button-outlined p-button-sm"
+              disabled={disabled}
+              onClick={() => setCell({ ...sel, hidden: !sel.hidden })}
+              tooltip="Hidden cells keep their square (so nothing moves), but the child doesn't see them yet. Bring them back when they're ready."
+              tooltipOptions={{ position: "top" }}
+            />
             {!disabled ? (
               <Button
-                label="Remove button"
+                label="Delete this button"
                 icon="pi pi-trash"
                 className="p-button-text p-button-danger p-button-sm"
                 onClick={() => {
+                  if (!window.confirm("Delete this button? If you might want it back later, Hide it instead.")) return;
                   setPage({ ...page, cells: page.cells.filter((c) => c.id !== sel.id) });
                   setSelected(null);
                 }}
