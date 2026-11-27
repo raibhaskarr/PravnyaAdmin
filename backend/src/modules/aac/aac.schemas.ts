@@ -38,14 +38,29 @@ const boardShape = {
   rows: z.number().int().min(LIMITS.minRows).max(LIMITS.maxRows),
   cols: z.number().int().min(LIMITS.minCols).max(LIMITS.maxCols),
   homePageId: id,
-  pages: z.array(pageSchema).min(1).max(LIMITS.maxPages)
+  pages: z.array(pageSchema).min(1).max(LIMITS.maxPages),
+  /** Cells shown in the same square on every page (Proloquo2Go-style motor plan). Default none. */
+  coreCells: z.array(cellSchema).max(80).default([])
 };
 
-/** Every cell inside the grid, one cell per square, folders open a page that exists, the home page exists. */
-function boardRules(b: { rows: number; cols: number; homePageId: string; pages: Page[] }, ctx: z.RefinementCtx) {
+/** Every cell inside the grid, one cell per square, folders open a page that exists, the home page exists, core cells don't collide with page cells. */
+function boardRules(b: { rows: number; cols: number; homePageId: string; pages: Page[]; coreCells?: Cell[] }, ctx: z.RefinementCtx) {
   const pageIds = new Set(b.pages.map((p) => p.id));
   if (pageIds.size !== b.pages.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["pages"], message: "Two pages have the same id" });
   if (!pageIds.has(b.homePageId)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["homePageId"], message: "The home page isn't one of the pages" });
+
+  // Core cells: inside the grid, each square used once, no folder cells allowed (a folder should
+  // live on the page it opens, not repeat on every page).
+  const coreSquares = new Set<string>();
+  (b.coreCells ?? []).forEach((c, ci) => {
+    const at = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["coreCells", ci], message: `Core cell: ${message}` });
+    if (c.row >= b.rows || c.col >= b.cols) at(`"${c.label}" is outside the grid`);
+    const sq = `${c.row},${c.col}`;
+    if (coreSquares.has(sq)) at(`two core cells in the same square`);
+    coreSquares.add(sq);
+    if (c.kind === "folder") at(`"${c.label}" can't be a folder (core cells appear on every page)`);
+  });
+
   b.pages.forEach((p, pi) => {
     const squares = new Set<string>();
     p.cells.forEach((c, ci) => {
@@ -53,6 +68,7 @@ function boardRules(b: { rows: number; cols: number; homePageId: string; pages: 
       if (c.row >= b.rows || c.col >= b.cols) at(`"${c.label}" is outside the grid`);
       const sq = `${c.row},${c.col}`;
       if (squares.has(sq)) at(`two buttons in the same square`);
+      if (coreSquares.has(sq)) at(`"${c.label}" sits where a core cell belongs; move it to a free square or unpin the core cell`);
       squares.add(sq);
       if (c.kind === "folder" && (!c.targetPageId || !pageIds.has(c.targetPageId) || c.targetPageId === p.id)) at(`folder "${c.label}" must open another page`);
     });

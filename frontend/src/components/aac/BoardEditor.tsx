@@ -71,6 +71,7 @@ function CellFace({ cell, size }: { cell: AacCell; size: number }) {
       {cell.picture?.url ? <img src={assetUrl(cell.picture.url)} alt="" style={{ width: size * 0.58, height: size * 0.58, objectFit: "contain" }} /> : null}
       <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1, textAlign: "center", padding: "0 3px" }}>{cell.label}</span>
       {cell.kind === "folder" ? <i className="pi pi-folder" style={{ position: "absolute", top: 3, right: 4, fontSize: 11 }} /> : null}
+      {(cell as AacCell & { core?: boolean }).core ? <i className="pi pi-bookmark-fill" style={{ position: "absolute", top: 3, right: 4, fontSize: 11, color: "#6366f1" }} title="On every page (core)" /> : null}
       {cell.hidden ? <i className="pi pi-eye-slash" style={{ position: "absolute", top: 3, left: 4, fontSize: 11 }} /> : null}
     </div>
   );
@@ -157,13 +158,40 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(null);
   const [picking, setPicking] = useState(false);
   const page = value.pages.find((p) => p.id === pageId) ?? value.pages[0];
-  const cellAt = (row: number, col: number) => page.cells.find((c) => c.row === row && c.col === col);
+  const core = value.coreCells ?? [];
+  const coreAt = (row: number, col: number) => core.find((c) => c.row === row && c.col === col);
+  const pageCellAt = (row: number, col: number) => page.cells.find((c) => c.row === row && c.col === col);
+  // When editing, a square is one of: a core cell (shown on every page), a page cell, or empty.
+  const cellAt = (row: number, col: number): (AacCell & { core?: boolean }) | undefined => {
+    const c = coreAt(row, col);
+    if (c) return { ...c, core: true };
+    return pageCellAt(row, col);
+  };
   const sel = selected ? cellAt(selected.row, selected.col) : undefined;
   const size = Math.max(64, Math.min(104, Math.floor(760 / value.cols)));
 
   const setPages = (pages: AacPage[], patch: Partial<AacBoardFields> = {}) => onChange({ ...value, ...patch, pages });
   const setPage = (p: AacPage) => setPages(value.pages.map((x) => (x.id === p.id ? p : x)));
-  const setCell = (c: AacCell) => setPage({ ...page, cells: page.cells.some((x) => x.id === c.id) ? page.cells.map((x) => (x.id === c.id ? c : x)) : [...page.cells, c] });
+  const setCoreCells = (cells: AacCell[]) => onChange({ ...value, coreCells: cells });
+  const setCell = (c: AacCell & { core?: boolean }) => {
+    if (c.core) {
+      setCoreCells(core.some((x) => x.id === c.id) ? core.map((x) => (x.id === c.id ? c : x)) : [...core, c]);
+    } else {
+      setPage({ ...page, cells: page.cells.some((x) => x.id === c.id) ? page.cells.map((x) => (x.id === c.id ? c : x)) : [...page.cells, c] });
+    }
+  };
+  const pinToCore = () => {
+    if (!sel || sel.core) return;
+    // Move the cell out of this page and into the board-level core strip.
+    setPage({ ...page, cells: page.cells.filter((x) => x.id !== sel.id) });
+    setCoreCells([...core, { ...sel, kind: "word", targetPageId: null }]);
+  };
+  const unpinFromCore = () => {
+    if (!sel || !sel.core) return;
+    // Put it back on the current page so it isn't lost.
+    setCoreCells(core.filter((x) => x.id !== sel.id));
+    setPage({ ...page, cells: [...page.cells, { id: sel.id, row: sel.row, col: sel.col, kind: sel.kind, label: sel.label, say: sel.say, picture: sel.picture, wordClass: sel.wordClass, targetPageId: sel.targetPageId, hidden: sel.hidden, audio: sel.audio }] });
+  };
 
   function resize(rows: number, cols: number) {
     const outside = value.pages.reduce((n, p) => n + p.cells.filter((c) => c.row >= rows || c.col >= cols).length, 0);
@@ -332,6 +360,17 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
               tooltip="Hidden cells keep their square (so nothing moves), but the child doesn't see them yet. Bring them back when they're ready."
               tooltipOptions={{ position: "top" }}
             />
+            {sel.kind === "word" ? (
+              <Button
+                label={sel.core ? "Unpin from every page" : "Pin to every page"}
+                icon="pi pi-bookmark"
+                className="p-button-outlined p-button-sm"
+                disabled={disabled}
+                onClick={() => (sel.core ? unpinFromCore() : pinToCore())}
+                tooltip="Core cells sit in the same square on every page, so the child learns a hand path for the words they use most."
+                tooltipOptions={{ position: "top" }}
+              />
+            ) : null}
             {!disabled ? (
               <Button
                 label="Delete this button"

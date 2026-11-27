@@ -18,6 +18,11 @@ export function AacTalk({ board, token, kidId, onClose, onEdit }: { board: AacBo
   const [sentence, setSentence] = useState<AacCell[]>([]);
   const voice = useBoardVoice(board.language === "hi" ? "hi-IN" : "en-IN");
   const page = board.pages.find((p) => p.id === pageId) ?? board.pages[0];
+  // Core cells are pinned at the same squares on every page (motor-planning). A core cell's picture
+  // is marked with a pin, so the child (and the adult modelling) gets a visual nudge that this
+  // cell is in the same place everywhere.
+  const core = board.coreCells ?? [];
+  const cellsForPage = [...page.cells, ...core];
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [holding, setHolding] = useState<"exit" | "edit" | null>(null);
 
@@ -156,7 +161,7 @@ export function AacTalk({ board, token, kidId, onClose, onEdit }: { board: AacBo
         {Array.from({ length: board.rows * board.cols }, (_, i) => {
           const row = Math.floor(i / board.cols);
           const col = i % board.cols;
-          const cell = page.cells.find((c) => c.row === row && c.col === col);
+          const cell = cellsForPage.find((c) => c.row === row && c.col === col);
           if (!cell || cell.hidden) return <span key={i} aria-hidden="true" />;
           return (
             <button key={i} type="button" onClick={() => tap(cell)} className="min-h-0 min-w-0 active:scale-95" aria-label={cell.kind === "folder" ? `${cell.label} (opens a page)` : cell.label}>

@@ -56,6 +56,7 @@ import type {
   ScheduleTemplate,
   AacBoard,
   AacBoardFields,
+  AacCell,
   AacTemplate,
   SymbolResult
 } from "./types";
@@ -78,12 +79,21 @@ function toApiBoard(b: AacBoardFields): AacBoardFields {
     pages: b.pages.map((p) => ({
       id: p.id,
       name: p.name,
-      cells: p.cells.map((c) => ({
-        ...c,
-        picture: c.picture && (c.picture.kind === "symbol" ? { kind: "symbol", symbolId: c.picture.symbolId } : { kind: "photo", mediaId: c.picture.mediaId }),
-        audio: c.audio ? { mediaId: c.audio.mediaId } : null
-      }))
-    }))
+      cells: p.cells.map(stripCell)
+    })),
+    coreCells: (b.coreCells ?? []).map(stripCell)
+  };
+}
+
+function stripCell(c: AacCell): AacCell {
+  return {
+    ...c,
+    picture: c.picture
+      ? c.picture.kind === "symbol"
+        ? { kind: "symbol" as const, symbolId: c.picture.symbolId }
+        : { kind: "photo" as const, mediaId: c.picture.mediaId }
+      : null,
+    audio: c.audio ? { mediaId: c.audio.mediaId } : null
   };
 }
 

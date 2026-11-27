@@ -21,6 +21,7 @@ type Language = "en" | "hi";
 const staffViewer = (user: AuthUser): Viewer => ({ kind: "staff", id: user.id });
 const parentViewer = (parentId: string): Viewer => ({ kind: "parent", id: parentId });
 const allCells = (pages: Page[]) => pages.flatMap((p) => p.cells);
+const allCellsWithCore = (pages: Page[], coreCells: Cell[]) => [...allCells(pages), ...coreCells];
 // The picture checks take anything with a `picture`; cells have the same picture shape as steps.
 const asSteps = (pages: Page[]) => allCells(pages) as unknown as Step[];
 
@@ -57,6 +58,7 @@ function presentBoard(b: AacBoard, viewer: Viewer) {
     cols: b.cols,
     homePageId: b.homePageId,
     pages: presentPages(b.pages as unknown as Page[], viewer),
+    coreCells: (present(((b as unknown as { coreCells: Cell[] }).coreCells ?? []) as unknown as Step[], viewer) as unknown as Cell[]).map((c) => ({ ...c, audio: c.audio ? { ...c.audio, url: mediaPath(c.audio.mediaId, viewer) } : null })),
     version: b.version,
     updatedByName: b.updatedByName,
     updatedAt: b.updatedAt,
@@ -77,23 +79,26 @@ async function parentName(parentId: string) {
   return p.displayName ?? p.motherName ?? p.fatherName ?? "Parent";
 }
 
-const json = (pages: Page[]) => pages as unknown as Prisma.InputJsonValue;
+const json = (value: unknown) => value as unknown as Prisma.InputJsonValue;
+/** The full set of cells on a board: every page + the core strip. Used for photo/audio ownership checks. */
+const allSteps = (input: BoardFields) => allCellsWithCore(input.pages, input.coreCells) as unknown as Step[];
+const allAudio = (input: BoardFields) => ({ pages: [...input.pages, { id: "core", name: "core", cells: input.coreCells }] });
 
 async function createFor(kid: { id: string; tenantId: string }, input: BoardFields, by: string) {
   if (await prisma.aacBoard.findUnique({ where: { kidId: kid.id }, select: { id: true } })) {
     throw conflict("This child already has a board. Open it to change it, or delete it to start again.", "BOARD_EXISTS");
   }
-  await assertPhotosFitKid(kid, asSteps(input.pages));
-  await assertAudioFitsKid(kid.id, input.pages);
-  return prisma.aacBoard.create({ data: { tenantId: kid.tenantId, kidId: kid.id, ...input, pages: json(input.pages), updatedByName: by } });
+  await assertPhotosFitKid(kid, allSteps(input));
+  await assertAudioFitsKid(kid.id, allAudio(input).pages);
+  return prisma.aacBoard.create({ data: { tenantId: kid.tenantId, kidId: kid.id, ...input, pages: json(input.pages), coreCells: json(input.coreCells), updatedByName: by } });
 }
 
 /** Saves only if nobody else saved since `version` was loaded. */
 async function saveFor(board: AacBoard, input: BoardFields & { version: number }, by: string) {
-  await assertPhotosFitKid({ id: board.kidId, tenantId: board.tenantId }, asSteps(input.pages));
-  await assertAudioFitsKid(board.kidId, input.pages);
+  await assertPhotosFitKid({ id: board.kidId, tenantId: board.tenantId }, allSteps(input));
+  await assertAudioFitsKid(board.kidId, allAudio(input).pages);
   const { version, ...fields } = input;
-  const res = await prisma.aacBoard.updateMany({ where: { id: board.id, version }, data: { ...fields, pages: json(fields.pages), version: { increment: 1 }, updatedByName: by } });
+  const res = await prisma.aacBoard.updateMany({ where: { id: board.id, version }, data: { ...fields, pages: json(fields.pages), coreCells: json(fields.coreCells), version: { increment: 1 }, updatedByName: by } });
   if (res.count === 0) throw conflict("Someone else changed this board since you opened it. Reload it to see their changes, then make yours again.", "BOARD_CHANGED");
   return prisma.aacBoard.findUniqueOrThrow({ where: { id: board.id } });
 }
