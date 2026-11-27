@@ -23,6 +23,9 @@ export function AacTalk({ board, token, kidId, onClose, onEdit }: { board: AacBo
   // cell is in the same place everywhere.
   const core = board.coreCells ?? [];
   const cellsForPage = [...page.cells, ...core];
+  // A page may override the board's grid size (e.g. Home 3×4, Food 3×3).
+  const rows = page.rows ?? board.rows;
+  const cols = page.cols ?? board.cols;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [holding, setHolding] = useState<"exit" | "edit" | null>(null);
 
@@ -157,10 +160,10 @@ export function AacTalk({ board, token, kidId, onClose, onEdit }: { board: AacBo
       </div>
 
       {/* The grid */}
-      <div className="grid min-h-0 flex-1 gap-1.5 p-2" style={{ gridTemplateColumns: `repeat(${board.cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${board.rows}, minmax(0, 1fr))` }}>
-        {Array.from({ length: board.rows * board.cols }, (_, i) => {
-          const row = Math.floor(i / board.cols);
-          const col = i % board.cols;
+      <div className="grid min-h-0 flex-1 gap-1.5 p-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}>
+        {Array.from({ length: rows * cols }, (_, i) => {
+          const row = Math.floor(i / cols);
+          const col = i % cols;
           const cell = cellsForPage.find((c) => c.row === row && c.col === col);
           if (!cell || cell.hidden) return <span key={i} aria-hidden="true" />;
           return (

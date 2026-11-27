@@ -79,6 +79,8 @@ function toApiBoard(b: AacBoardFields): AacBoardFields {
     pages: b.pages.map((p) => ({
       id: p.id,
       name: p.name,
+      ...(p.rows !== undefined ? { rows: p.rows } : {}),
+      ...(p.cols !== undefined ? { cols: p.cols } : {}),
       cells: p.cells.map(stripCell)
     })),
     coreCells: (b.coreCells ?? []).map(stripCell)

@@ -29,8 +29,20 @@ export const cellSchema = z.object({
 });
 export type Cell = z.infer<typeof cellSchema>;
 
-export const pageSchema = z.object({ id, name: z.string().trim().min(1).max(40), cells: z.array(cellSchema).max(80) });
+export const pageSchema = z.object({
+  id,
+  name: z.string().trim().min(1).max(40),
+  cells: z.array(cellSchema).max(80),
+  /** Per-page grid. Undefined inherits from the board; a page can be bigger or smaller than the home. */
+  rows: z.number().int().min(LIMITS.minRows).max(LIMITS.maxRows).optional(),
+  cols: z.number().int().min(LIMITS.minCols).max(LIMITS.maxCols).optional()
+});
 export type Page = z.infer<typeof pageSchema>;
+
+/** The grid used when rendering a page: its own rows/cols, or the board's defaults. */
+export function pageGrid(page: Pick<Page, "rows" | "cols">, board: { rows: number; cols: number }) {
+  return { rows: page.rows ?? board.rows, cols: page.cols ?? board.cols };
+}
 
 const boardShape = {
   name: z.string().trim().min(1).max(60),
@@ -43,18 +55,20 @@ const boardShape = {
   coreCells: z.array(cellSchema).max(80).default([])
 };
 
-/** Every cell inside the grid, one cell per square, folders open a page that exists, the home page exists, core cells don't collide with page cells. */
+/** Every cell inside its page's grid, one cell per square, folders open a page that exists, the home page exists, core cells fit every page and don't collide with page cells. */
 function boardRules(b: { rows: number; cols: number; homePageId: string; pages: Page[]; coreCells?: Cell[] }, ctx: z.RefinementCtx) {
   const pageIds = new Set(b.pages.map((p) => p.id));
   if (pageIds.size !== b.pages.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["pages"], message: "Two pages have the same id" });
   if (!pageIds.has(b.homePageId)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["homePageId"], message: "The home page isn't one of the pages" });
 
-  // Core cells: inside the grid, each square used once, no folder cells allowed (a folder should
-  // live on the page it opens, not repeat on every page).
+  // Core cells have to fit the smallest page (otherwise they'd fall off its grid). Each core cell
+  // uses a square once and is never a folder (a folder lives on the page it opens, not everywhere).
+  const minRows = Math.min(b.rows, ...b.pages.map((p) => pageGrid(p, b).rows));
+  const minCols = Math.min(b.cols, ...b.pages.map((p) => pageGrid(p, b).cols));
   const coreSquares = new Set<string>();
   (b.coreCells ?? []).forEach((c, ci) => {
     const at = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["coreCells", ci], message: `Core cell: ${message}` });
-    if (c.row >= b.rows || c.col >= b.cols) at(`"${c.label}" is outside the grid`);
+    if (c.row >= minRows || c.col >= minCols) at(`"${c.label}" doesn't fit every page's grid (smallest is ${minRows}×${minCols})`);
     const sq = `${c.row},${c.col}`;
     if (coreSquares.has(sq)) at(`two core cells in the same square`);
     coreSquares.add(sq);
@@ -62,10 +76,11 @@ function boardRules(b: { rows: number; cols: number; homePageId: string; pages: 
   });
 
   b.pages.forEach((p, pi) => {
+    const { rows, cols } = pageGrid(p, b);
     const squares = new Set<string>();
     p.cells.forEach((c, ci) => {
       const at = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["pages", pi, "cells", ci], message: `${p.name}: ${message}` });
-      if (c.row >= b.rows || c.col >= b.cols) at(`"${c.label}" is outside the grid`);
+      if (c.row >= rows || c.col >= cols) at(`"${c.label}" is outside the ${rows}×${cols} grid of this page`);
       const sq = `${c.row},${c.col}`;
       if (squares.has(sq)) at(`two buttons in the same square`);
       if (coreSquares.has(sq)) at(`"${c.label}" sits where a core cell belongs; move it to a free square or unpin the core cell`);

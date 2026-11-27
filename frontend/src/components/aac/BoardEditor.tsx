@@ -168,7 +168,10 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
     return pageCellAt(row, col);
   };
   const sel = selected ? cellAt(selected.row, selected.col) : undefined;
-  const size = Math.max(64, Math.min(104, Math.floor(760 / value.cols)));
+  // The current page's grid: its own rows/cols if set, otherwise the board defaults.
+  const pageRows = page.rows ?? value.rows;
+  const pageCols = page.cols ?? value.cols;
+  const size = Math.max(64, Math.min(104, Math.floor(760 / pageCols)));
 
   const setPages = (pages: AacPage[], patch: Partial<AacBoardFields> = {}) => onChange({ ...value, ...patch, pages });
   const setPage = (p: AacPage) => setPages(value.pages.map((x) => (x.id === p.id ? p : x)));
@@ -194,10 +197,25 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
   };
 
   function resize(rows: number, cols: number) {
-    const outside = value.pages.reduce((n, p) => n + p.cells.filter((c) => c.row >= rows || c.col >= cols).length, 0);
+    // Board-level rows/cols applies to pages that don't override their own grid.
+    const affectedPages = value.pages.filter((p) => p.rows === undefined && p.cols === undefined);
+    const outside = affectedPages.reduce((n, p) => n + p.cells.filter((c) => c.row >= rows || c.col >= cols).length, 0);
     if (outside && !window.confirm(`${outside} button${outside === 1 ? "" : "s"} would fall outside the smaller grid and be removed. Go ahead?`)) return;
     setSelected(null);
-    onChange({ ...value, rows, cols, pages: value.pages.map((p) => ({ ...p, cells: p.cells.filter((c) => c.row < rows && c.col < cols) })) });
+    onChange({
+      ...value,
+      rows,
+      cols,
+      pages: value.pages.map((p) => (p.rows === undefined && p.cols === undefined ? { ...p, cells: p.cells.filter((c) => c.row < rows && c.col < cols) } : p))
+    });
+  }
+
+  /** Change this one page's grid (leaves the rest of the board alone). */
+  function resizePage(rows: number, cols: number) {
+    const outside = page.cells.filter((c) => c.row >= rows || c.col >= cols).length;
+    if (outside && !window.confirm(`${outside} button${outside === 1 ? "" : "s"} on this page would fall outside the smaller grid and be removed. Go ahead?`)) return;
+    setSelected(null);
+    setPage({ ...page, rows, cols, cells: page.cells.filter((c) => c.row < rows && c.col < cols) });
   }
 
   function addPage(name = value.language === "hi" ? "नया पेज" : "New page") {
@@ -257,24 +275,46 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
         {!disabled ? <Button label="Add page" icon="pi pi-plus" className="p-button-text p-button-sm" onClick={() => setPageId(addPage().id)} /> : null}
       </div>
       {!disabled ? (
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-          <span className="field-label">This page</span>
-          <InputText value={page.name} onChange={(e) => setPage({ ...page, name: e.target.value })} maxLength={40} aria-label="Page name" />
-          {page.id !== value.homePageId ? (
-            <>
-              <Button label="Make it the home page" className="p-button-text p-button-sm" onClick={() => onChange({ ...value, homePageId: page.id })} />
-              <Button label="Delete page" className="p-button-text p-button-danger p-button-sm" onClick={deletePage} />
-            </>
-          ) : (
-            <span className="hint-text">The home page opens first.</span>
-          )}
-        </div>
+        <>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <span className="field-label">This page</span>
+            <InputText value={page.name} onChange={(e) => setPage({ ...page, name: e.target.value })} maxLength={40} aria-label="Page name" />
+            {page.id !== value.homePageId ? (
+              <>
+                <Button label="Make it the home page" className="p-button-text p-button-sm" onClick={() => onChange({ ...value, homePageId: page.id })} />
+                <Button label="Delete page" className="p-button-text p-button-danger p-button-sm" onClick={deletePage} />
+              </>
+            ) : (
+              <span className="hint-text">The home page opens first.</span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <span className="field-label">This page's grid</span>
+            <InputNumber value={pageRows} min={1} max={8} showButtons inputStyle={{ width: 50 }} onValueChange={(e) => e.value && resizePage(e.value, pageCols)} aria-label="Rows on this page" />
+            <span>×</span>
+            <InputNumber value={pageCols} min={1} max={10} showButtons inputStyle={{ width: 50 }} onValueChange={(e) => e.value && resizePage(pageRows, e.value)} aria-label="Columns on this page" />
+            {page.rows !== undefined || page.cols !== undefined ? (
+              <Button
+                label={`Use the board default (${value.rows}×${value.cols})`}
+                className="p-button-text p-button-sm"
+                onClick={() => {
+                  const next = { ...page };
+                  delete next.rows;
+                  delete next.cols;
+                  setPage(next);
+                }}
+              />
+            ) : (
+              <span className="hint-text">Inherits the board default ({value.rows}×{value.cols}).</span>
+            )}
+          </div>
+        </>
       ) : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${value.cols}, ${size}px)`, gap: 6, padding: 8, background: "#f3f4f6", borderRadius: 12, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
-        {Array.from({ length: value.rows * value.cols }, (_, i) => {
-          const row = Math.floor(i / value.cols);
-          const col = i % value.cols;
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${pageCols}, ${size}px)`, gap: 6, padding: 8, background: "#f3f4f6", borderRadius: 12, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
+        {Array.from({ length: pageRows * pageCols }, (_, i) => {
+          const row = Math.floor(i / pageCols);
+          const col = i % pageCols;
           const c = cellAt(row, col);
           const isSel = selected?.row === row && selected?.col === col;
           return (
