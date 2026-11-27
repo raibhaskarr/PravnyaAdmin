@@ -1230,6 +1230,9 @@ model AacBoard {
   homePageId    String
   /// [{ id, name, cells: [{ id, row, col, kind: "word" | "folder", label, say, picture, wordClass, targetPageId, hidden }] }]
   pages         Json
+  /// Core cells pinned at the same square on every page (Proloquo2Go-style motor plan). Default [].
+  /// Same cell shape as pages[].cells. A page's cells[] can't occupy a square a core cell holds.
+  coreCells     Json     @default("[]")
   version       Int      @default(1)
   updatedByName String
   createdAt     DateTime @default(now())
@@ -1274,6 +1277,8 @@ model AacBoardTemplate {
   cols            Int
   homePageId      String
   pages           Json
+  /// Core cells pinned on every page; mirrors AacBoard.coreCells so a copied template keeps the motor plan.
+  coreCells       Json     @default("[]")
   createdByUserId String?  @db.Uuid
   createdBy       User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdByName   String

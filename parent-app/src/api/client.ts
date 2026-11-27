@@ -105,7 +105,7 @@ export type AacCell = {
   audio: { mediaId: string; url: string } | null;
 };
 export type AacPage = { id: string; name: string; cells: AacCell[] };
-export type AacBoardFields = { name: string; language: "en" | "hi"; rows: number; cols: number; homePageId: string; pages: AacPage[] };
+export type AacBoardFields = { name: string; language: "en" | "hi"; rows: number; cols: number; homePageId: string; pages: AacPage[]; coreCells?: AacCell[] };
 export type AacBoard = AacBoardFields & { id: string; kidId: string; version: number; updatedByName: string; updatedAt: string; credit: string };
 export type AacTemplate = AacBoardFields & { id: string; scope: "PRAVNYA" | "CENTRE"; builtIn: boolean };
 
@@ -121,7 +121,8 @@ function toApiBoard(b: AacBoardFields): AacBoardFields {
       id: p.id,
       name: p.name,
       cells: p.cells.map((c) => ({ ...c, picture: stripUrl(c as unknown as VisualScheduleStep).picture as SchedulePicture | null, audio: c.audio ? ({ mediaId: c.audio.mediaId } as AacCell["audio"]) : null }))
-    }))
+    })),
+    coreCells: (b.coreCells ?? []).map((c) => ({ ...c, picture: stripUrl(c as unknown as VisualScheduleStep).picture as SchedulePicture | null, audio: c.audio ? ({ mediaId: c.audio.mediaId } as AacCell["audio"]) : null }))
   };
 }
 

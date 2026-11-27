@@ -695,7 +695,7 @@ export type AacCell = {
 
 export type AacPage = { id: string; name: string; cells: AacCell[] };
 
-export type AacBoardFields = { name: string; language: "en" | "hi"; rows: number; cols: number; homePageId: string; pages: AacPage[] };
+export type AacBoardFields = { name: string; language: "en" | "hi"; rows: number; cols: number; homePageId: string; pages: AacPage[]; coreCells?: AacCell[] };
 
 export type AacBoard = AacBoardFields & { id: string; kidId: string; version: number; updatedByName: string; updatedAt: string };
 
