@@ -693,7 +693,7 @@ export type AacCell = {
   audio: { mediaId: string; url?: string } | null;
 };
 
-export type AacPage = { id: string; name: string; cells: AacCell[] };
+export type AacPage = { id: string; name: string; cells: AacCell[]; rows?: number; cols?: number };
 
 export type AacBoardFields = { name: string; language: "en" | "hi"; rows: number; cols: number; homePageId: string; pages: AacPage[]; coreCells?: AacCell[] };
 
