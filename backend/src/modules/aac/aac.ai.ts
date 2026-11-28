@@ -185,6 +185,7 @@ export async function draftBoardWithAi(input: DraftInput): Promise<DraftBoard | 
         picture,
         wordClass: c.wordClass,
         targetPageId: isFolder ? pageIds.get(c.targetPage!) ?? null : null,
+        affix: null,
         hidden: false,
         audio: null
       });

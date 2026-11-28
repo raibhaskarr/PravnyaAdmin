@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
-import { Checkbox } from "primereact/checkbox";
 import { Dropdown } from "primereact/dropdown";
 import { InputNumber } from "primereact/inputnumber";
 import { InputText } from "primereact/inputtext";
 import { api, ApiError, assetUrl } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
-import type { AacBoardFields, AacCell, AacPage, AacWordClass } from "../../api/types";
+import type { AacAffix, AacBoardFields, AacCell, AacPage, AacWordClass } from "../../api/types";
 import { LANGUAGES, PicturePicker, SYMBOL_CREDIT, type PhotoTarget } from "../schedules/ScheduleForm";
 
 // The AAC board editor shared by a child's board and the AAC templates: board settings, pages,
@@ -23,6 +22,22 @@ export const WORD_CLASSES: { value: AacWordClass; label: string; bg: string; bor
   { value: "misc", label: "Other", bg: "#ffffff", border: "#b9b9b9" }
 ];
 const COLOUR = Object.fromEntries(WORD_CLASSES.map((w) => [w.value, w])) as Record<AacWordClass, (typeof WORD_CLASSES)[number]>;
+
+// Grammar-affix cells: tapped after a word, they replace the sentence's last word with its inflected
+// form (eat + ed -> ate). The label the parent sees is "+ ed" etc.
+const AFFIX_OPTIONS: { value: AacAffix; label: string }[] = [
+  { value: "ed", label: "+ ed (past)" },
+  { value: "ing", label: "+ ing" },
+  { value: "s", label: "+ s (plural / 3rd person)" },
+  { value: "'s", label: "+ 's (possessive)" }
+];
+const AFFIX_LABEL: Record<AacAffix, string> = { ed: "+ ed", ing: "+ ing", s: "+ s", "'s": "+ 's" };
+
+const KIND_OPTIONS: { value: AacCell["kind"]; label: string }[] = [
+  { value: "word", label: "Word" },
+  { value: "folder", label: "Folder (opens a page)" },
+  { value: "affix", label: "Grammar affix" }
+];
 
 const uuid = () => crypto.randomUUID();
 
@@ -187,13 +202,13 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
     if (!sel || sel.core) return;
     // Move the cell out of this page and into the board-level core strip.
     setPage({ ...page, cells: page.cells.filter((x) => x.id !== sel.id) });
-    setCoreCells([...core, { ...sel, kind: "word", targetPageId: null }]);
+    setCoreCells([...core, { ...sel, kind: "word", targetPageId: null, affix: null }]);
   };
   const unpinFromCore = () => {
     if (!sel || !sel.core) return;
     // Put it back on the current page so it isn't lost.
     setCoreCells(core.filter((x) => x.id !== sel.id));
-    setPage({ ...page, cells: [...page.cells, { id: sel.id, row: sel.row, col: sel.col, kind: sel.kind, label: sel.label, say: sel.say, picture: sel.picture, wordClass: sel.wordClass, targetPageId: sel.targetPageId, hidden: sel.hidden, audio: sel.audio }] });
+    setPage({ ...page, cells: [...page.cells, { id: sel.id, row: sel.row, col: sel.col, kind: sel.kind, label: sel.label, say: sel.say, picture: sel.picture, wordClass: sel.wordClass, targetPageId: sel.targetPageId, affix: sel.affix, hidden: sel.hidden, audio: sel.audio }] });
   };
 
   function resize(rows: number, cols: number) {
@@ -236,7 +251,7 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
   function newCellAt(row: number, col: number) {
     if (disabled) return;
     setSelected({ row, col });
-    setCell({ id: uuid(), row, col, kind: "word", label: value.language === "hi" ? "नया शब्द" : "new word", say: null, picture: null, wordClass: "misc", targetPageId: null, hidden: false, audio: null });
+    setCell({ id: uuid(), row, col, kind: "word", label: value.language === "hi" ? "नया शब्द" : "new word", say: null, picture: null, wordClass: "misc", targetPageId: null, affix: null, hidden: false, audio: null });
   }
 
   return (
@@ -355,10 +370,12 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
                 <span className="field-label">Label</span>
                 <InputText value={sel.label} onChange={(e) => setCell({ ...sel, label: e.target.value })} maxLength={40} disabled={disabled} />
               </label>
-              <label className="field">
-                <span className="field-label">Says (if different)</span>
-                <InputText value={sel.say ?? ""} onChange={(e) => setCell({ ...sel, say: e.target.value || null })} maxLength={200} disabled={disabled} placeholder={sel.label} />
-              </label>
+              {sel.kind !== "affix" ? (
+                <label className="field">
+                  <span className="field-label">Says (if different)</span>
+                  <InputText value={sel.say ?? ""} onChange={(e) => setCell({ ...sel, say: e.target.value || null })} maxLength={200} disabled={disabled} placeholder={sel.label} />
+                </label>
+              ) : null}
               <label className="field">
                 <span className="field-label">Word type (colour)</span>
                 <Dropdown value={sel.wordClass} options={WORD_CLASSES} optionLabel="label" optionValue="value" onChange={(e) => setCell({ ...sel, wordClass: e.value })} disabled={disabled} />
@@ -366,10 +383,43 @@ export function BoardEditor({ value, onChange, disabled, photos }: { value: AacB
             </div>
           </div>
           <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
-            <label style={{ display: "flex", gap: "0.3rem", alignItems: "center" }}>
-              <Checkbox checked={sel.kind === "folder"} disabled={disabled} onChange={(e) => setCell({ ...sel, kind: e.checked ? "folder" : "word", targetPageId: e.checked ? (value.pages.find((p) => p.id !== page.id)?.id ?? null) : null })} />
-              Folder (opens a page)
+            <label className="field" style={{ margin: 0 }}>
+              <span className="field-label">Button does</span>
+              <Dropdown
+                value={sel.kind}
+                options={KIND_OPTIONS}
+                optionLabel="label"
+                optionValue="value"
+                disabled={disabled}
+                onChange={(e) => {
+                  const kind = e.value as AacCell["kind"];
+                  if (kind === "folder") {
+                    setCell({ ...sel, kind, targetPageId: value.pages.find((p) => p.id !== page.id)?.id ?? null, affix: null });
+                  } else if (kind === "affix") {
+                    const affix: AacAffix = sel.affix ?? "ed";
+                    setCell({ ...sel, kind, targetPageId: null, affix, label: AFFIX_LABEL[affix], say: null, picture: null });
+                  } else {
+                    setCell({ ...sel, kind, targetPageId: null, affix: null });
+                  }
+                }}
+              />
             </label>
+            {sel.kind === "affix" ? (
+              <label className="field" style={{ margin: 0 }}>
+                <span className="field-label">Which affix</span>
+                <Dropdown
+                  value={sel.affix ?? "ed"}
+                  options={AFFIX_OPTIONS}
+                  optionLabel="label"
+                  optionValue="value"
+                  disabled={disabled}
+                  onChange={(e) => {
+                    const affix = e.value as AacAffix;
+                    setCell({ ...sel, affix, label: AFFIX_LABEL[affix] });
+                  }}
+                />
+              </label>
+            ) : null}
             {sel.kind === "folder" ? (
               <>
                 <Dropdown

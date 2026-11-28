@@ -202,6 +202,7 @@ export async function ensureBuiltInBoards() {
               picture: symbolId ? { kind: "symbol" as const, symbolId } : null,
               wordClass: folder ? ("misc" as const) : cls,
               targetPageId: folder ? pageId.get(target!)! : null,
+              affix: null,
               hidden: false,
               audio: null
             }

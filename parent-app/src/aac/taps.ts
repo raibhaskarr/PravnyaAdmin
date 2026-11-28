@@ -4,7 +4,7 @@
 
 import { api } from "../api/client";
 
-export type Tap = { cellId: string; pageId: string; label: string; wordClass: string; kind: "word" | "folder"; at: string };
+export type Tap = { cellId: string; pageId: string; label: string; wordClass: string; kind: "word" | "folder" | "affix"; at: string };
 
 const FLUSH_MS = 20_000;
 const MAX_BATCH = 300;

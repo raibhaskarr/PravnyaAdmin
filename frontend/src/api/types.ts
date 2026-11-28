@@ -678,16 +678,20 @@ export type SymbolResult = { id: string; label: string; grammar: string; categor
 
 export type AacWordClass = "pronoun" | "verb" | "describe" | "noun" | "social" | "question" | "misc";
 
+export type AacAffix = "ed" | "ing" | "s" | "'s";
+
 export type AacCell = {
   id: string;
   row: number;
   col: number;
-  kind: "word" | "folder";
+  kind: "word" | "folder" | "affix";
   label: string;
   say: string | null;
   picture: SchedulePicture | null;
   wordClass: AacWordClass;
   targetPageId: string | null;
+  /** On an affix cell, which grammar marker (+ed, +ing, +s, 's) this cell applies to the last word tapped. */
+  affix?: AacAffix | null;
   hidden: boolean;
   /** Someone's recording of this word, played instead of the phone's voice. */
   audio: { mediaId: string; url?: string } | null;

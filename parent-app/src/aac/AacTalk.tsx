@@ -3,6 +3,7 @@ import { assetUrl, type AacBoard, type AacCell } from "../api/client";
 import { useBoardVoice } from "./voice";
 import { CellFace } from "./shared";
 import { TapLog } from "./taps";
+import { inflect } from "./grammar";
 
 // The child's talking board, full screen. Tap a word: it's said aloud (in the recorded voice, if
 // someone recorded it, otherwise the phone's voice) and added to the sentence at
@@ -48,6 +49,22 @@ export function AacTalk({ board, token, kidId, onClose, onEdit }: { board: AacBo
     if (cell.kind === "folder" && cell.targetPageId) {
       setHistory((h) => [...h, page.id]);
       setPageId(cell.targetPageId);
+      return;
+    }
+    if (cell.kind === "affix" && cell.affix) {
+      // Replace the last sentence word with its inflected form (eat + ed -> ate). Silent if the
+      // sentence is empty or the last cell has no text.
+      const affix = cell.affix;
+      let inflected: AacCell | null = null;
+      setSentence((s) => {
+        if (!s.length) return s;
+        const prev = s[s.length - 1];
+        const base = prev.say ?? prev.label;
+        const next = inflect(base, affix);
+        inflected = { ...prev, id: prev.id + "+" + affix, label: next, say: next };
+        return [...s.slice(0, -1), inflected];
+      });
+      if (inflected) void voice.say([inflected]);
       return;
     }
     setSentence((s) => [...s, cell].slice(-20));
