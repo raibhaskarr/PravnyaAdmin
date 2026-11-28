@@ -90,16 +90,19 @@ export type SymbolResult = { id: string; label: string; url: string };
 // ---------- AAC (talking) boards ----------
 
 export type AacWordClass = "pronoun" | "verb" | "describe" | "noun" | "social" | "question" | "misc";
+export type AacAffix = "ed" | "ing" | "s" | "'s";
 export type AacCell = {
   id: string;
   row: number;
   col: number;
-  kind: "word" | "folder";
+  kind: "word" | "folder" | "affix";
   label: string;
   say: string | null;
   picture: SchedulePicture | null;
   wordClass: AacWordClass;
   targetPageId: string | null;
+  /** On an affix cell: which grammar marker (ed / ing / s / 's). Null on word and folder cells. */
+  affix?: AacAffix | null;
   hidden: boolean;
   /** Someone's recording of this word, played instead of the phone's voice. */
   audio: { mediaId: string; url: string } | null;
@@ -545,7 +548,7 @@ export const api = {
     return request<void>(`/parent-kids/${kidId}/aac-board/${id}`, { token, method: "DELETE" });
   },
   /** Send a batch of taps from the talking screen. The server drops ones whose cell no longer exists. */
-  sendAacTaps(token: string, kidId: string, taps: { cellId: string; pageId: string; label: string; wordClass: string; kind: "word" | "folder"; at: string }[]) {
+  sendAacTaps(token: string, kidId: string, taps: { cellId: string; pageId: string; label: string; wordClass: string; kind: "word" | "folder" | "affix"; at: string }[]) {
     return request<{ saved: number }>(`/parent-kids/${kidId}/aac-board/taps`, { token, method: "POST", body: { taps } });
   },
   /** Weekly stats for the parent (last 7 days, top 10 words). Null when there's no board yet. */

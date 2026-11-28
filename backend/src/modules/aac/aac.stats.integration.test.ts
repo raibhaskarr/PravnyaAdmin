@@ -9,7 +9,7 @@ import type { Cell } from "./aac.schemas";
 
 // Usage stats live here because they slice across the board JSON and the AacCellTap log.
 
-const cell = (row: number, col: number, label: string, over: Partial<Cell> = {}): Cell => ({ id: randomUUID(), row, col, kind: "word", label, say: null, picture: null, wordClass: "verb", targetPageId: null, hidden: false, audio: null, ...over });
+const cell = (row: number, col: number, label: string, over: Partial<Cell> = {}): Cell => ({ id: randomUUID(), row, col, kind: "word", label, say: null, picture: null, wordClass: "verb", targetPageId: null, affix: null, hidden: false, audio: null, ...over });
 
 async function world() {
   const centre = await makeTenant({ name: "Sunrise" });

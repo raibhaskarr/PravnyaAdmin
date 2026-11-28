@@ -17,7 +17,7 @@ import { setTestAiResponse } from "../ai/ai.platform";
 
 type Board = { id: string; name: string; language: string; rows: number; cols: number; homePageId: string; version: number; pages: Page[] };
 type Page = { id: string; name: string; cells: Cell[] };
-type Cell = { id: string; row: number; col: number; kind: string; label: string; say: string | null; picture: { kind: string; symbolId?: string; mediaId?: string; url?: string } | null; wordClass: string; targetPageId: string | null; hidden: boolean; audio?: { mediaId: string; url?: string } | null };
+type Cell = { id: string; row: number; col: number; kind: string; label: string; say: string | null; picture: { kind: string; symbolId?: string; mediaId?: string; url?: string } | null; wordClass: string; targetPageId: string | null; affix?: string | null; hidden: boolean; audio?: { mediaId: string; url?: string } | null };
 type Template = Board & { scope: string; builtIn: boolean; builtInKey: string | null; canEdit: boolean };
 
 async function png() {
@@ -39,7 +39,7 @@ function fields(b: Pick<Board, "name" | "language" | "rows" | "cols" | "homePage
   };
 }
 
-const cell = (row: number, col: number, label: string, over: Partial<Cell> = {}): Cell => ({ id: randomUUID(), row, col, kind: "word", label, say: null, picture: null, wordClass: "misc", targetPageId: null, hidden: false, ...over });
+const cell = (row: number, col: number, label: string, over: Partial<Cell> = {}): Cell => ({ id: randomUUID(), row, col, kind: "word", label, say: null, picture: null, wordClass: "misc", targetPageId: null, affix: null, hidden: false, ...over });
 
 function smallBoard(over: Partial<Board> = {}) {
   const home = randomUUID();
